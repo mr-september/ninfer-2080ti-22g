@@ -145,9 +145,10 @@ void w8_pair_splitk_medium_launch(W8PairScheduleId schedule, const Tensor& x,
             return;
         }
         break;
+#if defined(NINFER_SM75)
     case W8PairScheduleId::DualSplitKMediumC80:
         if (x.ne[1] <= 80) {
-            launch_medium<80, 4, 2, 1>(x, first_weight, second_weight, first_out, second_out,
+            launch_medium<80, 2, 2, 1>(x, first_weight, second_weight, first_out, second_out,
                                        stream);
             CUDA_CHECK(cudaGetLastError());
             return;
@@ -155,7 +156,7 @@ void w8_pair_splitk_medium_launch(W8PairScheduleId schedule, const Tensor& x,
         break;
     case W8PairScheduleId::DualSplitKMediumC88:
         if (x.ne[1] <= 88) {
-            launch_medium<88, 4, 1, 1>(x, first_weight, second_weight, first_out, second_out,
+            launch_medium<88, 2, 1, 1>(x, first_weight, second_weight, first_out, second_out,
                                        stream);
             CUDA_CHECK(cudaGetLastError());
             return;
@@ -163,12 +164,69 @@ void w8_pair_splitk_medium_launch(W8PairScheduleId schedule, const Tensor& x,
         break;
     case W8PairScheduleId::DualSplitKMediumC96:
         if (x.ne[1] <= 96) {
-            launch_medium<96, 4, 1, 1>(x, first_weight, second_weight, first_out, second_out,
+            launch_medium<96, 2, 2, 1>(x, first_weight, second_weight, first_out, second_out,
                                        stream);
             CUDA_CHECK(cudaGetLastError());
             return;
         }
         break;
+    case W8PairScheduleId::DualSplitKMediumC104:
+        if (x.ne[1] <= 104) {
+            launch_medium<104, 2, 1, 1>(x, first_weight, second_weight, first_out, second_out,
+                                        stream);
+            CUDA_CHECK(cudaGetLastError());
+            return;
+        }
+        break;
+    case W8PairScheduleId::DualSplitKMediumC112:
+        if (x.ne[1] <= 112) {
+            launch_medium<112, 2, 2, 1>(x, first_weight, second_weight, first_out, second_out,
+                                        stream);
+            CUDA_CHECK(cudaGetLastError());
+            return;
+        }
+        break;
+    case W8PairScheduleId::DualSplitKMediumC128:
+        if (x.ne[1] <= 128) {
+            launch_medium<128, 2, 2, 2>(x, first_weight, second_weight, first_out, second_out,
+                                        stream);
+            CUDA_CHECK(cudaGetLastError());
+            return;
+        }
+        break;
+    case W8PairScheduleId::DualSplitKMediumC160:
+        if (x.ne[1] <= 160) {
+            launch_medium<160, 2, 2, 2>(x, first_weight, second_weight, first_out, second_out,
+                                        stream);
+            CUDA_CHECK(cudaGetLastError());
+            return;
+        }
+        break;
+    case W8PairScheduleId::DualSplitKMediumC192:
+        if (x.ne[1] <= 192) {
+            launch_medium<160, 2, 2, 2>(x, first_weight, second_weight, first_out, second_out,
+                                        stream);
+            CUDA_CHECK(cudaGetLastError());
+            return;
+        }
+        break;
+    case W8PairScheduleId::DualSplitKMediumC224:
+        if (x.ne[1] <= 224) {
+            launch_medium<160, 2, 2, 2>(x, first_weight, second_weight, first_out, second_out,
+                                        stream);
+            CUDA_CHECK(cudaGetLastError());
+            return;
+        }
+        break;
+    case W8PairScheduleId::DualSplitKMediumC256:
+        if (x.ne[1] <= 256) {
+            launch_medium<160, 2, 2, 2>(x, first_weight, second_weight, first_out, second_out,
+                                        stream);
+            CUDA_CHECK(cudaGetLastError());
+            return;
+        }
+        break;
+#else
     case W8PairScheduleId::DualSplitKMediumC104:
         if (x.ne[1] <= 104) {
             launch_medium<104, 4, 1, 1>(x, first_weight, second_weight, first_out, second_out,
@@ -225,6 +283,7 @@ void w8_pair_splitk_medium_launch(W8PairScheduleId schedule, const Tensor& x,
             return;
         }
         break;
+#endif
     default:
         break;
     }

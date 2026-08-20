@@ -1267,6 +1267,7 @@ void sparse_moe_prefill_launch(const Tensor& x, const SparseMoeWeights& weights,
                     routed_sum, shared_scale, output, tokens, nullptr);
         }
         CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaStreamSynchronize(stream));
     }
 }
 

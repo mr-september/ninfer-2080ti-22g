@@ -38,7 +38,7 @@ struct GemmCfg {
                                           STAGES_ * (BM_ * GROUPS_PER_BK * (32 + 16 + SCALE_BYTES));
 
     static_assert(BK_ % 64 == 0, "GemmCfg: BK must be a multiple of 64");
-    static_assert(STAGES_ >= 2, "GemmCfg: cp.async pipeline requires at least two stages");
+    static_assert(STAGES_ >= 1, "GemmCfg: pipeline requires at least one stage");
     static_assert(BM_ % WM_ == 0 && BN_ % WN_ == 0,
                   "GemmCfg: block tile must divide into warp tiles");
     static_assert(WM_ % 16 == 0 && WN_ % 8 == 0, "GemmCfg: warp tile must use m16n8 multiples");

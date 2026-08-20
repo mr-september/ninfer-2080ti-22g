@@ -596,9 +596,19 @@ void validate_target_options(DeviceContext& device, const EngineOptions& options
         }
         break;
     }
+#if defined(NINFER_SM75)
+    if (device.sm() != 75) {
+        throw std::invalid_argument("Qwen3.6 family runtime requires compute capability 7.5");
+    }
+#elif defined(NINFER_SM86)
+    if (device.sm() != 86) {
+        throw std::invalid_argument("Qwen3.6 family runtime requires compute capability 8.6");
+    }
+#else
     if (device.sm() != 120) {
         throw std::invalid_argument("Qwen3.6 family runtime requires compute capability 12.0");
     }
+#endif
 }
 
 std::unique_ptr<SequencePlanImpl> build_sequence_candidate(const SequencePlanningInputs& inputs,
@@ -636,8 +646,13 @@ std::unique_ptr<SequencePlanImpl> build_sequence_candidate(const SequencePlannin
         // each reachable node-topology class. These bounds cover the largest profile installed in
         // each class and the driver/module state materialized while qualifying all definitions.
         if (impl->speculative_backend == SpeculativeBackend::None) {
+#if defined(NINFER_SM75)
+            impl->graph_allowance_bytes = checked_mul(64ULL * kMiB, impl->max_concurrency,
+                                                      "ordinary exact-b graph allowance");
+#else
             impl->graph_allowance_bytes = checked_mul(12ULL * kMiB, impl->max_concurrency,
                                                       "ordinary exact-b graph allowance");
+#endif
         } else if (impl->speculative_backend == SpeculativeBackend::Mtp) {
             const auto profiles = mtp_graph_profiles(impl->capacity, impl->draft_window);
             const std::size_t per_batch_allowance = graph_topology_allowance(
@@ -646,7 +661,11 @@ std::unique_ptr<SequencePlanImpl> build_sequence_candidate(const SequencePlannin
                     const std::uint64_t final_visible = std::min<std::uint64_t>(
                         impl->capacity,
                         static_cast<std::uint64_t>(profile.max) + 2ULL * impl->draft_window);
+#if defined(NINFER_SM75)
+                    return (final_visible <= 4096 ? 64ULL : 96ULL) * kMiB;
+#else
                     return (final_visible <= 4096 ? 12ULL : 82ULL) * kMiB;
+#endif
                 },
                 "MTP graph allowance");
             impl->graph_allowance_bytes = checked_mul(per_batch_allowance, impl->max_concurrency,

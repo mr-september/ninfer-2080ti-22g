@@ -23,11 +23,16 @@ __device__ __forceinline__ float exp2_approx(float x) {
 }
 
 __device__ __forceinline__ std::uint32_t pack_bf16x2(float lo, float hi) {
+#if defined(NINFER_SM75)
+    __nv_bfloat162 b = __floats2bfloat162_rn(lo, hi);
+    return *reinterpret_cast<const std::uint32_t*>(&b);
+#else
     std::uint32_t out;
     const std::uint32_t lo_bits = __float_as_uint(lo);
     const std::uint32_t hi_bits = __float_as_uint(hi);
     asm volatile("cvt.rn.bf16x2.f32 %0, %1, %2;\n" : "=r"(out) : "r"(hi_bits), "r"(lo_bits));
     return out;
+#endif
 }
 
 __device__ __forceinline__ float2 bf16x2_to_float2(__nv_bfloat162 value) {

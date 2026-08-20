@@ -53,10 +53,22 @@ struct W8SmallTMmaSchedule {
     static constexpr int kScaleBytesPerRow  = kGroupK / 16;
 };
 
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ <= 750
+template <int TileTokens, int ActiveTokens>
+using W8SmallTMmaDefaultSchedule = W8SmallTMmaSchedule<
+    TileTokens <= 32 ? 8 : 4, TileTokens, TileTokens == 8 ? 5 : (TileTokens == 16 ? 4 : (TileTokens == 24 ? 3 : 2)),
+    (ActiveTokens > 4 ? W8SmallTMmaScaleAccess::Shared : W8SmallTMmaScaleAccess::Direct)>;
+#elif defined(NINFER_SM75)
+template <int TileTokens, int ActiveTokens>
+using W8SmallTMmaDefaultSchedule = W8SmallTMmaSchedule<
+    TileTokens <= 32 ? 8 : 4, TileTokens, TileTokens == 8 ? 5 : (TileTokens == 16 ? 4 : (TileTokens == 24 ? 3 : 2)),
+    (ActiveTokens > 4 ? W8SmallTMmaScaleAccess::Shared : W8SmallTMmaScaleAccess::Direct)>;
+#else
 template <int TileTokens, int ActiveTokens>
 using W8SmallTMmaDefaultSchedule = W8SmallTMmaSchedule<
     8, TileTokens, TileTokens == 8 ? 5 : (TileTokens == 16 ? 4 : (TileTokens == 24 ? 3 : 2)),
     (ActiveTokens > 4 ? W8SmallTMmaScaleAccess::Shared : W8SmallTMmaScaleAccess::Direct)>;
+#endif
 
 using W8VocabularyProjectionGeometry   = W8LinearGeometry<248320, 5120>;
 using W8MtpInputProjectionGeometry     = W8LinearGeometry<5120, 10240>;
@@ -203,8 +215,16 @@ struct W8LinearSmallTProductionSchedule<W835bMtpProjectionGeometry, ActiveTokens
                                        : ActiveTokens <= 32 ? 32
                                        : ActiveTokens <= 40 ? 40
                                                             : 48;
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ <= 750
+    static constexpr int kKWarps     = ActiveTokens <= 32 ? 8 : 4;
+    static constexpr int kMinBlocks  = 2;
+#elif defined(NINFER_SM75)
+    static constexpr int kKWarps     = ActiveTokens <= 32 ? 8 : 4;
+    static constexpr int kMinBlocks  = 2;
+#else
     static constexpr int kKWarps     = ActiveTokens <= 12 ? 16 : 8;
     static constexpr int kMinBlocks  = kKWarps == 16 ? 1 : 2;
+#endif
     static constexpr auto kScaleAccess =
         ActiveTokens > 4 ? W8SmallTMmaScaleAccess::Shared : W8SmallTMmaScaleAccess::Direct;
     static constexpr auto kActivationCache =

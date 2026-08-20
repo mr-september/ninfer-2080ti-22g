@@ -27,9 +27,14 @@ void launch_active_cols(const Tensor& x, const Weight& weight, Tensor& residual_
                              : ActiveCols <= 32 ? 32
                              : ActiveCols <= 40 ? 40
                                                 : 48;
+#if defined(NINFER_SM75)
+    constexpr int KWarps    = ActiveCols <= 32 ? 8 : 4;
+    constexpr int MinBlocks = 2;
+#else
     constexpr int KWarps =
         Hidden == 4096 ? (ActiveCols <= 12 ? 16 : 8) : (ActiveCols <= 32 ? 8 : 4);
     constexpr int MinBlocks = Hidden == 4096 ? (KWarps == 16 ? 1 : 2) : (ActiveCols <= 32 ? 2 : 3);
+#endif
     constexpr auto ScaleAccess =
         ActiveCols > 4 ? W8SmallTMmaScaleAccess::Shared : W8SmallTMmaScaleAccess::Direct;
     constexpr auto ActivationCache =
@@ -102,6 +107,27 @@ void w8_linear_add_medium_splitk_launch(const Tensor& x, const Weight& weight, T
     if ((weight.k != 4096 && weight.k != 6144) || t < 49 || t > 128) {
         throw std::invalid_argument("W8 linear_add medium split-K requires T=49..128");
     }
+#if defined(NINFER_SM75)
+    if (t <= 64) {
+        dispatch_medium_shape<64, 2, 2, 1>(x, weight, residual_out, stream);
+    } else if (t == 65) {
+        dispatch_medium_shape<80, 2, 2, 1>(x, weight, residual_out, stream);
+    } else if (t <= 72) {
+        dispatch_medium_shape<72, 2, 3, 1>(x, weight, residual_out, stream);
+    } else if (t <= 80) {
+        dispatch_medium_shape<80, 2, 2, 1>(x, weight, residual_out, stream);
+    } else if (t <= 96) {
+        dispatch_medium_shape<96, 2, 2, 1>(x, weight, residual_out, stream);
+    } else if (t <= 112) {
+        dispatch_medium_shape<112, 2, 2, 1>(x, weight, residual_out, stream);
+    } else if (t <= 120) {
+        dispatch_medium_shape<120, 2, 3, 1>(x, weight, residual_out, stream);
+    } else if (t <= 125) {
+        dispatch_medium_shape<128, 2, 2, 1>(x, weight, residual_out, stream);
+    } else {
+        dispatch_medium_shape<128, 2, 2, 1>(x, weight, residual_out, stream);
+    }
+#else
     if (t <= 64) {
         dispatch_medium_shape<64, 8, 4, 1>(x, weight, residual_out, stream);
     } else if (t == 65) {
@@ -121,6 +147,7 @@ void w8_linear_add_medium_splitk_launch(const Tensor& x, const Weight& weight, T
     } else {
         dispatch_medium_shape<128, 4, 8, 1>(x, weight, residual_out, stream);
     }
+#endif
     CUDA_CHECK(cudaGetLastError());
 }
 

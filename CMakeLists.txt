@@ -1,18 +1,18 @@
 cmake_minimum_required(VERSION 3.28)
 
-# The current implementation is compiled only for sm_120a. Set and validate the
-# architecture before CUDA compiler detection so CMake never injects a generic
-# host-toolchain default or accepts an unsupported target.
+# Supported architectures: 75 (Turing), 86 (Ampere), 120a (Blackwell)
 if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-  set(CMAKE_CUDA_ARCHITECTURES 120a CACHE STRING "CUDA architectures to build")
+  set(CMAKE_CUDA_ARCHITECTURES 75 CACHE STRING "CUDA architectures to build")
 endif()
-if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "120a")
+if(NOT (CMAKE_CUDA_ARCHITECTURES STREQUAL "75" OR
+        CMAKE_CUDA_ARCHITECTURES STREQUAL "86" OR
+        CMAKE_CUDA_ARCHITECTURES STREQUAL "120a"))
   message(FATAL_ERROR
-    "NInfer supports only CMAKE_CUDA_ARCHITECTURES=120a; got "
+    "NInfer supports only CMAKE_CUDA_ARCHITECTURES=75, 86, or 120a; got "
     "'${CMAKE_CUDA_ARCHITECTURES}'")
 endif()
 
-project(ninfer LANGUAGES C CXX CUDA)
+project(ninfer-2080ti-22g LANGUAGES C CXX CUDA)
 
 # --- Global settings ---------------------------------------------------------
 option(NINFER_BUILD_APPS "Build the NInfer CLI and server" ON)
@@ -33,10 +33,18 @@ if(CMAKE_GENERATOR MATCHES "Ninja")
   set(CMAKE_JOB_POOL_LINK cuda_link)
 endif()
 
-if(CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 13.1)
+if(CMAKE_CUDA_COMPILER_VERSION VERSION_LESS 12.8)
   message(FATAL_ERROR
-    "NInfer requires CUDA 13.1 or newer; found CUDA compiler "
+    "NInfer requires CUDA 12.8 or newer; found CUDA compiler "
     "${CMAKE_CUDA_COMPILER_VERSION}")
+endif()
+
+if(CMAKE_CUDA_ARCHITECTURES STREQUAL "75")
+  add_compile_definitions(NINFER_SM75=1)
+elseif(CMAKE_CUDA_ARCHITECTURES STREQUAL "86")
+  add_compile_definitions(NINFER_SM86=1)
+elseif(CMAKE_CUDA_ARCHITECTURES STREQUAL "120a")
+  add_compile_definitions(NINFER_SM120A=1)
 endif()
 
 set(NINFER_BUILD_MEDIA_ACQUIRE OFF)

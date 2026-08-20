@@ -1,9 +1,9 @@
-# NInfer
+# NInfer (`ninfer-2080ti-22g`)
 
-> Selected checkpoints. Maximum single-GPU inference performance.
+> Selected checkpoints. Maximum single-GPU inference performance on NVIDIA Turing (RTX 2080 Ti 22GB / `sm_75`).
 
 NInfer is a from-scratch C++/CUDA inference engine for explicitly registered Qwen checkpoints on a
-single NVIDIA GeForce RTX 5090. It runs text, image, and video prompts through a local CLI or
+single GPU (including RTX 2080 Ti 22GB and RTX 5090). It runs text, image, and video prompts through a local CLI or
 OpenAI-/Anthropic-compatible HTTP APIs.
 
 NInfer deliberately supports a closed set of model artifacts instead of acting as a general model

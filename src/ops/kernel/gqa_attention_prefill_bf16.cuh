@@ -118,7 +118,7 @@ __launch_bounds__(kGqaPrefillThreads, 1) __global__
     constexpr float Log2E       = 1.4426950408889634074f;
     constexpr unsigned FullMask = 0xffffffffu;
 
-    static_assert(Threads == 128);
+    static_assert(Threads == kGqaPrefillThreads);
 
     extern __shared__ __align__(16) __nv_bfloat16 gqa_smem[];
     __nv_bfloat16* q_s = gqa_smem;     // [Br, D] swizzled
@@ -218,7 +218,7 @@ __launch_bounds__(kGqaPrefillThreads, 1) __global__
     // Fold softmax_scale into the exp2 (FA-style): scores stay raw, so the
     // per-element "* scale" multiply drops out of the QK epilogue entirely.
     const float scale_l2 = scale * Log2E;
-    int physical_page    = block_table[0];
+    int physical_page    = paged_kv_physical_page(block_table, 0);
 
     // Prologue: commit Q, then kick off K(0). The loop's wait<0> below drains both.
     ninfer::ops::cp_commit();
@@ -227,7 +227,9 @@ __launch_bounds__(kGqaPrefillThreads, 1) __global__
 
     for (int kb = 0; kb < n_block_max; ++kb) {
         const int k0                 = kb * Bc;
-        const int next_physical_page = (kb + 1 < n_block_max) ? block_table[kb + 1] : physical_page;
+        const int next_physical_page = (kb + 1 < n_block_max)
+                                           ? paged_kv_physical_page(block_table, (kb + 1) * Bc)
+                                           : physical_page;
 
         ninfer::ops::cp_wait<0>(); // K(kb) landed (also publishes q_s / prev PV done)
         __syncthreads();

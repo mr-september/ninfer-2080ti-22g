@@ -16,10 +16,17 @@
 
 namespace ninfer::ops {
 
+#if defined(NINFER_SM75)
+inline constexpr int kGqaPrefillI8Warps      = 8;
+inline constexpr int kGqaPrefillI8Threads    = kGqaPrefillI8Warps * 32;
+inline constexpr int kGqaPrefillI8Br         = 32;
+inline constexpr int kGqaPrefillI8Bc         = 32;
+#else
 inline constexpr int kGqaPrefillI8Warps      = 16;
 inline constexpr int kGqaPrefillI8Threads    = kGqaPrefillI8Warps * 32;
 inline constexpr int kGqaPrefillI8Br         = 64;
 inline constexpr int kGqaPrefillI8Bc         = 64;
+#endif
 inline constexpr int kGqaPrefillI8Groups     = kGqaPrefillHeadDim / kGqaKvQuantGroup;
 inline constexpr int kGqaPrefillI8DB16       = kGqaPrefillHeadDim / 2;
 inline constexpr int kGqaPrefillI8RowTiles   = kGqaPrefillI8Br / 16;
@@ -45,7 +52,11 @@ inline constexpr int kGqaPrefillI8SmemBytes = kGqaPrefillI8QBytes + kGqaPrefillI
 
 static_assert(kGqaPrefillI8Groups == 4);
 static_assert(kGqaPrefillI8DConsumers == 4);
+#if defined(NINFER_SM75)
+static_assert(kGqaPrefillI8SmemBytes == 44288);
+#else
 static_assert(kGqaPrefillI8SmemBytes == 92672);
+#endif
 
 __device__ __forceinline__ void gqa_prefill_i8_store_swz(std::int8_t* tile, int row, int d,
                                                          std::int8_t code) {

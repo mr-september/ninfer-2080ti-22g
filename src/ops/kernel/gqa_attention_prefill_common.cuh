@@ -18,9 +18,15 @@ namespace ninfer::ops {
 
 inline constexpr int kGqaPrefillHeadDim = 256;
 
+#if defined(NINFER_SM75)
+inline constexpr int kGqaPrefillBr        = 32;
+inline constexpr int kGqaPrefillBc        = 32;
+inline constexpr int kGqaPrefillThreads   = 64;
+#else
 inline constexpr int kGqaPrefillBr        = 64;
 inline constexpr int kGqaPrefillBc        = 64;
 inline constexpr int kGqaPrefillThreads   = 128;
+#endif
 inline constexpr int kGqaPrefillSmemBytes = (kGqaPrefillBr + 2 * kGqaPrefillBc) *
                                             kGqaPrefillHeadDim *
                                             static_cast<int>(sizeof(__nv_bfloat16));

@@ -395,20 +395,19 @@ std::size_t valid_utf8_prefix_size(std::string_view bytes) {
             codepoint = lead & 0x07U;
             minimum   = 0x10000U;
         } else {
-            throw std::invalid_argument("invalid UTF-8 leading byte in generated token stream");
+            return offset;
         }
         if (offset + length > bytes.size()) { return offset; }
         for (std::size_t index = 1; index < length; ++index) {
             const auto byte = static_cast<unsigned char>(bytes[offset + index]);
             if ((byte & 0xc0U) != 0x80U) {
-                throw std::invalid_argument(
-                    "invalid UTF-8 continuation byte in generated token stream");
+                return offset;
             }
             codepoint = (codepoint << 6U) | (byte & 0x3fU);
         }
         if (codepoint < minimum || (codepoint >= 0xd800U && codepoint <= 0xdfffU) ||
             codepoint > 0x10ffffU) {
-            throw std::invalid_argument("invalid UTF-8 codepoint in generated token stream");
+            return offset;
         }
         offset += length;
     }
