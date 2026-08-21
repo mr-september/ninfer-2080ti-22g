@@ -205,9 +205,10 @@ void validate_tokenizer_config(const FrontendResources& resources) {
     }
 }
 
-fi::CompiledChatTemplate compile_chat_template(const FrontendResources& resources) {
+fi::CompiledChatTemplate compile_chat_template(const FrontendResources& resources,
+                                            ChatStyle chat_style) {
     validate_tokenizer_config(resources);
-    return fi::CompiledChatTemplate::resolve(resources.chat_template_jinja);
+    return fi::CompiledChatTemplate::resolve(resources.chat_template_jinja, chat_style);
 }
 
 [[noreturn]] void throw_processor_error(const fi::ProcessorError& error) {
@@ -283,6 +284,7 @@ fi::ChatRenderOptions render_options(const PromptOptions& options) {
                                  .reasoning_effort      = options.reasoning_effort,
                                  .preserve_thinking     = options.preserve_thinking,
                                  .add_vision_id         = options.add_vision_id,
+                                 .chat_style            = options.chat_style,
                                  .tool_jsons            = options.tool_jsons};
 }
 
@@ -395,19 +397,20 @@ std::size_t valid_utf8_prefix_size(std::string_view bytes) {
             codepoint = lead & 0x07U;
             minimum   = 0x10000U;
         } else {
-            return offset;
+            throw std::invalid_argument("invalid UTF-8 leading byte in generated token stream");
         }
         if (offset + length > bytes.size()) { return offset; }
         for (std::size_t index = 1; index < length; ++index) {
             const auto byte = static_cast<unsigned char>(bytes[offset + index]);
             if ((byte & 0xc0U) != 0x80U) {
-                return offset;
+                throw std::invalid_argument(
+                    "invalid UTF-8 continuation byte in generated token stream");
             }
             codepoint = (codepoint << 6U) | (byte & 0x3fU);
         }
         if (codepoint < minimum || (codepoint >= 0xd800U && codepoint <= 0xdfffU) ||
             codepoint > 0x10ffffU) {
-            return offset;
+            throw std::invalid_argument("invalid UTF-8 codepoint in generated token stream");
         }
         offset += length;
     }
@@ -594,7 +597,7 @@ DecoderState terminal_state(DecoderState state) {
 class Frontend::Impl {
 public:
     Impl(const FrontendResources& resources, bool registered_checkpoint, FrontendOptions options)
-        : chat_template(compile_chat_template(resources)),
+        : chat_template(compile_chat_template(resources, options.chat_style)),
           tokenizer(std::make_shared<const fi::Tokenizer>(
               fi::TokenizerResources{.tokenizer_json         = resources.tokenizer_json,
                                      .tokenizer_config_json  = resources.tokenizer_config_json,

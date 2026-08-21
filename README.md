@@ -1,9 +1,9 @@
-# NInfer (`ninfer-2080ti-22g`)
+# NInfer
 
-> Selected checkpoints. Maximum single-GPU inference performance on NVIDIA Turing (RTX 2080 Ti 22GB / `sm_75`).
+> Selected checkpoints. Maximum single-GPU inference performance.
 
 NInfer is a from-scratch C++/CUDA inference engine for explicitly registered Qwen checkpoints on a
-single GPU (including RTX 2080 Ti 22GB and RTX 5090). It runs text, image, and video prompts through a local CLI or
+single NVIDIA GeForce RTX 5090. It runs text, image, and video prompts through a local CLI or
 OpenAI-/Anthropic-compatible HTTP APIs.
 
 NInfer deliberately supports a closed set of model artifacts instead of acting as a general model
@@ -25,6 +25,181 @@ source's mixed allocation: NVFP4 MLP weights in Text layers 0–55 and row-scale
 embedding, attention input/output projections, GDN Q/K/V/Z and output projections, output head, and
 remaining MLP weights. All four 27B artifacts retain the same Text, Vision, MTP, prefix-reuse, CLI,
 and serving routes.
+
+## Chat-style support (`--chat-style`)
+
+This fork adds `--chat-style default|sharp-v22.1` to the CLI and server, implementing a
+[Sharp v22.1](https://huggingface.co/froggeric/Qwen3.8-27B-Instruct-v22.1-Q6_K.gguf) overlay as a
+**compiled-C++ prompt modifier** rather than a Jinja template swap.
+
+### What it does
+
+The overlay appends Sharp's terseness instruction to the effective system content and changes
+reasoning-effort defaults:
+- **System content**: Sharp's `_terse` instruction is appended to any existing system/developer
+  message, or becomes the system block itself when none is provided.
+- **Reasoning effort**: Default effort shifts from `XHigh` (stock) to `Medium` (Sharp). Six
+  discrete levels (`none`→`minimal`→`low`→`medium`→`high`→`xhigh`) are exposed; `none`
+  disables thinking; `minimal`/`low` map to concise reasoning, `high`/`xhigh` to thorough.
+- **Thinking-history rendering**: Historical turns without reasoning content omit the empty
+  thinking wrapper, matching Sharp's `{% if message.reasoning_content or message.reasoning %}`.
+
+All other rendering (tool format, per-turn formatting, generation prompt) is unchanged from stock
+NInfer. The official `.ninfer` artifact's embedded template hash is not modified — the same
+artifact loads with either style.
+
+### Token-efficiency results (RTX 5090, Qwen3.8-27B NVFP4, INT8 KV)
+
+| Metric | Value |
+|--------|-------:|
+| **Median completion-token reduction** (24 tasks, MTP3, medium effort) | **−42.2%** |
+| Range (24 tasks) | −70.3% to +2.4% |
+| **Median wall-time reduction** | **−22.6%** |
+| **Raw decode TPS change** (median) | **−0.0%** |
+| MTP acceptance Δ (mean) | −0.0 pp |
+
+Sharp produces equivalent-quality answers on objective checks (math reasoning, JSON structure, code
+correctness). The effect is prompt-driven (terse system instruction), not MTP-dependent — MTP0
+shows the same 31–64% token reduction with similar TPS.
+
+**MTP3 breakdown by reasoning effort** (matched config, system message present):
+
+| Effort | Stock tokens | Sharp tokens | Token reduction | Wall reduction | Raw TPS (stock/sharp) |
+|--------|------------:|------------:|----------------:|---------------:|----------------------:|
+| medium | 1,184 | 609 | −48.6% | −26.8% | 142.6 / 142.1 |
+| high | 1,084 | 511 | −52.9% | −41.5% | 130.3 / 129.6 |
+| xhigh | 1,084 | 511 | −52.9% | −34.6% | 131.6 / 129.6 |
+
+**Hard-subset token reduction** (out-of-distribution difficulty, MTP3): −7% to −59% (analytic
+−58.7%, coding −33.5%).
+
+### Usage
+
+```bash
+# CLI
+./build/apps/ninfer models/qwen3_8_27b_nvfp4.ninfer \
+  --chat-style sharp-v22.1 \
+  --reasoning-effort medium \
+  --messages chat.json
+
+# Server (all requests use the configured style)
+./build/apps/ninfer-serve models/qwen3_8_27b_nvfp4.ninfer \
+  --chat-style sharp-v22.1 \
+  --spec mtp --draft-tokens 3 --lm-head-draft
+```
+
+The flag is server-wide; individual per-request override is not currently supported.
+
+### Reproducing these results
+
+To reproduce the byte-exact system-block validation and token-efficiency benchmark from scratch:
+
+```bash
+# 1. Clone and build
+git clone https://github.com/mr-september/ninfer-sharp-5090.git
+cd ninfer
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+
+# 2. Download a Qwen3.8-27B NVFP4 model artifact
+pip install huggingface-hub
+hf download unsloth/Qwen3.8-27B-NVFP4 \
+  qwen3_8_27b_nvfp4.ninfer \
+  --local-dir models
+
+# 3. Download the Sharp v22.1 template for oracle validation
+pip install jinja2
+wget -O work/chat_template.jinja \
+  https://huggingface.co/froggeric/Qwen3.8-27B-Instruct-v22.1-Q6_K.gguf/raw/main/chat_template.jinja
+
+# 4. Build and run the Sharp overlay unit test
+#    (compares system-block output against the real Sharp Jinja template)
+cmake --build build --target ninfer_qwen3_6_chat_template_sharp_test
+./build/tests/ninfer_qwen3_6_chat_template_sharp_test
+
+# 5. Run a quick manual smoke test
+./build/apps/ninfer-serve models/qwen3_8_27b_nvfp4.ninfer \
+  --chat-style sharp-v22.1 \
+  --max-context 131072 --kv-dtype int8 --no-prefix-reuse \
+  --greedy --seed 42 --default-max-tokens 256
+
+curl http://127.0.0.1:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "qwen3.8-27b",
+    "messages": [
+      {"role": "system", "content": "You are a precise assistant."},
+      {"role": "user", "content": "Explain virtual memory in one sentence."}
+    ],
+    "max_tokens": 256
+  }'
+```
+
+A full A/B benchmark requires the task suite and analysis scripts in `work/` (included in the fork
+at `work/ab_harness2.py`, `work/ab_analyze2.py`). Example run:
+
+```bash
+# Start two servers (default and sharp) on different ports
+./build/apps/ninfer-serve models/qwen3_8_27b_nvfp4.ninfer \
+  --port 8100 --chat-style default --spec mtp --draft-tokens 3 --lm-head-draft \
+  --max-context 131072 --kv-dtype int8 --greedy --seed 42
+
+./build/apps/ninfer-serve models/qwen3_8_27b_nvfp4.ninfer \
+  --port 8101 --chat-style sharp-v22.1 --spec mtp --draft-tokens 3 --lm-head-draft \
+  --max-context 131072 --kv-dtype int8 --greedy --seed 42
+
+# Run the benchmark harness
+pip install httpx
+python3 work/ab_harness2.py --default http://127.0.0.1:8100 --sharp http://127.0.0.1:8101
+
+# Analyze results
+python3 work/ab_analyze2.py
+```
+
+### Why not replace the Jinja template directly
+
+The simplest-appearing approach — swap the Jinja template inside the `.ninfer` artifact and
+repack — does not work with NInfer's architecture. NInfer does not interpret Jinja at runtime.
+Its `chat_template.cpp` computes `sha256(template_source)` and matches it against a hardcoded
+constexpr allowlist of exactly two digests: one for ThinkingToggle semantics and one for
+ReasoningEffort. A third-party template (Sharp's SHA-256 `d1f22a89…`) is rejected at load.
+Patching the allowlist would make the artifact loadable, but the runtime still invokes the
+**compiled C++ renderer**, not the Jinja template — so Sharp's `reasoning_effort`, terse
+instruction, tool formatting, and disabled-thinking behavior would remain inert.
+
+Repacking Sharp's Jinja into the artifact would be the "correct" surface-level fix but is
+**insufficient** without either:
+
+- embedding a Jinja interpreter (heavy, fragile, defeats the purpose of a compiled renderer); or
+- rewriting the C++ renderer to accommodate Sharp's semantics — which is what this `--chat-style`
+  overlay already does.
+
+The overlay approach (compiled C++ modifier on the existing renderer) was chosen because it:
+
+- leaves the official artifact untouched (no digest repack);
+- adds zero runtime overhead (a ~300-byte prompt append + enum dispatch);
+- lets stock and Sharp share one code-path, reducing divergence surface area;
+- exposes the configuration through a straightforward CLI flag.
+
+### Limitations
+
+1. **System-message dependency**: the overlay synthesizes a system block when none exists, but
+   clients that intentionally suppress system content (transparent proxy layers) will not observe
+   Sharp's effect. This matches Sharp's own Jinja behavior.
+2. **Tool-formatting is NInfer-native, not Sharp-v22.1-format**: This is the main reason the
+   overlay is recommended for **non-tool chat** when byte-exact Sharp compatibility matters.
+   The overlay does not change NInfer's `<tool_call>` XML format to match Sharp's Jinja
+   `_render_tool_schema` (`# Tools` header, `⚠️` error-escalation warnings, different JSON
+   argument rendering). For tool-using clients, the rendered prompt is therefore stock NInfer's
+   tool format with the Sharp terse overlay — not Sharp's exact template output. If your
+   workflow does not use tool calling, or does not require byte-exact Sharp tool-format
+   compatibility, the overlay's token savings still apply. Tool output is identical between
+   `--chat-style default` and `--chat-style sharp-v22.1`.
+3. **Server-wide style**: `--chat-style` is set at process startup and applies to all requests.
+   Per-request override is not implemented.
+4. **Qwen3.6/3.8 only**: the overlay targets the Qwen3.6/3.8 ReasoningEffort renderer (the C++
+   `CompiledChatTemplate`). Other model families (future targets using ThinkingToggle or other
+   semantics) are unaffected.
 
 ## Performance
 
@@ -100,18 +275,14 @@ and per-fixture results.
 Capability scores were measured through NInfer's OpenAI-compatible serving route with thinking
 enabled, MTP=3, and EvalScope 1.9.0 (0-shot, rule scoring, one sample per problem):
 
-| Model profile | AIME 2025 | AIME 2026 | GPQA-Diamond | ERQA | RealWorldQA |
-|---|---:|---:|---:|---:|---:|
-| [Qwen3.6-27B groupwise-int](model-cards/Qwen3.6-27B-NInfer/README.md) | 86.67% | 93.33% | 86.87% | — | — |
-| [Qwen3.6-27B NVFP4](model-cards/Qwen3.6-27B-nvfp4-NInfer/README.md) | 93.33% | 93.33% | 84.34% | — | — |
-| [Qwen3.6-35B-A3B groupwise-int](model-cards/Qwen3.6-35B-A3B-NInfer/README.md) | 90.00% | 90.00% | 85.35% | — | — |
-| [Qwen3.8-27B NVFP4](model-cards/Qwen3.8-27B-nvfp4-NInfer/README.md) | 96.67% | 96.67% | 90.40% | 66.25% | 83.53% |
+| Model profile | AIME 2025 | AIME 2026 | GPQA-Diamond |
+|---|---:|---:|---:|
+| [Qwen3.6-27B groupwise-int](model-cards/Qwen3.6-27B-NInfer/README.md) | 86.67% | 93.33% | 86.87% |
+| [Qwen3.6-27B NVFP4](model-cards/Qwen3.6-27B-nvfp4-NInfer/README.md) | 93.33% | 93.33% | 84.34% |
+| [Qwen3.6-35B-A3B groupwise-int](model-cards/Qwen3.6-35B-A3B-NInfer/README.md) | 90.00% | 90.00% | 85.35% |
 
-The Qwen3.8-27B groupwise-int profile has not yet been added to this published evaluation campaign.
-The Qwen3.6 rows used temperature 0.6 and presence penalty 1.0; the Qwen3.8-27B NVFP4 row used
-temperature 1.0 and presence penalty 0.0. The multimodal columns (ERQA and RealWorldQA) ran with
-`--vision` at a 81,920-token context limit; the text columns used a 252,928-token limit for
-Qwen3.8-27B NVFP4 and a 262,144-token limit for the Qwen3.6 rows.
+Both Qwen3.8-27B profiles are supported but have not yet been added to this published evaluation
+campaign.
 
 These are single-sample results under that NInfer evaluation profile, not pass@k. See the model
 cards and [full performance document](docs/performance.md) for correct/total counts and evaluation

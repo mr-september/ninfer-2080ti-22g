@@ -95,8 +95,8 @@ std::string rstrip_newlines(std::string text) {
 
 // Split an assistant turn into (reasoning, content) exactly as the Qwen3.6 jinja
 // does when reasoning_content is not provided: reasoning is the text between the
-// last <think> and the first </think>; content is everything after the last
-// </think>. When there is no </think> the whole thing is content and reasoning is
+// last  thinking and the first  response; content is everything after the last
+//  response. When there is no  response the whole thing is content and reasoning is
 // empty.
 struct ThinkParts {
     std::string reasoning;
@@ -105,21 +105,21 @@ struct ThinkParts {
 
 ThinkParts derive_think_parts(const std::string& content) {
     ThinkParts parts;
-    const std::size_t first_close = content.find("</think>");
+    const std::size_t first_close = content.find(" response");
     if (first_close == std::string::npos) {
         parts.content = content;
         return parts;
     }
-    // reasoning = content.split('</think>')[0].rstrip('\n').split('<think>')[-1].lstrip('\n')
+    // reasoning = content.split(' response')[0].rstrip('\n').split(' thinking')[-1].lstrip('\n')
     std::string before          = rstrip_newlines(content.substr(0, first_close));
-    const std::size_t last_open = before.rfind("<think>");
+    const std::size_t last_open = before.rfind(" thinking");
     std::string reasoning       = (last_open == std::string::npos)
                                       ? before
-                                      : before.substr(last_open + std::string("<think>").size());
+                                      : before.substr(last_open + std::string(" thinking").size());
     parts.reasoning             = lstrip_newlines(std::move(reasoning));
-    // content = content.split('</think>')[-1].lstrip('\n')
-    const std::size_t last_close = content.rfind("</think>");
-    parts.content = lstrip_newlines(content.substr(last_close + std::string("</think>").size()));
+    // content = content.split(' response')[-1].lstrip('\n')
+    const std::size_t last_close = content.rfind(" response");
+    parts.content = lstrip_newlines(content.substr(last_close + std::string(" response").size()));
     return parts;
 }
 
@@ -226,14 +226,40 @@ std::string render_tools_system_block(const std::vector<std::string>& tool_jsons
     return rendered;
 }
 
-std::string_view resolve_reasoning_instructions(ChatTemplateSemantics semantics,
-                                                const ChatRenderOptions& options) {
-    if (semantics == ChatTemplateSemantics::ThinkingToggle) {
-        if (options.reasoning_effort) {
-            throw std::invalid_argument("loaded chat template does not support reasoning effort");
-        }
-        return {};
+// Emit a non-tools system block: <|im_start|>system\n[reasoning][\n\n][leading]<|im_end|>\n
+void emit_system_block(std::string& out, std::string_view reasoning_instructions,
+                       const std::string& leading_instruction) {
+    out += "<|im_start|>system\n";
+    if (!reasoning_instructions.empty()) {
+        out += reasoning_instructions;
+        if (!leading_instruction.empty()) { out += "\n\n"; }
     }
+    out += leading_instruction;
+    out += "<|im_end|>\n";
+}
+
+// Sharp v22.1 overlay: appends a terse steering instruction to the effective
+// system content. Applied at the leading-instruction resolution point so it
+// covers both the no-tools system block and the tools system block.
+static std::string apply_sharp_v22_1_system_overlay(std::string leading_instruction) {
+    // Verbatim from Sharp v22.1 chat_template.jinja (_terse block, lines 154-158).
+    constexpr std::string_view kSharpTerseInstruction =
+        "Answer directly, after thinking. Lead with the answer, then only what it needs to be "
+        "correct and usable.\n"
+        "Never: open with preamble or pleasantries; restate the question; add filler transitions; "
+        "hedge with niceties; or repeat a point you've already made.\n"
+        "Always: keep essential steps, caveats, uncertainties, and specifics \u2014 never drop "
+        "correctness or a needed warning for brevity. Keep the final answer lean. Use the least "
+        "structure that conveys it (plain prose when short; lists or code only when they earn their "
+        "place). If genuinely uncertain, say so and explain why \u2014 never omit uncertainty for the "
+        "sake of brevity.\n"
+        "If a user request is genuinely ambiguous, ask a sharp question, don't guess.";
+    if (!leading_instruction.empty()) { leading_instruction += "\n\n"; }
+    leading_instruction += std::string(kSharpTerseInstruction);
+    return leading_instruction;
+}
+
+std::string_view resolve_default_reasoning_instructions(const ChatRenderOptions& options) {
     if (!options.enable_thinking) {
         if (options.reasoning_effort) {
             throw std::invalid_argument(
@@ -241,13 +267,30 @@ std::string_view resolve_reasoning_instructions(ChatTemplateSemantics semantics,
         }
         return {};
     }
-
     switch (options.reasoning_effort.value_or(ReasoningEffort::XHigh)) {
     case ReasoningEffort::Low:
         return kLowReasoningInstructions;
     case ReasoningEffort::Medium:
         return {};
     case ReasoningEffort::XHigh:
+        return kXHighReasoningInstructions;
+    }
+    throw std::invalid_argument("invalid reasoning effort");
+}
+
+std::string_view resolve_sharp_reasoning_instructions(const ChatRenderOptions& options) {
+    // Sharp v22.1 silently ignores reasoning effort when thinking is disabled.
+    if (!options.enable_thinking) { return {}; }
+    switch (options.reasoning_effort.value_or(ReasoningEffort::Medium)) {
+    case ReasoningEffort::Medium:
+    case ReasoningEffort::None:
+        return {};
+    case ReasoningEffort::Minimal:
+    case ReasoningEffort::Low:
+        return kLowReasoningInstructions;
+    case ReasoningEffort::High:
+    case ReasoningEffort::XHigh:
+    case ReasoningEffort::Max:
         return kXHighReasoningInstructions;
     }
     throw std::invalid_argument("invalid reasoning effort");
@@ -289,13 +332,14 @@ std::string ChatMessage::rendered_content(bool add_vision_id, int* image_count,
     return out;
 }
 
-CompiledChatTemplate CompiledChatTemplate::resolve(std::string_view source) {
+CompiledChatTemplate CompiledChatTemplate::resolve(std::string_view source,
+                                                    ChatStyle chat_style) {
     const Sha256Digest digest = sha256(source);
     if (digest == kThinkingToggleTemplateDigest) {
-        return CompiledChatTemplate(ChatTemplateSemantics::ThinkingToggle);
+        return CompiledChatTemplate(ChatTemplateSemantics::ThinkingToggle, chat_style);
     }
     if (digest == kReasoningEffortTemplateDigest) {
-        return CompiledChatTemplate(ChatTemplateSemantics::ReasoningEffort);
+        return CompiledChatTemplate(ChatTemplateSemantics::ReasoningEffort, chat_style);
     }
     throw std::invalid_argument("unsupported frontend/chat_template.jinja (sha256 " +
                                 sha256_hex(digest) + ")");
@@ -309,6 +353,10 @@ PromptCapabilities CompiledChatTemplate::capabilities() const noexcept {
         result.reasoning_effort.medium         = true;
         result.reasoning_effort.xhigh          = true;
         result.reasoning_effort.default_effort = ReasoningEffort::XHigh;
+        if (chat_style_ == ChatStyle::SharpV22_1) {
+            result.reasoning_effort.high          = true;
+            result.reasoning_effort.default_effort = ReasoningEffort::Medium;
+        }
     }
     return result;
 }
@@ -319,7 +367,9 @@ RenderedChat CompiledChatTemplate::render(const std::vector<ChatMessage>& messag
 
     const bool effort_template = semantics_ == ChatTemplateSemantics::ReasoningEffort;
     const std::string_view reasoning_instructions =
-        resolve_reasoning_instructions(semantics_, options);
+        chat_style_ == ChatStyle::SharpV22_1
+            ? resolve_sharp_reasoning_instructions(options)
+            : resolve_default_reasoning_instructions(options);
 
     std::size_t message_begin = 0;
     std::string leading_instruction;
@@ -328,26 +378,19 @@ RenderedChat CompiledChatTemplate::render(const std::vector<ChatMessage>& messag
         leading_instruction = trim_ascii_whitespace(messages[0].rendered_content());
         message_begin       = 1;
     }
+    if (chat_style_ == ChatStyle::SharpV22_1) {
+        leading_instruction = apply_sharp_v22_1_system_overlay(std::move(leading_instruction));
+    }
 
     std::string rendered;
     const bool has_tools = !options.tool_jsons.empty();
     if (has_tools) {
         rendered += render_tools_system_block(options.tool_jsons, leading_instruction,
                                               reasoning_instructions);
-    } else if (message_begin == 1) {
-        if (!effort_template || !leading_instruction.empty() || !reasoning_instructions.empty()) {
-            rendered += "<|im_start|>system\n";
-            if (!reasoning_instructions.empty()) {
-                rendered += reasoning_instructions;
-                if (!leading_instruction.empty()) { rendered += "\n\n"; }
-            }
-            rendered += leading_instruction;
-            rendered += "<|im_end|>\n";
-        }
-    } else if (!reasoning_instructions.empty()) {
-        rendered += "<|im_start|>system\n";
-        rendered += reasoning_instructions;
-        rendered += "<|im_end|>\n";
+    } else if (!reasoning_instructions.empty() || !leading_instruction.empty()) {
+        // May seed a system block with terse overlay or reasoning instructions even when
+        // no explicit system/developer message is present (Sharp v22.1 always emits one).
+        emit_system_block(rendered, reasoning_instructions, leading_instruction);
     }
 
     const long last_query_index  = last_real_user_query(messages);
@@ -408,10 +451,17 @@ RenderedChat CompiledChatTemplate::render(const std::vector<ChatMessage>& messag
             rewrite_checkpoint = RewriteCheckpointByteSpec{
                 .kind = RewriteCheckpointKind::TurnClosure, .offset = rendered.size()};
         }
-        if (keep_thinking) {
-            rendered += "<think>\n";
+        // Sharp v22.1 omits the thinking wrapper entirely for history turns that carry no
+        // reasoning, matching its `{% if message.reasoning_content or message.reasoning %}` guard.
+        // Stock NInfer keeps an empty wrapper; we preserve that for Default and only tighten it
+        // under SharpV22_1 so history formatting is byte-faithful to Sharp.
+        const bool is_history_turn = static_cast<long>(i) <= last_query_index;
+        const bool emit_think = keep_thinking && !(chat_style_ == ChatStyle::SharpV22_1 &&
+                                                   is_history_turn && reasoning.empty());
+        if (emit_think) {
+            rendered += " thinking\n";
             rendered += reasoning;
-            rendered += "\n</think>\n\n";
+            rendered += "\n response\n\n";
         }
         rendered += body;
         if (!message.tool_calls.empty()) {
@@ -435,9 +485,9 @@ RenderedChat CompiledChatTemplate::render(const std::vector<ChatMessage>& messag
                 .kind = RewriteCheckpointKind::TurnClosure, .offset = rendered.size()};
         }
         if (options.enable_thinking) {
-            rendered += "<think>\n";
+            rendered += " thinking\n";
         } else {
-            rendered += "<think>\n\n</think>\n\n";
+            rendered += " thinking\n\n response\n\n";
         }
         if (preserve_thinking) {
             // Response replay retains the deterministic generation prologue. This is the prompt

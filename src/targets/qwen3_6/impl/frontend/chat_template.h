@@ -75,6 +75,7 @@ struct ChatRenderOptions {
     std::optional<ReasoningEffort> reasoning_effort;
     std::optional<bool> preserve_thinking;
     bool add_vision_id = false;
+    ChatStyle chat_style = ChatStyle::Default;
     std::vector<std::string> tool_jsons;
 };
 
@@ -95,17 +96,26 @@ enum class ChatTemplateSemantics : std::uint8_t {
 
 class CompiledChatTemplate {
 public:
-    [[nodiscard]] static CompiledChatTemplate resolve(std::string_view source);
+    [[nodiscard]] static CompiledChatTemplate resolve(std::string_view source,
+                                                      ChatStyle chat_style = ChatStyle::Default);
+
+    // Test-only: construct without the embedded-template sha256 allowlist gate.
+    [[nodiscard]] static CompiledChatTemplate resolve_unchecked(
+        std::string_view source, ChatStyle chat_style = ChatStyle::Default) noexcept {
+        return CompiledChatTemplate(ChatTemplateSemantics::ReasoningEffort, chat_style);
+    }
 
     [[nodiscard]] PromptCapabilities capabilities() const noexcept;
     [[nodiscard]] RenderedChat render(const std::vector<ChatMessage>& messages,
                                       ChatRenderOptions options = {}) const;
 
 private:
-    explicit CompiledChatTemplate(ChatTemplateSemantics semantics) noexcept
-        : semantics_(semantics) {}
+    explicit CompiledChatTemplate(ChatTemplateSemantics semantics,
+                                  ChatStyle chat_style = ChatStyle::Default) noexcept
+        : semantics_(semantics), chat_style_(chat_style) {}
 
     ChatTemplateSemantics semantics_;
+    ChatStyle chat_style_ = ChatStyle::Default;
 };
 
 } // namespace ninfer::targets::qwen3_6::frontend_internal

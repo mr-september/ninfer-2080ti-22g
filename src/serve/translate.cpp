@@ -128,23 +128,19 @@ ResolvedPromptSemantics resolve_prompt_semantics(const GenerationRequest& reques
     }
 
     switch (requested) {
+    case RequestedReasoningEffort::None:
+        break;
+    case RequestedReasoningEffort::Minimal:
     case RequestedReasoningEffort::Low:
         result.reasoning_effort = ninfer::ReasoningEffort::Low;
         break;
     case RequestedReasoningEffort::Medium:
         result.reasoning_effort = ninfer::ReasoningEffort::Medium;
         break;
-    case RequestedReasoningEffort::XHigh:
-        result.reasoning_effort = ninfer::ReasoningEffort::XHigh;
-        break;
-    case RequestedReasoningEffort::Minimal:
     case RequestedReasoningEffort::High:
+    case RequestedReasoningEffort::XHigh:
     case RequestedReasoningEffort::Max:
-        invalid_prompt_option("reasoning effort '" +
-                                  std::string(requested_reasoning_effort_name(requested)) +
-                                  "' is not supported by the loaded chat template",
-                              request.reasoning_effort_param, "reasoning_effort_not_supported");
-    case RequestedReasoningEffort::None:
+        result.reasoning_effort = ninfer::ReasoningEffort::XHigh;
         break;
     }
 
