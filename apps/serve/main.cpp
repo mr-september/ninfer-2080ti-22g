@@ -39,13 +39,20 @@ std::string format_bytes(std::size_t bytes) {
 } // namespace
 
 int main(int argc, char** argv) {
+    ninfer::serve::ServeOptions options;
     try {
-        const ninfer::serve::ServeOptions options = ninfer::serve::parse_serve_options(argc, argv);
-        if (options.help_requested) {
-            std::cout << ninfer::serve::serve_usage_text(argv[0]);
-            return 0;
-        }
+        options = ninfer::serve::parse_serve_options(argc, argv);
+    } catch (const std::exception& exception) {
+        ninfer::serve::write_console_log(ninfer::serve::ConsoleLogLevel::Error, exception.what());
+        std::cerr << ninfer::serve::serve_usage_text(argv[0]);
+        return 1;
+    }
+    if (options.help_requested) {
+        std::cout << ninfer::serve::serve_usage_text(argv[0]);
+        return 0;
+    }
 
+    try {
         using Clock = std::chrono::steady_clock;
         ninfer::serve::HttpServer server(options);
         if (!server.bind()) {
@@ -117,7 +124,6 @@ int main(int argc, char** argv) {
         return 0;
     } catch (const std::exception& exception) {
         ninfer::serve::write_console_log(ninfer::serve::ConsoleLogLevel::Error, exception.what());
-        std::cerr << ninfer::serve::serve_usage_text(argv[0]);
         return 1;
     }
 }

@@ -430,8 +430,7 @@ void GenerationService::warmup() {
         PreparedRequest prepared = prepare(request);
         run(prepared, nullptr);
     } catch (const std::exception& exception) {
-        write_console_log(ConsoleLogLevel::Warning,
-                          std::string("warmup failed (continuing): ") + exception.what());
+        throw std::runtime_error(std::string("warmup generation failed: ") + exception.what());
     }
 }
 
