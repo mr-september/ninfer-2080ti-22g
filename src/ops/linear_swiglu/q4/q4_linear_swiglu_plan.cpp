@@ -31,6 +31,13 @@ struct RouteSpec {
 
 constexpr Q4LinearSwiGluProblem kShape{34816, 17408, 5120, 5120, 1};
 
+// On Turing SM75 (e.g. RTX 2080 Ti, 68 SMs), C128 consumes 45.57 KiB static smem and 166
+// regs/thread, capping residency to 1 CTA/SM (25% theoretical occupancy).
+// An experimental C64 tile (BN=64, WN=8, 256 threads) with MIN_BLOCKS=2 achieved 28.5 KiB smem,
+// 128 regs/thread, 0 spills, and 2 CTAs/SM (50% occupancy), but regressed latency at T=2414 from
+// 58.07 ms to 60.04 ms (+3.39%). Halving WN from 16 to 8 halves per-fragment MMA instruction reuse
+// (4 vs 8 ops/step) and doubles grid launch/barrier overhead, which outweighs the residency gain.
+// Therefore C128 is retained for long prefill.
 constexpr std::array<RouteSpec, 10> kRoutes{{
     {{1, 1}, Q4LinearSwiGluScheduleId::GemvPair},
     {{2, 32}, Q4LinearSwiGluScheduleId::SmallTExact},
