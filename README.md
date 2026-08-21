@@ -2,7 +2,7 @@
 
 > Selected checkpoints. Maximum single-GPU inference performance.
 
-NInfer is a from-scratch C++/CUDA inference engine for explicitly registered Qwen model checkpoints. This repository is a specialized port for NVIDIA Turing architecture (`sm_75`, tuned specifically for the **RTX 2080 Ti 22GB**), while retaining compatibility with Ampere (`sm_86`) and Blackwell (`sm_120a`). It executes text and multimodal (image/video) prompts through a fast local CLI or OpenAI/Anthropic-compatible HTTP servers.
+This repository is a specialized port of [NInfer](https://github.com/Neroued/ninfer) (originally developed by [@Neroued](https://github.com/Neroued)) optimized for NVIDIA Turing architecture (`sm_75`, tuned specifically for the **RTX 2080 Ti 22GB** modded card), while retaining compatibility with Ampere (`sm_86`) and Blackwell (`sm_120a`). It executes text and multimodal (image/video) prompts through a fast local CLI or OpenAI/Anthropic-compatible HTTP servers.
 
 ---
 
@@ -197,6 +197,13 @@ curl http://127.0.0.1:8080/v1/chat/completions \
 - [Paged KV Cache Architecture](docs/maintainer/paged-kv-cache.md)
 - [Concurrent Inference Engine](docs/maintainer/concurrent-inference-architecture.md)
 - [CLI Input Examples](examples/cli/)
+
+---
+
+## Acknowledgements & Upstream Project
+
+- **Original Project:** [NInfer](https://github.com/Neroued/ninfer) by [@Neroued](https://github.com/Neroued).
+- **Original Checkpoint Artifacts:** [neroued on Hugging Face](https://huggingface.co/neroued).
 
 ---
 
