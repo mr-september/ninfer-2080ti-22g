@@ -152,9 +152,7 @@ Options parse_args(int argc, char** argv) {
             throw std::invalid_argument("unknown argument: " + std::string(argv[i]));
         }
     }
-    if (!opt.geometry35 && !opt.auto_route) {
-        throw std::invalid_argument("fixed candidate screening is supported only for --35b");
-    }
+
     if (opt.norm_control && !opt.auto_route && !opt.composed_norm_control) {
         throw std::invalid_argument("--norm-control supports only --candidate auto or composed");
     }

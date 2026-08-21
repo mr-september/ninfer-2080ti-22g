@@ -27,10 +27,21 @@ struct RouteSpec {
 };
 
 #if defined(NINFER_SM75)
-constexpr std::array<RouteSpec, 3> k27Routes{{
+constexpr std::array<RouteSpec, 6> k27Routes{{
     {{1, 1}, Bf16GdnGatingScheduleId::GemvPairedRows},
     {{2, 8}, Bf16GdnGatingScheduleId::SmallTSplit10},
-    {{9, kAnyCols}, Bf16GdnGatingScheduleId::MmaUnsplit},
+    // On SM75 (RTX 2080 Ti, 68 SMs), 27B BN128 MMA kernels consume 40 KiB dynamic shared memory
+    // per CTA out of 64 KiB available per SM, strictly limiting cooperative residency to 1 CTA/SM
+    // (maximum 68 CTAs device-wide).
+    // Grid sizes:
+    // Split8: ceil(T/128) * 3 * 8 <= 68 -> legal for T <= 256 (48 CTAs at T=256)
+    // Split4: ceil(T/128) * 3 * 4 <= 68 -> legal for T <= 640 (60 CTAs at T=640)
+    // Split2: ceil(T/128) * 3 * 2 <= 68 -> legal for T <= 1408 (66 CTAs at T=1408)
+    // Unsplit: T >= 1409 (at T=2048: 48 CTAs; at T=2414: 57 CTAs)
+    {{9, 256}, Bf16GdnGatingScheduleId::MmaCooperativeSplit8},
+    {{257, 640}, Bf16GdnGatingScheduleId::MmaCooperativeSplit4},
+    {{641, 1408}, Bf16GdnGatingScheduleId::MmaCooperativeSplit2},
+    {{1409, kAnyCols}, Bf16GdnGatingScheduleId::MmaUnsplit},
 }};
 
 constexpr std::array<RouteSpec, 2> k35Routes{{
@@ -406,12 +417,14 @@ Bf16GdnNormGatingPlan bf16_gdn_norm_gating_resolve_plan(const Bf16GdnGatingProbl
     Bf16GdnGatingPlan control            = bf16_gdn_gating_resolve_plan(problem);
     Bf16GdnNormGatingScheduleId schedule = Bf16GdnNormGatingScheduleId::Composed;
     std::int32_t norm_splits             = 0;
+#if !defined(NINFER_SM75)
     if (is_35(problem) && problem.cols <= 16) {
         control  = bf16_gdn_gating_resolve_candidate(Bf16GdnGatingScheduleId::MmaCooperativeSplit32,
                                                      problem);
         schedule = Bf16GdnNormGatingScheduleId::MmaCooperativeSplit32;
         norm_splits = 32;
     }
+#endif
     const std::size_t norm_partial_bytes =
         static_cast<std::size_t>(norm_splits) * problem.cols * sizeof(float);
     return {schedule, control, control.workspace_bytes + norm_partial_bytes};
@@ -423,12 +436,14 @@ std::size_t bf16_gdn_norm_gating_capacity_workspace_bytes(std::int32_t heads,
                                                           std::int32_t max_cols) {
     std::size_t maximum =
         bf16_gdn_gating_capacity_workspace_bytes(heads, input_rows, min_cols, max_cols);
+#if !defined(NINFER_SM75)
     if (heads == 32 && input_rows == 2048 && min_cols <= 16) {
         const std::int32_t fused_cols = std::min<std::int32_t>(max_cols, 16);
         maximum                       = std::max(
             maximum,
             bf16_gdn_norm_gating_resolve_plan({heads, input_rows, fused_cols}).workspace_bytes);
     }
+#endif
     return maximum;
 }
 
