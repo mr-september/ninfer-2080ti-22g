@@ -26,6 +26,18 @@ struct RouteSpec {
     Bf16GdnGatingScheduleId schedule;
 };
 
+#if defined(NINFER_SM75)
+constexpr std::array<RouteSpec, 3> k27Routes{{
+    {{1, 1}, Bf16GdnGatingScheduleId::GemvPairedRows},
+    {{2, 8}, Bf16GdnGatingScheduleId::SmallTSplit10},
+    {{9, kAnyCols}, Bf16GdnGatingScheduleId::MmaUnsplit},
+}};
+
+constexpr std::array<RouteSpec, 2> k35Routes{{
+    {{1, 8}, Bf16GdnGatingScheduleId::SimtWarpRowC4},
+    {{9, kAnyCols}, Bf16GdnGatingScheduleId::MmaUnsplit},
+}};
+#else
 constexpr std::array<RouteSpec, 6> k27Routes{{
     {{1, 1}, Bf16GdnGatingScheduleId::GemvPairedRows},
     {{2, 8}, Bf16GdnGatingScheduleId::SmallTSplit10},
@@ -46,6 +58,7 @@ constexpr std::array<RouteSpec, 5> k35Routes{{
     {{2049, 4096}, Bf16GdnGatingScheduleId::MmaCooperativeSplit2},
     {{4097, kAnyCols}, Bf16GdnGatingScheduleId::MmaUnsplit},
 }};
+#endif
 
 template <std::size_t N>
 constexpr bool catalog_is_closed(const std::array<RouteSpec, N>& routes,
@@ -125,18 +138,28 @@ bool cooperative_grid_is_resident(Bf16GdnGatingScheduleId schedule, std::int32_t
 
 bool cooperative_27_grid_is_resident(Bf16GdnGatingScheduleId schedule, std::int32_t cols) noexcept {
     // BN128 uses 40 KiB of dynamic shared memory. Split8 uses 71 registers with 256 threads;
-    // split4/2 use 62 registers with 512 threads. Each specialization admits two CTAs/SM, hence
-    // 340 resident CTAs device-wide. There are three 16-row tiles per token tile.
-    return cooperative_grid_is_resident(schedule, cols, 128, 3, 340);
+    // split4/2 use 62 registers with 512 threads.
+#if defined(NINFER_SM75)
+    constexpr std::int32_t kResidentCtas = 68;
+#elif defined(NINFER_SM86)
+    constexpr std::int32_t kResidentCtas = 82 * 2;
+#else
+    constexpr std::int32_t kResidentCtas = 340;
+#endif
+    return cooperative_grid_is_resident(schedule, cols, 128, 3, kResidentCtas);
 }
 
 bool cooperative_35_grid_is_resident(Bf16GdnGatingScheduleId schedule, std::int32_t cols) noexcept {
-    // BN64 uses 24 KiB of dynamic shared memory and two 16-row tiles. With the registered CUDA
-    // 13.1/sm_120a build, split32 uses 91/93 registers per thread and admits two CTAs/SM;
-    // split16/8/4/2 use at most 62 registers and admit four CTAs/SM. Across 170 SMs the
-    // device-wide limits are 340 and 680 CTAs respectively.
+    // BN64 uses 24 KiB of dynamic shared memory and two 16-row tiles.
+#if defined(NINFER_SM75)
+    const std::int32_t resident_ctas = 68;
+#elif defined(NINFER_SM86)
+    const std::int32_t resident_ctas =
+        schedule == Bf16GdnGatingScheduleId::MmaCooperativeSplit32 ? (82 * 2) : (82 * 4);
+#else
     const std::int32_t resident_ctas =
         schedule == Bf16GdnGatingScheduleId::MmaCooperativeSplit32 ? 340 : 680;
+#endif
     return cooperative_grid_is_resident(schedule, cols, 64, 2, resident_ctas);
 }
 
