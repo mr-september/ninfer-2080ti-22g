@@ -554,6 +554,97 @@ int verify_planner_legality() {
         std::cerr << "Expected exception for Split2 at T=2414 on SM75 (114 CTAs > 68)\n";
         ++failures;
     } catch (const std::invalid_argument&) {}
+
+    // Verify 35B candidate legality boundaries against the 136-CTA ceiling (68 SMs * 2 CTAs/SM)
+    try {
+        // T=128: ceil(128/64)*2*32 = 128 CTAs <= 136 (legal)
+        ops::detail::bf16_gdn_gating_resolve_candidate(
+            Bf16GdnGatingScheduleId::MmaCooperativeSplit32, {32, 2048, 128});
+    } catch (const std::exception& e) {
+        std::cerr << "Unexpected exception for 35B Split32 at T=128 on SM75 (128 CTAs <= 136): "
+                  << e.what() << "\n";
+        ++failures;
+    }
+
+    try {
+        // T=129: ceil(129/64)*2*32 = 192 CTAs > 136 (illegal)
+        ops::detail::bf16_gdn_gating_resolve_candidate(
+            Bf16GdnGatingScheduleId::MmaCooperativeSplit32, {32, 2048, 129});
+        std::cerr << "Expected exception for 35B Split32 at T=129 on SM75 (192 CTAs > 136)\n";
+        ++failures;
+    } catch (const std::invalid_argument&) {}
+
+    try {
+        // T=256: ceil(256/64)*2*16 = 128 CTAs <= 136 (legal)
+        ops::detail::bf16_gdn_gating_resolve_candidate(
+            Bf16GdnGatingScheduleId::MmaCooperativeSplit16, {32, 2048, 256});
+    } catch (const std::exception& e) {
+        std::cerr << "Unexpected exception for 35B Split16 at T=256 on SM75 (128 CTAs <= 136): "
+                  << e.what() << "\n";
+        ++failures;
+    }
+
+    try {
+        // T=257: ceil(257/64)*2*16 = 160 CTAs > 136 (illegal)
+        ops::detail::bf16_gdn_gating_resolve_candidate(
+            Bf16GdnGatingScheduleId::MmaCooperativeSplit16, {32, 2048, 257});
+        std::cerr << "Expected exception for 35B Split16 at T=257 on SM75 (160 CTAs > 136)\n";
+        ++failures;
+    } catch (const std::invalid_argument&) {}
+
+    try {
+        // T=512: ceil(512/64)*2*8 = 128 CTAs <= 136 (legal)
+        ops::detail::bf16_gdn_gating_resolve_candidate(
+            Bf16GdnGatingScheduleId::MmaCooperativeSplit8, {32, 2048, 512});
+    } catch (const std::exception& e) {
+        std::cerr << "Unexpected exception for 35B Split8 at T=512 on SM75 (128 CTAs <= 136): "
+                  << e.what() << "\n";
+        ++failures;
+    }
+
+    try {
+        // T=513: ceil(513/64)*2*8 = 144 CTAs > 136 (illegal)
+        ops::detail::bf16_gdn_gating_resolve_candidate(
+            Bf16GdnGatingScheduleId::MmaCooperativeSplit8, {32, 2048, 513});
+        std::cerr << "Expected exception for 35B Split8 at T=513 on SM75 (144 CTAs > 136)\n";
+        ++failures;
+    } catch (const std::invalid_argument&) {}
+
+    try {
+        // T=1088: ceil(1088/64)*2*4 = 136 CTAs <= 136 (legal)
+        ops::detail::bf16_gdn_gating_resolve_candidate(
+            Bf16GdnGatingScheduleId::MmaCooperativeSplit4, {32, 2048, 1088});
+    } catch (const std::exception& e) {
+        std::cerr << "Unexpected exception for 35B Split4 at T=1088 on SM75 (136 CTAs <= 136): "
+                  << e.what() << "\n";
+        ++failures;
+    }
+
+    try {
+        // T=1089: ceil(1089/64)*2*4 = 144 CTAs > 136 (illegal)
+        ops::detail::bf16_gdn_gating_resolve_candidate(
+            Bf16GdnGatingScheduleId::MmaCooperativeSplit4, {32, 2048, 1089});
+        std::cerr << "Expected exception for 35B Split4 at T=1089 on SM75 (144 CTAs > 136)\n";
+        ++failures;
+    } catch (const std::invalid_argument&) {}
+
+    try {
+        // T=2176: ceil(2176/64)*2*2 = 136 CTAs <= 136 (legal)
+        ops::detail::bf16_gdn_gating_resolve_candidate(
+            Bf16GdnGatingScheduleId::MmaCooperativeSplit2, {32, 2048, 2176});
+    } catch (const std::exception& e) {
+        std::cerr << "Unexpected exception for 35B Split2 at T=2176 on SM75 (136 CTAs <= 136): "
+                  << e.what() << "\n";
+        ++failures;
+    }
+
+    try {
+        // T=2177: ceil(2177/64)*2*2 = 140 CTAs > 136 (illegal)
+        ops::detail::bf16_gdn_gating_resolve_candidate(
+            Bf16GdnGatingScheduleId::MmaCooperativeSplit2, {32, 2048, 2177});
+        std::cerr << "Expected exception for 35B Split2 at T=2177 on SM75 (140 CTAs > 136)\n";
+        ++failures;
+    } catch (const std::invalid_argument&) {}
 #endif
 
     return failures;

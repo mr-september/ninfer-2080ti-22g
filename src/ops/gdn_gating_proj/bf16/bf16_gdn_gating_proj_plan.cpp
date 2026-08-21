@@ -148,8 +148,11 @@ bool cooperative_grid_is_resident(Bf16GdnGatingScheduleId schedule, std::int32_t
 }
 
 bool cooperative_27_grid_is_resident(Bf16GdnGatingScheduleId schedule, std::int32_t cols) noexcept {
-    // BN128 uses 40 KiB of dynamic shared memory. Split8 uses 71 registers with 256 threads;
-    // split4/2 use 62 registers with 512 threads.
+    // BN128 uses 40 KiB of dynamic shared memory. On Turing SM75 (64 KiB shared memory per SM),
+    // 40 KiB strictly limits cooperative residency to 1 CTA/SM.
+    // For the registered RTX 2080 Ti target (68 SMs), maximum resident cooperative grid = 68 CTAs
+    // (68 RTX 2080 Ti SMs * 1 verified resident CTA/SM for this exact 40-KiB compiled kernel,
+    // rather than a generic SM75 limit).
 #if defined(NINFER_SM75)
     constexpr std::int32_t kResidentCtas = 68;
 #elif defined(NINFER_SM86)
@@ -162,8 +165,14 @@ bool cooperative_27_grid_is_resident(Bf16GdnGatingScheduleId schedule, std::int3
 
 bool cooperative_35_grid_is_resident(Bf16GdnGatingScheduleId schedule, std::int32_t cols) noexcept {
     // BN64 uses 24 KiB of dynamic shared memory and two 16-row tiles.
+    // On Turing SM75 (64 KiB shared memory per SM), 24 KiB dynamic shared memory allows 2 CTAs/SM
+    // (2 * 24 KiB = 48 KiB <= 64 KiB), and cudaOccupancyMaxActiveBlocksPerMultiprocessor
+    // independently confirms 2 active blocks/SM across all compiled 35B SplitK and NormFused
+    // specializations (Warps=8 / 256 threads, 89..125 registers <= 65536 registers per SM).
+    // For the registered RTX 2080 Ti target (68 SMs), maximum resident cooperative grid = 136 CTAs
+    // (68 RTX 2080 Ti SMs * 2 verified resident CTAs/SM).
 #if defined(NINFER_SM75)
-    const std::int32_t resident_ctas = 68;
+    constexpr std::int32_t resident_ctas = 136;
 #elif defined(NINFER_SM86)
     const std::int32_t resident_ctas =
         schedule == Bf16GdnGatingScheduleId::MmaCooperativeSplit32 ? (82 * 2) : (82 * 4);
