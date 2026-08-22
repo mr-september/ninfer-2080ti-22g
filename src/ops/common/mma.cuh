@@ -71,22 +71,71 @@ __device__ __forceinline__ void mma_s8_m8n8k16(int& c0, int& c1, unsigned a0, un
                  : "r"(a0), "r"(b0));
 }
 
+__device__ __forceinline__ float bf16_low_to_float(unsigned packed) {
+    return __uint_as_float(packed << 16);
+}
+__device__ __forceinline__ float bf16_high_to_float(unsigned packed) {
+    return __uint_as_float(packed & 0xffff0000U);
+}
+
 __device__ __forceinline__ void mma_bf16(float& c0, float& c1, float& c2, float& c3, unsigned a0,
                                          unsigned a1, unsigned a2, unsigned a3, unsigned b0,
                                          unsigned b1) {
 #if defined(NINFER_SM75)
-    // Emulate BF16 m16n8k16 via two Turing FP16 m16n8k8 operations:
-    // (A_k0: a0 [rows 0..7], a2 [rows 8..15]) x B_k0 [b0]
-    // (A_k1: a1 [rows 0..7], a3 [rows 8..15]) x B_k1 [b1]
-    unsigned fa0 = bf162_to_f162(a0);
-    unsigned fa2 = bf162_to_f162(a2);
-    unsigned fb0 = bf162_to_f162(b0);
-    mma_f16_m16n8k8(c0, c1, c2, c3, fa0, fa2, fb0);
+    const int lane    = threadIdx.x & 31;
+    const int r       = lane >> 2;
+    const int t       = lane & 3;
+    const int base_a  = 4 * r;
+    const int base_b0 = 8 * t;
+    const int base_b1 = 8 * t + 4;
 
-    unsigned fa1 = bf162_to_f162(a1);
-    unsigned fa3 = bf162_to_f162(a3);
-    unsigned fb1 = bf162_to_f162(b1);
-    mma_f16_m16n8k8(c0, c1, c2, c3, fa1, fa3, fb1);
+    float sum0 = 0.0f;
+    float sum1 = 0.0f;
+    float sum2 = 0.0f;
+    float sum3 = 0.0f;
+
+#pragma unroll
+    for (int k_idx = 0; k_idx < 4; ++k_idx) {
+        const unsigned reg_a0 = __shfl_sync(0xffffffff, a0, base_a + k_idx);
+        const unsigned reg_a1 = __shfl_sync(0xffffffff, a1, base_a + k_idx);
+        const unsigned reg_a2 = __shfl_sync(0xffffffff, a2, base_a + k_idx);
+        const unsigned reg_a3 = __shfl_sync(0xffffffff, a3, base_a + k_idx);
+
+        const unsigned reg_b0_n0 = __shfl_sync(0xffffffff, b0, base_b0 + k_idx);
+        const unsigned reg_b1_n0 = __shfl_sync(0xffffffff, b1, base_b0 + k_idx);
+        const unsigned reg_b0_n1 = __shfl_sync(0xffffffff, b0, base_b1 + k_idx);
+        const unsigned reg_b1_n1 = __shfl_sync(0xffffffff, b1, base_b1 + k_idx);
+
+        const float a_r_k0  = bf16_low_to_float(reg_a0);
+        const float a_r_k1  = bf16_high_to_float(reg_a0);
+        const float a_r8_k0 = bf16_low_to_float(reg_a1);
+        const float a_r8_k1 = bf16_high_to_float(reg_a1);
+
+        const float a_r_k8  = bf16_low_to_float(reg_a2);
+        const float a_r_k9  = bf16_high_to_float(reg_a2);
+        const float a_r8_k8 = bf16_low_to_float(reg_a3);
+        const float a_r8_k9 = bf16_high_to_float(reg_a3);
+
+        const float b_n0_k0 = bf16_low_to_float(reg_b0_n0);
+        const float b_n0_k1 = bf16_high_to_float(reg_b0_n0);
+        const float b_n0_k8 = bf16_low_to_float(reg_b1_n0);
+        const float b_n0_k9 = bf16_high_to_float(reg_b1_n0);
+
+        const float b_n1_k0 = bf16_low_to_float(reg_b0_n1);
+        const float b_n1_k1 = bf16_high_to_float(reg_b0_n1);
+        const float b_n1_k8 = bf16_low_to_float(reg_b1_n1);
+        const float b_n1_k9 = bf16_high_to_float(reg_b1_n1);
+
+        sum0 += a_r_k0  * b_n0_k0 + a_r_k1  * b_n0_k1 + a_r_k8  * b_n0_k8 + a_r_k9  * b_n0_k9;
+        sum1 += a_r_k0  * b_n1_k0 + a_r_k1  * b_n1_k1 + a_r_k8  * b_n1_k8 + a_r_k9  * b_n1_k9;
+        sum2 += a_r8_k0 * b_n0_k0 + a_r8_k1 * b_n0_k1 + a_r8_k8 * b_n0_k8 + a_r8_k9 * b_n0_k9;
+        sum3 += a_r8_k0 * b_n1_k0 + a_r8_k1 * b_n1_k1 + a_r8_k8 * b_n1_k8 + a_r8_k9 * b_n1_k9;
+    }
+
+    c0 += sum0;
+    c1 += sum1;
+    c2 += sum2;
+    c3 += sum3;
 #else
     asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.bf16.bf16.f32 "
                  "{%0,%1,%2,%3}, {%4,%5,%6,%7}, {%8,%9}, {%0,%1,%2,%3};\n"
@@ -149,26 +198,51 @@ __device__ __forceinline__ void mma_tf32_bits(float& c0, float& c1, float& c2, f
                                               unsigned a0, unsigned a1, unsigned a2, unsigned a3,
                                               unsigned b0, unsigned b1) {
 #if defined(NINFER_SM75)
-    // Convert float bits to half2 and compute via m16n8k8 FP16 TC.
-    // fa0: row 0 (k=t),   fa2: row 0 (k=t+4)
-    // fa1: row 1 (k=t),   fa3: row 1 (k=t+4)
-    // fb0: col (k=t),     fb1: col (k=t+4)
-    float fa0 = __uint_as_float(a0);
-    float fa1 = __uint_as_float(a1);
-    float fa2 = __uint_as_float(a2);
-    float fa3 = __uint_as_float(a3);
-    float fb0 = __uint_as_float(b0);
-    float fb1 = __uint_as_float(b1);
+    // On SM75 (Turing), TF32 Tensor Cores are unavailable.
+    // We compute the exact m16n8k8 row.col FP32 tile via warp shuffles + SIMT FMAs.
+    // Thread T (r = T / 4 in [0..7], t = T % 4 in [0..3]):
+    // Target C registers: c0 = C(r, 2t), c1 = C(r, 2t+1), c2 = C(r+8, 2t), c3 = C(r+8, 2t+1)
+    const int lane    = threadIdx.x & 31;
+    const int r       = lane >> 2;
+    const int t       = lane & 3;
+    const int base_a  = 4 * r;
+    const int base_b0 = 8 * t;
+    const int base_b1 = 8 * t + 4;
 
-    half2 ha0 = __floats2half2_rn(fa0, fa2);
-    half2 ha1 = __floats2half2_rn(fa1, fa3);
-    half2 hb0 = __floats2half2_rn(fb0, fb1);
+    const float fa0 = __uint_as_float(a0);
+    const float fa1 = __uint_as_float(a1);
+    const float fa2 = __uint_as_float(a2);
+    const float fa3 = __uint_as_float(a3);
+    const float fb0 = __uint_as_float(b0);
+    const float fb1 = __uint_as_float(b1);
 
-    unsigned ua0 = *reinterpret_cast<const unsigned*>(&ha0);
-    unsigned ua1 = *reinterpret_cast<const unsigned*>(&ha1);
-    unsigned ub0 = *reinterpret_cast<const unsigned*>(&hb0);
+    float sum0 = 0.0f;
+    float sum1 = 0.0f;
+    float sum2 = 0.0f;
+    float sum3 = 0.0f;
 
-    mma_f16_m16n8k8(c0, c1, c2, c3, ua0, ua1, ub0);
+#pragma unroll
+    for (int k_idx = 0; k_idx < 4; ++k_idx) {
+        const float a_r_k   = __shfl_sync(0xffffffff, fa0, base_a + k_idx);
+        const float a_r8_k  = __shfl_sync(0xffffffff, fa1, base_a + k_idx);
+        const float a_r_k4  = __shfl_sync(0xffffffff, fa2, base_a + k_idx);
+        const float a_r8_k4 = __shfl_sync(0xffffffff, fa3, base_a + k_idx);
+
+        const float b_n0_k  = __shfl_sync(0xffffffff, fb0, base_b0 + k_idx);
+        const float b_n0_k4 = __shfl_sync(0xffffffff, fb1, base_b0 + k_idx);
+        const float b_n1_k  = __shfl_sync(0xffffffff, fb0, base_b1 + k_idx);
+        const float b_n1_k4 = __shfl_sync(0xffffffff, fb1, base_b1 + k_idx);
+
+        sum0 += a_r_k  * b_n0_k  + a_r_k4  * b_n0_k4;
+        sum1 += a_r_k  * b_n1_k  + a_r_k4  * b_n1_k4;
+        sum2 += a_r8_k * b_n0_k  + a_r8_k4 * b_n0_k4;
+        sum3 += a_r8_k * b_n1_k  + a_r8_k4 * b_n1_k4;
+    }
+
+    c0 += sum0;
+    c1 += sum1;
+    c2 += sum2;
+    c3 += sum3;
 #else
     asm volatile("mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32 "
                  "{%0,%1,%2,%3}, {%4,%5,%6,%7}, {%8,%9}, {%0,%1,%2,%3};\n"
