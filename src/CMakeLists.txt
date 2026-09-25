@@ -269,6 +269,11 @@ else()
   list(APPEND NINFER_OPS_SOURCES ops/unsupported/nvfp4_unsupported_stubs.cpp)
 endif()
 
+if(CMAKE_CUDA_ARCHITECTURES STREQUAL "75" AND NINFER_SM75_INT8_KV_ONLY)
+  set_source_files_properties(ops/launcher/gqa_attention_decode.cu PROPERTIES
+    COMPILE_DEFINITIONS NINFER_SM75_INT8_KV_ONLY=1)
+endif()
+
 add_library(ninfer_ops STATIC ${NINFER_OPS_SOURCES})
 ninfer_internal_includes(ninfer_ops)
 ninfer_cuda_archive(ninfer_ops)

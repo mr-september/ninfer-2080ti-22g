@@ -99,6 +99,10 @@ cmake --build build --parallel
 
 *(For Ampere or Blackwell, set `-DCMAKE_CUDA_ARCHITECTURES=86` or `-DCMAKE_CUDA_ARCHITECTURES=120a`.)*
 
+On SM75, add `-DNINFER_SM75_INT8_KV_ONLY=ON` when using only `--kv-dtype int8`.
+This omits the software-emulated BF16 decode-attention kernels to reduce build cost;
+BF16 KV decode is unavailable in that build. The option is off by default.
+
 Targets:
 - `build/apps/ninfer`: CLI inference runner.
 - `build/apps/ninfer-serve`: OpenAI & Anthropic HTTP server.

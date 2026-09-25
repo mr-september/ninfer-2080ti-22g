@@ -14,6 +14,12 @@
 namespace ninfer::ops::detail {
 namespace {
 
+#if defined(NINFER_SM75_INT8_KV_ONLY)
+constexpr bool kSm75Int8KvOnly = true;
+#else
+constexpr bool kSm75Int8KvOnly = false;
+#endif
+
 // Supplies an upper bound for the device-side active-split policy over one explicit execution
 // envelope. Eager calls normally pass an exact window; graph calls pass their target-private
 // replay interval. The dtype-aware wrapper below adds the measured INT8 specializations.
@@ -254,9 +260,13 @@ void gqa_attention_small_t_launch_for(const Tensor& q, CacheInput input, const T
                     q, input, pos, scale, cache, invocation, logical_capacity,                     \
                     implementation_window, splits, partial_acc, partial_m, partial_l, stream);     \
             } else {                                                                               \
-                launch_tc_partial_bf16<Geometry, (TOKENS), (WARPS), MultiBatch, Masked>(           \
-                    q, input, pos, scale, cache, invocation, logical_capacity, splits,             \
-                    partial_acc, partial_m, partial_l, stream);                                    \
+                if constexpr (kSm75Int8KvOnly) {                                                   \
+                    throw std::invalid_argument("SM75 build supports only INT8 KV cache");         \
+                } else {                                                                           \
+                    launch_tc_partial_bf16<Geometry, (TOKENS), (WARPS), MultiBatch, Masked>(       \
+                        q, input, pos, scale, cache, invocation, logical_capacity, splits,         \
+                        partial_acc, partial_m, partial_l, stream);                                \
+                }                                                                                  \
             }                                                                                      \
         };                                                                                         \
         const bool masked = invocation.valid_columns != nullptr;                                   \
