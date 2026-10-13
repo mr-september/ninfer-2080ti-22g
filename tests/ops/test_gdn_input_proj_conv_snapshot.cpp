@@ -1,3 +1,4 @@
+#include "ops/format_support.h"
 #include "core/weight.h"
 #include "ninfer/ops/gdn_input_proj.h"
 
@@ -1168,39 +1169,43 @@ int main() {
         std::cerr << "Q8 snapshot interval did not preserve its zero/nonzero route boundary\n";
         ++failures;
     }
-    const std::size_t nvfp4_a4_4 = ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
-        QType::NVFP4, 16384, 5120, ops::LinearPolicy::AllowA4, 1, 4, 4);
-    if (ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
-            QType::NVFP4, 16384, 5120, ops::LinearPolicy::A16Only, 1, 1, 16) != 0 ||
-        ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
-            QType::NVFP4, 16384, 5120, ops::LinearPolicy::AllowA4, 1, 1, 3) != 0 ||
-        nvfp4_a4_4 == 0 ||
-        ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
-            QType::NVFP4, 16384, 5120, ops::LinearPolicy::AllowA4, 1, 1, 4) != nvfp4_a4_4) {
-        std::cerr << "NVFP4 snapshot interval did not preserve its A16/A4 route boundary\n";
-        ++failures;
-    }
-    const auto fp8_snapshot_capacity = [](ops::LinearPolicy policy, std::int32_t batch,
-                                          std::int32_t min_width, std::int32_t max_width) {
-        return ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
-            QType::FP8_E4M3FN_ROW_BF16, 16384, 5120, policy, batch, min_width, max_width);
-    };
-    for (auto policy : {ops::LinearPolicy::A16Only, ops::LinearPolicy::AllowA8}) {
-        for (int batch : {1, 2, 8}) {
-            std::size_t peak = 0;
-            for (int width = 1; width <= 16; ++width) {
-                peak = std::max(peak, fp8_snapshot_capacity(policy, batch, width, width));
-                if (fp8_snapshot_capacity(policy, batch, 1, width) != peak) {
-                    std::cerr << "FP8 snapshot interval misses an execution capacity\n";
-                    ++failures;
+    if (ninfer::test::kSm120Formats) {
+        const std::size_t nvfp4_a4_4 = ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
+            QType::NVFP4, 16384, 5120, ops::LinearPolicy::AllowA4, 1, 4, 4);
+        if (ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
+                QType::NVFP4, 16384, 5120, ops::LinearPolicy::A16Only, 1, 1, 16) != 0 ||
+            ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
+                QType::NVFP4, 16384, 5120, ops::LinearPolicy::AllowA4, 1, 1, 3) != 0 ||
+            nvfp4_a4_4 == 0 ||
+            ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
+                QType::NVFP4, 16384, 5120, ops::LinearPolicy::AllowA4, 1, 1, 4) != nvfp4_a4_4) {
+            std::cerr << "NVFP4 snapshot interval did not preserve its A16/A4 route boundary\n";
+            ++failures;
+        }
+        const auto fp8_snapshot_capacity = [](ops::LinearPolicy policy, std::int32_t batch,
+                                              std::int32_t min_width, std::int32_t max_width) {
+            return ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
+                QType::FP8_E4M3FN_ROW_BF16, 16384, 5120, policy, batch, min_width, max_width);
+        };
+        for (auto policy : {ops::LinearPolicy::A16Only, ops::LinearPolicy::AllowA8}) {
+            for (int batch : {1, 2, 8}) {
+                std::size_t peak = 0;
+                for (int width = 1; width <= 16; ++width) {
+                    peak = std::max(peak, fp8_snapshot_capacity(policy, batch, width, width));
+                    if (fp8_snapshot_capacity(policy, batch, 1, width) != peak) {
+                        std::cerr << "FP8 snapshot interval misses an execution capacity\n";
+                        ++failures;
+                    }
                 }
             }
         }
     }
     failures += run_q4_q5();
     failures += run_q8();
-    failures += run_nvfp4();
-    failures += run_fp8();
+    if (ninfer::test::kSm120Formats) {
+        failures += run_nvfp4();
+        failures += run_fp8();
+    }
     std::cout << (failures == 0 ? "OK" : "FAIL") << " gdn_input_proj_conv_snapshot\n";
     return failures == 0 ? 0 : 1;
 }

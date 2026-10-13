@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -257,6 +258,32 @@ void require_shape35(const Weight& w, const char* name) {
     }
 }
 
+#if defined(NINFER_SM75) || defined(NINFER_SM86)
+// Residency of a cooperative grid is a property of the compiled kernel on the actual
+// architecture (registers and the 40/24 KiB dynamic shared memory against a 64 KiB Turing SM),
+// so it is queried from the occupancy calculator instead of being a qualified constant.
+template <class Geometry, int SplitK, int Warps, bool NormalizeInput, int NormTokenCapacity>
+std::int32_t cooperative_resident_ctas_per_sm() {
+    static const std::int32_t resident = [] {
+        constexpr int kSmemBytes = kBf16GdnSmemBytes<Geometry::kBlockN>;
+        std::int32_t minimum     = std::numeric_limits<std::int32_t>::max();
+        const auto query         = [&](auto kernel) {
+            CUDA_CHECK(cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                            kSmemBytes));
+            int blocks = 0;
+            CUDA_CHECK(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&blocks, kernel, Warps * 32,
+                                                                     kSmemBytes));
+            minimum = std::min<std::int32_t>(minimum, blocks);
+        };
+        query(bf16_gdn_gating_proj_gemm_mma_kernel<Geometry, SplitK, true, Warps, NormalizeInput,
+                                                   NormTokenCapacity>);
+        query(bf16_gdn_gating_proj_gemm_mma_kernel<Geometry, SplitK, false, Warps, NormalizeInput,
+                                                   NormTokenCapacity>);
+        return minimum;
+    }();
+    return resident;
+}
+#else
 template <class Geometry, int SplitK>
 constexpr std::int32_t cooperative_resident_ctas_per_sm() noexcept {
     static_assert(SplitK > 1);
@@ -273,6 +300,8 @@ constexpr std::int32_t cooperative_resident_ctas_per_sm() noexcept {
         return SplitK == 32 ? 2 : 4;
     }
 }
+
+#endif
 
 template <class Geometry, int SplitK, int Warps = kBf16GdnWarps, bool NormalizeInput = false,
           int NormTokenCapacity = 0>
@@ -357,8 +386,14 @@ bool launch_bf16_prefill_mma(Bf16GdnGatingTokenVariant variant, const Tensor& x,
     } else {
         constexpr std::int64_t kCtasPerTokenTile =
             static_cast<std::int64_t>(Geometry::kHeads / kBf16GdnBlockM) * SplitK;
+#if defined(NINFER_SM75) || defined(NINFER_SM86)
+        const std::int32_t kResidentCtasPerSm =
+            cooperative_resident_ctas_per_sm<Geometry, SplitK, Warps, NormalizeInput,
+                                             NormTokenCapacity>();
+#else
         constexpr std::int32_t kResidentCtasPerSm =
             cooperative_resident_ctas_per_sm<Geometry, SplitK>();
+#endif
         const std::int64_t resident_ctas =
             static_cast<std::int64_t>(multiprocessor_count) * kResidentCtasPerSm;
         const std::int64_t max_token_tiles = resident_ctas / kCtasPerTokenTile;

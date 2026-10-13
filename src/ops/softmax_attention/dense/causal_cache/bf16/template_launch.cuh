@@ -27,7 +27,7 @@ void validate_bf16_kv_operands(const CausalAttentionOperands& p,
 
 template <int Bytes, auto Kernel>
 int bf16_kv_dynamic_shared() {
-    static_assert(Bytes <= 99 * 1024);
+    static_assert(Bytes <= core::kMaxCtaSharedBytes);
     if constexpr (Bytes > 48 * 1024) {
         static const auto status =
             cudaFuncSetAttribute(Kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, Bytes);

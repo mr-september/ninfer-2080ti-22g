@@ -167,7 +167,7 @@ __launch_bounds__(Schedule::kThreads, Schedule::kMinBlocksPerSm) void q8_grouped
                             smem_addr(
                                 &x_shared[k_split][row * kTileK + q8_sliced_k_swizzle_64(
                                                                       row, k_step * 16 + b_koff)]));
-                        mma_bf16(group_acc[token_mma][0], group_acc[token_mma][1],
+                        mma_integer_weights(group_acc[token_mma][0], group_acc[token_mma][1],
                                  group_acc[token_mma][2], group_acc[token_mma][3], a0, a1, a2, a3,
                                  b0, b1);
                     }

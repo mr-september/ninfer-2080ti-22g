@@ -1,3 +1,4 @@
+#include "ops/format_support.h"
 #include "core/weight.h"
 #include "ninfer/ops/attn_input_proj.h"
 #include "ninfer/ops/weight_input.h"
@@ -651,8 +652,10 @@ int main(int argc, char** argv) {
     if (!dflash2_only) {
         failures += run_q4_q5();
         failures += run_bf16_target();
-        failures += run_nvfp4_target();
-        failures += run_fp8_target();
+        if (ninfer::test::kSm120Formats) {
+            failures += run_nvfp4_target();
+            failures += run_fp8_target();
+        }
         failures += run_q8_target();
         failures += run_q8_companion();
     }

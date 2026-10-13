@@ -1,3 +1,4 @@
+#include "ops/format_support.h"
 #include "core/weight.h"
 #include "ninfer/ops/embedding.h"
 #include "ops/op_tester.h"
@@ -725,7 +726,7 @@ int main() {
         failures += test_dense();
         failures += test_q6();
         failures += test_q8();
-        failures += test_fp8();
+        if (ninfer::test::kSm120Formats) failures += test_fp8();
     } catch (const std::exception& error) {
         std::cerr << "embedding test exception: " << error.what() << '\n';
         return 1;

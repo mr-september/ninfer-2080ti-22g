@@ -3,6 +3,7 @@
 // Paired MTP K/V Q8G32 GEMM. One CTA keeps a single BF16 activation tile in
 // shared memory and contracts it against independent K and V weight tiles.
 
+#include "ops/common/operand16.cuh"
 #include "ops/linear/q8/q8_mma_launch.cuh"
 
 namespace ninfer::ops::detail {
@@ -77,10 +78,10 @@ __launch_bounds__((TileCols / 16) * 32, kQ8PairMmaMinBlocks<TileCols>) void q8_p
             const int nn = n0 + nl;
             auto* dst    = &Bs[stage][nl * BK + q8_g32_swz64(nl, k8 * 8)];
             if constexpr (Full) {
-                cp_async<16, Cache::cg>(dst, &x[static_cast<std::int64_t>(nn) * k + kk]);
+                stage_activation_operand<16, Cache::cg>(dst, &x[static_cast<std::int64_t>(nn) * k + kk]);
             } else {
                 const int valid = (nn < n && kk < k) ? min(8, k - kk) * 2 : 0;
-                ninfer::ops::cp_async_zfill<16>(
+                ninfer::ops::stage_activation_operand_zfill<16>(
                     dst, &x[static_cast<std::int64_t>(nn < n ? nn : 0) * k + (kk < k ? kk : 0)],
                     valid);
             }
@@ -145,15 +146,13 @@ __launch_bounds__((TileCols / 16) * 32, kQ8PairMmaMinBlocks<TileCols>) void q8_p
             scale_pair          = __shfl_sync(0xffffffffu, scale_pair, half * 16);
 #pragma unroll
             for (int gg = 0; gg < 2; ++gg) {
-                const float scale =
-                    __half2float(__ushort_as_half((scale_pair >> (gg * 16)) & 0xffffu));
+                const __half scale = __ushort_as_half((scale_pair >> (gg * 16)) & 0xffffu);
                 const int col = gg * 32 + half_lane * 2;
                 const std::uint16_t packed =
                     *reinterpret_cast<const std::uint16_t*>(&Cr[p][row * BK + col]);
                 const int q0 = static_cast<int>(static_cast<std::int8_t>(packed & 0xffu));
                 const int q1 = static_cast<int>(static_cast<std::int8_t>(packed >> 8));
-                const __nv_bfloat162 values = __floats2bfloat162_rn(static_cast<float>(q0) * scale,
-                                                                    static_cast<float>(q1) * scale);
+                const unsigned values = scaled_weight_pair_operand(q0, q1, scale);
                 store_vec(&As[row * BK + q8_g32_swz64(row, col)], values);
             }
         }
@@ -188,12 +187,12 @@ __launch_bounds__((TileCols / 16) * 32, kQ8PairMmaMinBlocks<TileCols>) void q8_p
 #pragma unroll
                 for (int ni = 0; ni < NT; ++ni) {
                     if (p == 0) {
-                        mma_bf16(acc_k[mi][ni][0], acc_k[mi][ni][1], acc_k[mi][ni][2],
+                        mma_operands(acc_k[mi][ni][0], acc_k[mi][ni][1], acc_k[mi][ni][2],
                                  acc_k[mi][ni][3], af[slot][mi][0], af[slot][mi][1],
                                  af[slot][mi][2], af[slot][mi][3], bf[slot][ni][0],
                                  bf[slot][ni][1]);
                     } else {
-                        mma_bf16(acc_v[mi][ni][0], acc_v[mi][ni][1], acc_v[mi][ni][2],
+                        mma_operands(acc_v[mi][ni][0], acc_v[mi][ni][1], acc_v[mi][ni][2],
                                  acc_v[mi][ni][3], af[slot][mi][0], af[slot][mi][1],
                                  af[slot][mi][2], af[slot][mi][3], bf[slot][ni][0],
                                  bf[slot][ni][1]);

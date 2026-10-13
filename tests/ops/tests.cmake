@@ -26,11 +26,20 @@ set(ninfer_op_tests
   scatter_bf16_batch
   target_logprobs
   position)
+# The Kimi delta-attention chunk recurrence stages more than the 64 KiB a Turing CTA may use; it
+# is not part of the Qwen product surface that sm_75 builds serve.
+if(CMAKE_CUDA_ARCHITECTURES STREQUAL "75")
+  list(REMOVE_ITEM ninfer_op_tests kimi_delta_attention)
+endif()
 foreach(op IN LISTS ninfer_op_tests)
   ninfer_add_op_test(ninfer_${op}_test
     SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_${op}.cpp"
     LIBRARIES ninfer_ops)
 endforeach()
+
+# Tensor-core wrappers against naive math in the PTX fragment layouts (Turing decompositions).
+ninfer_add_op_test(ninfer_mma_shim_test
+  SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_mma_shim.cu")
 
 ninfer_add_op_test(ninfer_linear_topk_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_linear_topk.cu"
@@ -63,16 +72,18 @@ ninfer_add_op_test(ninfer_context_kv_materialize_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_context_kv_materialize.cpp"
   LIBRARIES ninfer_ops)
 
-add_test(NAME ninfer_kv_cache_append_nvfp4_test
-  COMMAND ninfer_kv_cache_append_test --nvfp4-only)
+if(CMAKE_CUDA_ARCHITECTURES STREQUAL "120a")
+  add_test(NAME ninfer_kv_cache_append_nvfp4_test
+    COMMAND ninfer_kv_cache_append_test --nvfp4-only)
 
-add_test(NAME ninfer_kv_cache_append_k8v4_test
-  COMMAND ninfer_kv_cache_append_test --k8v4-only)
+  add_test(NAME ninfer_kv_cache_append_k8v4_test
+    COMMAND ninfer_kv_cache_append_test --k8v4-only)
 
-set_tests_properties(
-  ninfer_kv_cache_append_nvfp4_test
-  ninfer_kv_cache_append_k8v4_test
-  PROPERTIES SKIP_RETURN_CODE 77)
+  set_tests_properties(
+    ninfer_kv_cache_append_nvfp4_test
+    ninfer_kv_cache_append_k8v4_test
+    PROPERTIES SKIP_RETURN_CODE 77)
+endif()
 
 ninfer_add_op_test(ninfer_prepare_masked_block_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_prepare_masked_block.cpp"

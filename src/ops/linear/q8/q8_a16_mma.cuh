@@ -9,6 +9,7 @@
 // m16n8k16 BF16 MMA with FP32 accumulation.
 
 #include "ops/common/mma.cuh"
+#include "ops/common/operand16.cuh"
 #include "ops/common/math.cuh"
 #include "ops/common/memory.cuh"
 #include "ops/linear/q8/q8_schedule.cuh"
@@ -129,12 +130,12 @@ __global__ __launch_bounds__(Cfg::kThreads, Cfg::kMinBlocksPerSm) void q8_a16_mm
             const int nn = n0 + nl;
             auto* dst    = &Bs[stage][nl * BK + q8_g32_swz64(nl, k8 * 8)];
             if constexpr (Full) {
-                cp_async<16, Cfg::kActivationCache>(dst,
-                                                    &x[static_cast<std::int64_t>(nn) * k + kk]);
+                stage_activation_operand<16, Cfg::kActivationCache>(
+                    dst, &x[static_cast<std::int64_t>(nn) * k + kk]);
             } else {
                 const int valid =
                     nn < n && (FullK || kk < k) ? (FullK ? 16 : min(8, k - kk) * 2) : 0;
-                ninfer::ops::cp_async_zfill<16, Cfg::kPredicatedCache>(
+                ninfer::ops::stage_activation_operand_zfill<16, Cfg::kPredicatedCache>(
                     dst,
                     &x[static_cast<std::int64_t>(nn < n ? nn : 0) * k + (FullK || kk < k ? kk : 0)],
                     valid);
@@ -207,11 +208,11 @@ __global__ __launch_bounds__(Cfg::kThreads, Cfg::kMinBlocksPerSm) void q8_a16_mm
             const int chunk = item - row * kChunksPerRow;
             const int col   = chunk * 8;
             const int gg    = col >> 5;
-            const float scale =
+            const __half scale =
                 (FullK || kt * BK + col < k)
-                    ? __half2float(__ushort_as_half(*reinterpret_cast<const std::uint16_t*>(
-                          &Sr[row * Cfg::kScaleCacheBytes + scale_tile_offset + gg * 2])))
-                    : 0.0f;
+                    ? __ushort_as_half(*reinterpret_cast<const std::uint16_t*>(
+                          &Sr[row * Cfg::kScaleCacheBytes + scale_tile_offset + gg * 2]))
+                    : __ushort_as_half(0);
             const uint2 packed = *reinterpret_cast<const uint2*>(&Cr[row * BK + col]);
             Q8Bf16x8Bits decoded;
 #pragma unroll
@@ -219,8 +220,8 @@ __global__ __launch_bounds__(Cfg::kThreads, Cfg::kMinBlocksPerSm) void q8_a16_mm
                 const unsigned word = (pair < 2 ? packed.x : packed.y) >> ((pair & 1) * 16);
                 const int q0        = static_cast<int>(static_cast<std::int8_t>(word & 0xffu));
                 const int q1 = static_cast<int>(static_cast<std::int8_t>((word >> 8) & 0xffu));
-                decoded.pair[pair] = __floats2bfloat162_rn(static_cast<float>(q0) * scale,
-                                                           static_cast<float>(q1) * scale);
+                reinterpret_cast<unsigned&>(decoded.pair[pair]) =
+                    scaled_weight_pair_operand(q0, q1, scale);
             }
             store_vec(&As[row * BK + q8_g32_swz64(row, col)], decoded.raw);
         }
@@ -284,7 +285,7 @@ __global__ __launch_bounds__(Cfg::kThreads, Cfg::kMinBlocksPerSm) void q8_a16_mm
             for (int mi = 0; mi < MT; ++mi) {
 #pragma unroll
                 for (int ni = 0; ni < NT; ++ni) {
-                    mma_bf16(acc[mi][ni][0], acc[mi][ni][1], acc[mi][ni][2], acc[mi][ni][3],
+                    mma_operands(acc[mi][ni][0], acc[mi][ni][1], acc[mi][ni][2], acc[mi][ni][3],
                              af[slot][mi][0], af[slot][mi][1], af[slot][mi][2], af[slot][mi][3],
                              bf[slot][ni][0], bf[slot][ni][1]);
                 }

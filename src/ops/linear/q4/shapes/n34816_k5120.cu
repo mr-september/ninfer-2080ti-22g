@@ -3,8 +3,17 @@
 namespace ninfer::ops::detail {
 Q4Launch select_q4_n34816_k5120(std::int32_t tokens) {
     // Selected with complete-Op cold CUDA Graph measurements on RTX 5090.
+#if defined(NINFER_SM75)
+    if (tokens <= 1) return launch_q4_a16_gemv_r4_w1_direct;
+#else
     if (tokens <= 1) return launch_q4_a16_gemv_r1_w8_direct;
+#endif
+#if defined(NINFER_SM75)
+    // Turing measurement: the 4-token SIMT route beats the tensor-core route for the verify widths.
+    if (tokens <= 4) return launch_q4_a16_simt_r4_t4_w2_g8_s2;
+#else
     if (tokens <= 4) return launch_q4_a16_sliced_r16_t8_capacity4;
+#endif
     if (tokens <= 8) return launch_q4_a16_sliced_r32_t8_w4_s2;
     if (tokens <= 16) return launch_q4_a16_sliced_r32_t16_w4_s2;
     if (tokens <= 63) return launch_q4_a16_sliced_r32_t32_w4_s1;

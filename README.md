@@ -1,6 +1,17 @@
-# NInfer
+# NInfer (Turing / RTX 2080 Ti 22 GB port)
 
-> Selected checkpoints. Maximum single-GPU inference performance.
+> Selected checkpoints. Maximum single-GPU inference performance, on modified 22 GB RTX 2080 Ti
+> (`sm_75`) cards.
+
+This fork tracks [Neroued/ninfer](https://github.com/Neroued/ninfer) and re-targets its CUDA layer
+to NVIDIA Turing. The Engine, runtime, frontend, serving and scheduling are upstream's; only the
+kernel layer differs. Supported here: `groupwise-int` artifacts (Qwen3.6-27B, Qwen3.8-27B,
+Qwen3.6-35B-A3B) with BF16/INT8 KV, MTP and DFlash. NVFP4/FP8 weights and FP8/NVFP4 KV need
+Blackwell and are not available. Measured on one 2080 Ti 22 GB (Qwen3.8-27B `groupwise-int`, INT8 KV,
+~125-token prompts): prefill 225-240 tok/s, decode 29 tok/s without MTP, ~44 tok/s with MTP3.
+See [docs/turing-port.md](docs/turing-port.md) for the porting notes and build command
+(`-DCMAKE_CUDA_ARCHITECTURES=75`). The text below is upstream's and describes the RTX 5090 product;
+where it conflicts, the Turing page wins.
 
 NInfer is a from-scratch C++/CUDA inference engine for Qwen3.5 Dense and MoE architectures on a
 single NVIDIA GeForce RTX 5090. It runs text, image, and video prompts through a local CLI or
@@ -114,6 +125,11 @@ Redirected stderr receives persistent readable progress without terminal control
 `--log-level debug` for complete startup detail. Option and local input errors remain direct command
 diagnostics. Use `--messages FILE` and `--vision` for structured image/video input; see the
 [CLI guide](docs/cli.md) and [committed examples](examples/cli/).
+
+### Multi-GPU device selection
+
+On multi-GPU systems select the device with `--device <N>`; independent instances on different
+ports give data parallelism. See [docs/multi-gpu.md](docs/multi-gpu.md).
 
 ## Resource-aware long-context reuse
 
@@ -259,6 +275,8 @@ capacities remain fixed for the process lifetime.
 - [CLI](docs/cli.md)
 - [HTTP serving](docs/serving.md)
 - [Performance](docs/performance.md)
+- [Turing port notes](docs/turing-port.md)
+- [Multi-GPU](docs/multi-gpu.md)
 - [Perplexity evaluation](docs/perplexity.md)
 - [Weight conversion and custom recipes](docs/weight-conversion.md)
 - [Resource scheduling and context cache](docs/maintainer/resource-scheduling-and-context-cache.md)

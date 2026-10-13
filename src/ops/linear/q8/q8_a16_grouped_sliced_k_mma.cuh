@@ -189,7 +189,7 @@ __global__ __launch_bounds__(
                         bf0, bf1,
                         smem_addr(&b_shared[warp][br * kTileK +
                                                   q8_sliced_k_swizzle_64(br, ks * 16 + b_koff)]));
-                    mma_bf16(group_acc[ni][0], group_acc[ni][1], group_acc[ni][2], group_acc[ni][3],
+                    mma_integer_weights(group_acc[ni][0], group_acc[ni][1], group_acc[ni][2], group_acc[ni][3],
                              af0, af1, af2, af3, bf0, bf1);
                 }
             }

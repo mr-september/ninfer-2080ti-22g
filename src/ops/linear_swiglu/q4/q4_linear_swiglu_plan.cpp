@@ -33,8 +33,15 @@ struct RouteSpec {
 constexpr Q4LinearSwiGluProblem kShape{34816, 17408, 5120, 5120, 1};
 
 constexpr std::array<RouteSpec, 10> kRoutes{{
+#if defined(NINFER_SM75)
+    // Turing: gate/up through the tuned Linear routes (FP16-mantissa GEMV at T=1, SIMT up to T=4)
+    // plus an elementwise SwiGLU beats the fused kernels at these widths.
+    {{1, 4}, Q4LinearSwiGluScheduleId::Materialized},
+    {{5, 32}, Q4LinearSwiGluScheduleId::SmallTTiled},
+#else
     {{1, 1}, Q4LinearSwiGluScheduleId::GemvPair},
     {{2, 32}, Q4LinearSwiGluScheduleId::SmallTTiled},
+#endif
     {{33, 128}, Q4LinearSwiGluScheduleId::Materialized},
     {{129, 168}, Q4LinearSwiGluScheduleId::MmaSplitHalfPairR32C128Tail},
     {{169, 224}, Q4LinearSwiGluScheduleId::Materialized},

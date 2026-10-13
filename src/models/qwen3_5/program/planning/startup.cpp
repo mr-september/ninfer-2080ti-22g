@@ -7,6 +7,7 @@
 #include "models/qwen3_5/program/planning/startup.h"
 #include "models/qwen3_5/execution/vision.h"
 #include "models/qwen3_5/execution/workspace.h"
+#include "core/arch_traits.cuh"
 #include "core/device.h"
 #include "ninfer/ops/gated_delta_net.h"
 #include "ninfer/ops/candidate_selector.h"
@@ -36,6 +37,18 @@ using execution::dimension;
 namespace workspace = execution::workspace;
 
 constexpr std::size_t kMiB        = 1024ULL * 1024ULL;
+
+// CUDA Graph executable and driver module state per exact-b profile class. Turing measured
+// larger executables than Blackwell, so its bounds are higher.
+#if defined(NINFER_SM75)
+constexpr std::uint64_t kOrdinaryGraphAllowanceMiB = 64;
+constexpr std::uint64_t kMtpShortGraphAllowanceMiB = 64;
+constexpr std::uint64_t kMtpLongGraphAllowanceMiB  = 96;
+#else
+constexpr std::uint64_t kOrdinaryGraphAllowanceMiB = 12;
+constexpr std::uint64_t kMtpShortGraphAllowanceMiB = 12;
+constexpr std::uint64_t kMtpLongGraphAllowanceMiB  = 82;
+#endif
 constexpr std::size_t kArenaAlign = 256ULL;
 
 enum class GdnWorkspacePath : std::uint8_t {
@@ -809,8 +822,12 @@ void validate_target_options(const execution::Parameters& parameters, DeviceCont
         }
         break;
     }
-    if (device.compute_capability() != 120) {
-        throw std::invalid_argument("Qwen3.5 family runtime requires compute capability 12.0");
+    if (device.compute_capability() != core::CurrentArchTraits::compute_capability) {
+        throw std::invalid_argument(
+            std::string("Qwen3.5 family runtime was built for ") +
+            core::CurrentArchTraits::name + " and requires compute capability " +
+            std::to_string(core::CurrentArchTraits::compute_capability / 10) + "." +
+            std::to_string(core::CurrentArchTraits::compute_capability % 10));
     }
 }
 
@@ -853,8 +870,9 @@ std::unique_ptr<SequencePlanImpl> build_sequence_candidate(const SequencePlannin
         // each reachable node-topology class. These bounds cover the largest profile installed in
         // each class and the driver/module state materialized while qualifying all definitions.
         if (impl->speculative_backend == SpeculativeBackend::None) {
-            impl->graph_allowance_bytes = checked_mul(12ULL * kMiB, impl->max_concurrency,
-                                                      "ordinary exact-b graph allowance");
+            impl->graph_allowance_bytes =
+                checked_mul(kOrdinaryGraphAllowanceMiB * kMiB, impl->max_concurrency,
+                            "ordinary exact-b graph allowance");
         } else if (impl->speculative_backend == SpeculativeBackend::Mtp) {
             const auto profiles = mtp_graph_profiles(impl->capacity, impl->draft_window);
             const std::size_t per_batch_allowance = graph_topology_allowance(
@@ -863,7 +881,9 @@ std::unique_ptr<SequencePlanImpl> build_sequence_candidate(const SequencePlannin
                     const std::uint64_t final_visible = std::min<std::uint64_t>(
                         impl->capacity,
                         static_cast<std::uint64_t>(profile.max) + 2ULL * impl->draft_window);
-                    return (final_visible <= 4096 ? 12ULL : 82ULL) * kMiB;
+                    return (final_visible <= 4096 ? kMtpShortGraphAllowanceMiB
+                                                  : kMtpLongGraphAllowanceMiB) *
+                           kMiB;
                 },
                 "MTP graph allowance");
             impl->graph_allowance_bytes = checked_mul(per_batch_allowance, impl->max_concurrency,

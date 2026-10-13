@@ -27,7 +27,7 @@ __launch_bounds__(Schedule::kThreads, Schedule::kMinBlocks) __global__
     constexpr unsigned FullMask = 0xffffffffu;
 
     static_assert(Br == Schedule::kWarps * 16);
-    static_assert(bf16_kv_tiled_shared_bytes<Geometry, Schedule> <= 99 * 1024);
+    static_assert(bf16_kv_tiled_shared_bytes<Geometry, Schedule> <= core::kMaxCtaSharedBytes);
 
     extern __shared__ __align__(16) __nv_bfloat16 causal_smem[];
     __nv_bfloat16* q_s = causal_smem;                             // [Br, D] swizzled

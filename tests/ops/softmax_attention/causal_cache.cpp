@@ -1,3 +1,4 @@
+#include "ops/format_support.h"
 #include "core/arena.h"
 #include "core/paged_kv_cache.h"
 #include "ninfer/ops/kv_cache_append.h"
@@ -2762,6 +2763,9 @@ int run_softmax_attention_causal_cache_tests(std::optional<KvCacheStorage> selec
          {KvCacheStorage::BFloat16, KvCacheStorage::Int8Group64, KvCacheStorage::Fp8E4M3Row256,
           KvCacheStorage::Nvfp4Group16, KvCacheStorage::Fp8KeyNvfp4Value}) {
         if (selected && storage != *selected) continue;
+        if (!selected && !ninfer::test::kSm120Formats && storage != KvCacheStorage::BFloat16 &&
+            storage != KvCacheStorage::Int8Group64)
+            continue;
         const auto start = std::chrono::steady_clock::now();
         std::cout << "RUN causal_softmax_attention " << cache_name(storage) << std::endl;
         const int current = run_storage_cases(execution, storage);

@@ -90,7 +90,7 @@ constexpr auto make_launchers(std::index_sequence<Offsets...>) {
 constexpr auto kLaunchers =
     make_launchers(std::make_index_sequence<kLastExactT - kFirstExactT + 1>{});
 
-template <int TileCols, int KSplits, int NGroups, int MinBlocks>
+template <int TileCols, int KSplits, int NGroups, int MinBlocks, bool TiledTokens = false>
 void launch_medium(const Tensor& x, const Weight& first_weight, const Weight& second_weight,
                    Tensor& first_out, Tensor& second_out, cudaStream_t stream) {
     const auto* first_codes  = static_cast<const std::uint8_t*>(first_weight.qdata);
@@ -103,7 +103,7 @@ void launch_medium(const Tensor& x, const Weight& first_weight, const Weight& se
     const PairOutput output{static_cast<__nv_bfloat16*>(first_out.data),
                             static_cast<__nv_bfloat16*>(second_out.data)};
     launch_q8_a16_grouped_sliced_k_mma<Q8A16GroupedSlicedKMmaSchedule<
-        TileCols, KSplits, NGroups, 1, MinBlocks, kHidden, Cache::cg, Cache::cg, false>>(
+        TileCols, KSplits, NGroups, 1, MinBlocks, kHidden, Cache::cg, Cache::cg, TiledTokens>>(
         Q8LinearOperands{static_cast<const __nv_bfloat16*>(x.data), first_codes, first_scales,
                          ((2 * kRows) / 16) * 16, kHidden, x.ne[1], kHidden},
         output, LinearIdentityEpilogue{}, stream);
@@ -222,8 +222,15 @@ void q8_pair_splitk_medium_launch(Q8PairScheduleId schedule, const Tensor& x,
         break;
     case Q8PairScheduleId::DualSplitKMediumC256:
         if (x.ne[1] <= 256) {
+#if defined(NINFER_SM75)
+            // A 256-token tile stages 68 KiB, over a Turing CTA's 64 KiB; two 128-token tiles
+            // stage 36 KiB each.
+            launch_medium<128, 2, 4, 2, true>(x, first_weight, second_weight, first_out,
+                                              second_out, stream);
+#else
             launch_medium<256, 2, 8, 1>(x, first_weight, second_weight, first_out, second_out,
                                         stream);
+#endif
             CUDA_CHECK(cudaGetLastError());
             return;
         }

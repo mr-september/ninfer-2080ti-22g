@@ -23,7 +23,10 @@ constexpr ContextKVMaterializeRoute context_kv_materialize_route(std::int32_t co
     if (columns <= 64) return Route::Mma32;
     if (columns <= 80) return Route::Mma80;
     if (columns <= 96) return Route::Mma96;
+#if !defined(NINFER_SM75)
+    // The fused 128-row tile stages 66 KiB, over a Turing CTA's 64 KiB.
     if (columns <= 256) return Route::Fused64;
+#endif
     return Route::Mma64;
 }
 

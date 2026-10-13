@@ -1,3 +1,4 @@
+#include "ops/format_support.h"
 #include "core/weight.h"
 #include "core/device.h"
 #include "ninfer/ops/gdn_input_proj.h"
@@ -451,8 +452,10 @@ int main() {
     int failures = 0;
     failures += run_q4_q5();
     failures += run_q8();
-    failures += run_nvfp4();
-    failures += run_fp8();
+    if (ninfer::test::kSm120Formats) {
+        failures += run_nvfp4();
+        failures += run_fp8();
+    }
     std::cout << (failures == 0 ? "OK" : "FAIL") << " gdn_input_proj_conv_record\n";
     return failures == 0 ? 0 : 1;
 }

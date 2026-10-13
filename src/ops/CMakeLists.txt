@@ -29,3 +29,25 @@ include("${CMAKE_CURRENT_LIST_DIR}/linear_topk/sources.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/rmsnorm_rope/sources.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/softmax_attention/sources.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/sparse_moe/sources.cmake")
+
+# Blackwell-only formats. The FP8/NVFP4 weight paths, FP8/NVFP4/K8V4 KV caches and the TMA/tcgen
+# kernels need sm_120a instructions. Other targets drop these sources from the manifests above
+# (keeping the upstream manifests untouched) and link throwing definitions of the same
+# declarations instead; the BF16 and grouped-integer routes are the supported surface there.
+if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "120a")
+  set(_ninfer_sm120_only_regex
+    "/(fp8|nvfp4)/"
+    "/linear_topk/fp8(_m64)?[.]cu$"
+    "/kv_cache/append/(nvfp4|k8v4)_launch[.]cu$"
+    "/causal_cache/(fp8|nvfp4|k8v4)/")
+  string(REPLACE ";" "|" _ninfer_sm120_only_regex "${_ninfer_sm120_only_regex}")
+  foreach(_target ninfer_ops ninfer_nvfp4_non_rdc)
+    get_target_property(_sources ${_target} SOURCES)
+    list(FILTER _sources EXCLUDE REGEX "${_ninfer_sm120_only_regex}")
+    set_property(TARGET ${_target} PROPERTY SOURCES ${_sources})
+  endforeach()
+  target_sources(ninfer_ops PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/unsupported/sm120_formats_unsupported.cpp")
+  target_sources(ninfer_nvfp4_non_rdc PRIVATE
+    "${CMAKE_CURRENT_LIST_DIR}/unsupported/empty_non_rdc.cpp")
+endif()

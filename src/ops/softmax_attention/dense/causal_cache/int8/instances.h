@@ -8,7 +8,12 @@ template <class G, int Tokens>
 struct Int8KvGroupedInstance {
     static_assert(Tokens > 0 && Tokens * G::GroupSize <= 64);
     static constexpr int kRowTiles  = (Tokens * G::GroupSize + 15) / 16;
+#if defined(NINFER_SM75)
+    // The 64-key arena (4 * 64 * 256 B) plus Q state exceeds a Turing CTA's 64 KiB.
+    static constexpr bool kWideKeys = false;
+#else
     static constexpr bool kWideKeys = G::GroupSize == 8 && kRowTiles >= 3;
+#endif
     using Schedule                  = Int8KvGroupedMmaSchedule<Tokens,
                                               kWideKeys        ? 4 * kRowTiles
                                                                : kRowTiles <= 2 ? 8
@@ -17,6 +22,11 @@ struct Int8KvGroupedInstance {
     using Merge                     = Int8KvMergeSchedule<G::QHeads == 24 ? 256 : 64>;
 };
 
+#if defined(NINFER_SM75)
+// 64x64 stages 92 KiB; 32x32 stages 44 KiB, within a Turing CTA.
+using Int8KvTiledInstance = Int8KvTiledMmaSchedule<32, 32, 128>;
+#else
 using Int8KvTiledInstance = Int8KvTiledMmaSchedule<64, 64, 128>;
+#endif
 
 } // namespace ninfer::ops::detail

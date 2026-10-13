@@ -3,6 +3,7 @@
 // Row/tokens tiled Q6 x BF16 MMA. Scaled weights are materialized as BF16;
 // accumulation is FP32. N/K/T stay runtime values and the launcher owns bounds.
 #include "ops/common/mma.cuh"
+#include "ops/common/operand16.cuh"
 #include "ops/linear/q6/q6_schedule.cuh"
 
 namespace ninfer::ops::detail {
@@ -91,11 +92,11 @@ void q6_a16_mma_kernel(
             const int col       = col0 + local_col;
             auto* dst = &Bs[stage][local_col * BK + q6_mma_swizzle_k64(local_col, k8 * 8)];
             if constexpr (kFull) {
-                cp_async<16, Schedule::kActivationCache>(
+                stage_activation_operand<16, Schedule::kActivationCache>(
                     dst, &x[static_cast<std::int64_t>(col) * k + kk]);
             } else {
                 if (col < cols && kk + 8 <= k) {
-                    cp_async<16, Schedule::kActivationCache>(
+                    stage_activation_operand<16, Schedule::kActivationCache>(
                         dst, &x[static_cast<std::int64_t>(col) * k + kk]);
                 } else {
                     store_vec(dst, make_int4(0, 0, 0, 0));
@@ -235,7 +236,7 @@ void q6_a16_mma_kernel(
                                                         ? ((scale_group + group) & 1) *
                                                               Q6RowSplitStorage::kScaleBytesPerGroup
                                                         : 0)];
-                const __nv_bfloat162 weights = Q6MmaDecodeAtom::decode_pair(
+                const unsigned weights = Q6MmaDecodeAtom::decode_pair(
                     Cr[stage], Hr[stage], scale_ptr, staged_group, lane);
                 const int shared_col =
                     q6_mma_swizzle_k64(local_row, group * Q6RowSplitStorage::kGroupK + 2 * lane);
@@ -309,7 +310,7 @@ void q6_a16_mma_kernel(
                 for (int mi = 0; mi < MT; ++mi) {
 #pragma unroll
                     for (int ni = 0; ni < NT; ++ni) {
-                        mma_bf16(accum[mi][ni][0], accum[mi][ni][1], accum[mi][ni][2],
+                        mma_operands(accum[mi][ni][0], accum[mi][ni][1], accum[mi][ni][2],
                                  accum[mi][ni][3], a_frag[current][mi][0], a_frag[current][mi][1],
                                  a_frag[current][mi][2], a_frag[current][mi][3],
                                  b_frag[current][ni][0], b_frag[current][ni][1]);
@@ -326,7 +327,7 @@ void q6_a16_mma_kernel(
                 for (int mi = 0; mi < MT; ++mi) {
 #pragma unroll
                     for (int ni = 0; ni < NT; ++ni) {
-                        mma_bf16(accum[mi][ni][0], accum[mi][ni][1], accum[mi][ni][2],
+                        mma_operands(accum[mi][ni][0], accum[mi][ni][1], accum[mi][ni][2],
                                  accum[mi][ni][3], a_frag[mi][0], a_frag[mi][1], a_frag[mi][2],
                                  a_frag[mi][3], b_frag[ni][0], b_frag[ni][1]);
                     }

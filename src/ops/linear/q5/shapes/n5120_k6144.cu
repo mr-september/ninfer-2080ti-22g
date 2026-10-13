@@ -2,6 +2,11 @@
 
 namespace ninfer::ops::detail {
 Q5Launch select_q5_n5120_k6144(std::int32_t tokens) {
+#if defined(NINFER_SM75)
+    // Turing: the SIMT/direct decode kernels beat the tensor-core small-T routes (tuned on
+    // RTX 5090) at the MTP verify widths, measured per shape with the 2080 Ti.
+    if (tokens == 4) return launch_q5_a16_direct_r2_t4_w2_g8_b4;
+#endif
     // Selected with complete-Op cold CUDA Graph measurements on RTX 5090.
     if (tokens <= 1) return launch_q5_a16_direct_r1_t1_w4_k6144;
     if (tokens <= 2) return launch_q5_a16_direct_r1_t2_w2_k6144;

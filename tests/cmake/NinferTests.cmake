@@ -29,6 +29,10 @@ function(ninfer_op_oracle_options target)
 endfunction()
 
 function(ninfer_add_op_test name)
+  # FP8/NVFP4 routes need sm_120a; other targets link throwing definitions instead.
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "120a" AND name MATCHES "nvfp4|fp8")
+    return()
+  endif()
   ninfer_add_test(${name} ${ARGN})
   set_tests_properties(${name} PROPERTIES SKIP_RETURN_CODE 77)
   ninfer_op_oracle_options(${name})

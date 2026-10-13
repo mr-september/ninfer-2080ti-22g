@@ -8,6 +8,7 @@
 // the CTA reduces FP32 partials in shared memory. Output owns physical row/token addressing; an
 // optional caller epilogue may instead consume the FP32 tile.
 
+#include "ops/common/integer_operands.cuh"
 #include "ops/common/mma.cuh"
 #include "ops/common/memory.cuh"
 #include "ops/linear/q8/q8_schedule.cuh"
@@ -41,6 +42,9 @@ union Q8Bf16PairBits {
 };
 
 __device__ __forceinline__ unsigned q8_bf16_pair_from_s8(unsigned values) {
+#if defined(NINFER_SM75)
+    return s8x2_pair_operand(values);
+#else
     Q8Bf16PairBits biased;
     biased.bits          = __byte_perm(values, 0x43004300u, 0x7150) & 0xff7fff7fu;
     const unsigned signs = (values & 0x80u) | ((values & 0x8000u) << 8);
@@ -49,6 +53,7 @@ __device__ __forceinline__ unsigned q8_bf16_pair_from_s8(unsigned values) {
     Q8Bf16PairBits result;
     result.pair = __hsub2_rn(biased.pair, bias.pair);
     return result.bits;
+#endif
 }
 
 // The contraction owns the shared layout; tiled launchers use the same type for opt-in capacity.
@@ -295,7 +300,7 @@ __device__ __forceinline__ void q8_a16_sliced_k_mma(Q8LinearOperands operands, O
                         bf0, bf1,
                         smem_addr(&b_shared[k_split][br * kTileK + q8_sliced_k_swizzle_64(
                                                                        br, ks * 16 + b_koff)]));
-                    mma_bf16(group_acc[ni][0], group_acc[ni][1], group_acc[ni][2], group_acc[ni][3],
+                    mma_integer_weights(group_acc[ni][0], group_acc[ni][1], group_acc[ni][2], group_acc[ni][3],
                              af0, af1, af2, af3, bf0, bf1);
                 }
             }

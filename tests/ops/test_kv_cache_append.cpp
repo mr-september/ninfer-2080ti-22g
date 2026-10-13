@@ -1,3 +1,4 @@
+#include "ops/format_support.h"
 #include "ninfer/ops/kv_cache_append.h"
 #include "ops/op_tester.h"
 #include "core/decode_graph.h"
@@ -1393,14 +1394,18 @@ int main(int argc, char** argv) {
     for (const int kv_heads : {4, 2}) {
         failures += full_append_case(kv_heads, KvCacheStorage::BFloat16);
         failures += full_append_case(kv_heads, KvCacheStorage::Int8Group64);
-        failures += full_append_case(kv_heads, KvCacheStorage::Fp8E4M3Row256);
-        failures += full_append_case(kv_heads, KvCacheStorage::Nvfp4Group16);
-        failures += full_append_case(kv_heads, KvCacheStorage::Fp8KeyNvfp4Value);
+        if (ninfer::test::kSm120Formats) {
+            failures += full_append_case(kv_heads, KvCacheStorage::Fp8E4M3Row256);
+            failures += full_append_case(kv_heads, KvCacheStorage::Nvfp4Group16);
+            failures += full_append_case(kv_heads, KvCacheStorage::Fp8KeyNvfp4Value);
+        }
     }
     failures += full_append_case(2, KvCacheStorage::Int8Group64, 129);
-    failures += full_append_case(2, KvCacheStorage::Fp8E4M3Row256, 129);
-    failures += full_append_case(2, KvCacheStorage::Nvfp4Group16, 129);
-    failures += full_append_case(2, KvCacheStorage::Fp8KeyNvfp4Value, 129);
+    if (ninfer::test::kSm120Formats) {
+        failures += full_append_case(2, KvCacheStorage::Fp8E4M3Row256, 129);
+        failures += full_append_case(2, KvCacheStorage::Nvfp4Group16, 129);
+        failures += full_append_case(2, KvCacheStorage::Fp8KeyNvfp4Value, 129);
+    }
     failures += run_case(1, 0, 0, false, {0, 1, 2});
     failures += run_case(1, 1, 63, false, {2, 3, 4});
     failures += run_case(16, 7, 60, false, {5, 1, 4}, 5);
