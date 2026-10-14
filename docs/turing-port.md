@@ -9,10 +9,10 @@ sync can be redone deliberately instead of by merge.
 
 | Area | sm_75 |
 |---|---|
-| Artifacts | `groupwise-int` (Q4/Q5/Q6/Q8 + BF16 tensors): Qwen3.6-27B, Qwen3.8-27B, Qwen3.6-35B-A3B |
+| Artifacts | `groupwise-int` (Q4/Q5/Q6/Q8 + BF16 tensors): Qwen3.8-27B is the only tested model. Qwen3.6-27B and Qwen3.6-35B-A3B are untested (op-level kernels only; the 21.2 GiB 35B-A3B artifact does not fit 22 GB) |
 | NVFP4 / FP8 weights | unsupported; the routes link throwing definitions |
 | KV cache | `bf16`, `int8`; `fp8`, `nvfp4`, `k8v4` unsupported |
-| Speculation | MTP; DFlash (35B-A3B) |
+| Speculation | MTP (tested); DFlash is untested and tied to 35B-A3B |
 | Kimi delta attention | not built into the sm_75 test set (needs more than the 64 KiB CTA limit) |
 
 Unsupported formats are not stubbed one symbol at a time inside upstream sources. `src/ops/CMakeLists.txt`

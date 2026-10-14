@@ -12,13 +12,13 @@ merging (see [docs/turing-port.md](docs/turing-port.md)).
 
 | Area | Status on `sm_75` |
 |---|---|
-| Artifacts | v3 `groupwise-int` (Q4/Q5/Q6/Q8 + BF16): Qwen3.6-27B, Qwen3.8-27B, Qwen3.6-35B-A3B |
+| Artifacts | v3 `groupwise-int` (Q4/Q5/Q6/Q8 + BF16): Qwen3.8-27B (tested) |
 | NVFP4 / FP8 weights | not available (need Blackwell); the NVFP4 artifacts do not load |
 | KV cache | `bf16`, `int8`; `fp8`, `nvfp4`, `k8v4` unavailable |
 | Text, thinking, prefix reuse, CUDA Graph decode | yes |
 | Image / video Vision | yes (`--vision`) |
 | MTP | yes (`--spec mtp --draft-tokens N`) |
-| DFlash (35B-A3B) | builds and passes op tests; not run end to end (no local artifact) |
+| Qwen3.6-27B, Qwen3.6-35B-A3B, DFlash | untested; the kernels build and pass op tests, so they may work in theory, but nothing is guaranteed. The 35B-A3B artifact (21.2 GiB) cannot fit a 22 GB card |
 | OpenAI Chat/Responses, Anthropic Messages, streaming | yes |
 | Kimi delta attention | not built (needs more than the 64 KiB CTA shared memory limit) |
 
