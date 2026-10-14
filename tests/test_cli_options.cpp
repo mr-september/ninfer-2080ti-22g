@@ -1,4 +1,5 @@
 #include "options.h"
+#include "product/defaults.h"
 
 #include <functional>
 #include <iostream>
@@ -36,6 +37,30 @@ int main() {
                                "--choice", "a|b", "--choice", "你好"});
     failures += check(choice.choices == std::vector<std::string>{"", "a|b", "你好"},
                       "choice flags changed literal text or order");
+    const auto defaults = parse({"ninfer", "model.ninfer", "--prompt", "hello"});
+    failures += check(defaults.max_context == ninfer::product::kDefaultMaxContext &&
+                          defaults.kv_capacity.explicit_tokens == defaults.max_context &&
+                          defaults.kv_cache == ninfer::product::default_kv_cache(),
+                      "CLI defaults do not follow the product defaults");
+    failures += check(defaults.speculative.backend == ninfer::SpeculativeBackend::Mtp &&
+                          defaults.speculative.draft_tokens == ninfer::product::kDefaultDraftTokens &&
+                          defaults.speculative.proposal_head == ninfer::ProposalHead::Auto,
+                      "MTP with the automatic proposal head is not the CLI default");
+    const auto plain = parse({"ninfer", "model.ninfer", "--prompt", "hello", "--spec", "none"});
+    failures += check(plain.speculative.backend == ninfer::SpeculativeBackend::None &&
+                          plain.speculative.draft_tokens == 0 &&
+                          plain.speculative.proposal_head == ninfer::ProposalHead::Full,
+                      "--spec none did not clear the speculative defaults");
+    failures += check(rejects([] {
+                          (void)parse({"ninfer", "model.ninfer", "--prompt", "hello", "--spec",
+                                       "none", "--draft-tokens", "3"});
+                      }),
+                      "--draft-tokens was accepted with --spec none");
+    failures += check(rejects([] {
+                          (void)parse({"ninfer", "model.ninfer", "--prompt", "hello", "--spec",
+                                       "dflash"});
+                      }),
+                      "--spec dflash was accepted without its own --draft-tokens");
     failures +=
         check(parse({"ninfer", "model.ninfer", "--prompt", "hello", "--regex", ""}).regex == "",
               "empty regex must be distinct from no regex");

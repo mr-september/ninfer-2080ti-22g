@@ -27,6 +27,11 @@ struct HostPlacement {
     std::vector<std::byte> data;
 };
 
+struct PinnedPlacement {
+    ObjectHandle object;
+    std::unique_ptr<PinnedHostBuffer> buffer;
+};
+
 struct MaterializationPlan {
     const Reader* source                = nullptr;
     std::size_t object_count            = 0;
@@ -35,6 +40,10 @@ struct MaterializationPlan {
     std::uint64_t owned_value_bytes     = 0;
     std::vector<DevicePlacement> device_objects;
     std::vector<HostPlacement> host_objects;
+    // Page-locked host storage that kernels read in place. The buffers are acquired when the
+    // parameter is bound, so an allocation failure falls back to device residency before any
+    // device capacity is planned.
+    std::vector<PinnedPlacement> pinned_objects;
 };
 
 struct MaterializationStats {
@@ -43,10 +52,12 @@ struct MaterializationStats {
     std::uint64_t h2d_bytes  = 0;
     std::uint64_t device_capacity_bytes = 0;
     std::uint64_t retained_host_bytes   = 0;
+    std::uint64_t pinned_host_bytes     = 0;
     std::uint64_t owned_value_bytes     = 0;
     std::uint64_t peak_staging_bytes    = 0;
     std::size_t device_object_count     = 0;
     std::size_t host_object_count       = 0;
+    std::size_t pinned_object_count     = 0;
     double upload_seconds               = 0;
 };
 
@@ -61,6 +72,7 @@ public:
 
     [[nodiscard]] const WeightParent& device_parent(ObjectHandle handle) const;
     [[nodiscard]] const WeightParent& host_parent(ObjectHandle handle) const;
+    [[nodiscard]] const WeightParent& pinned_parent(ObjectHandle handle) const;
     [[nodiscard]] std::span<const std::byte> host_bytes(ObjectHandle handle) const;
     [[nodiscard]] bool has_device(ObjectHandle handle) const noexcept;
 
@@ -73,6 +85,8 @@ private:
     struct ObjectStorage {
         std::optional<WeightParent> device;
         std::optional<WeightParent> host;
+        std::optional<WeightParent> pinned;
+        std::unique_ptr<PinnedHostBuffer> pinned_data;
         std::vector<std::byte> host_data;
     };
 

@@ -114,6 +114,13 @@ const WeightParent& MaterializedArtifact::host_parent(ObjectHandle handle) const
     return *objects_[handle.index].host;
 }
 
+const WeightParent& MaterializedArtifact::pinned_parent(ObjectHandle handle) const {
+    if (handle.index >= objects_.size() || !objects_[handle.index].pinned) {
+        throw ArtifactError("object has no pinned Host weight backing");
+    }
+    return *objects_[handle.index].pinned;
+}
+
 std::span<const std::byte> MaterializedArtifact::host_bytes(ObjectHandle handle) const {
     if (handle.index >= objects_.size() || objects_[handle.index].host_data.empty()) {
         throw ArtifactError("object has no retained Host bytes");
@@ -146,6 +153,7 @@ MaterializedArtifact materialize(const Reader& reader, MaterializationPlan&& pla
     out.stats_.device_capacity_bytes = plan.device_capacity_bytes;
     out.stats_.device_object_count   = plan.device_objects.size();
     out.stats_.host_object_count     = plan.host_objects.size();
+    out.stats_.pinned_object_count   = plan.pinned_objects.size();
     if (plan.device_capacity_bytes > std::numeric_limits<std::size_t>::max()) {
         throw ArtifactError("device backing exceeds size_t");
     }
@@ -175,6 +183,34 @@ MaterializedArtifact materialize(const Reader& reader, MaterializationPlan&& pla
                 read_divisor(reader, placement.object, geometry, storage.host_data, out.stats_);
             storage.host = WeightParent{geometry, storage.host_data.data(), divisor};
         }
+    }
+    for (auto& placement : plan.pinned_objects) {
+        const ObjectHandle handle = placement.object;
+        reader.validate_object(handle);
+        auto& storage = out.objects_.at(handle.index);
+        if (storage.pinned) { throw ArtifactError("duplicate pinned Host placement"); }
+        const auto& geometry   = reader.geometry(handle);
+        const auto& descriptor = reader.directory().tensor(handle);
+        if (geometry.bytes > std::numeric_limits<std::size_t>::max()) {
+            throw ArtifactError("pinned Host object exceeds size_t");
+        }
+        if (!placement.buffer || placement.buffer->size() != geometry.bytes) {
+            throw ArtifactError("pinned Host placement has no matching buffer");
+        }
+        storage.pinned_data = std::move(placement.buffer);
+        reader.read_into(descriptor.offset,
+                         {static_cast<std::byte*>(storage.pinned_data->data()),
+                          static_cast<std::size_t>(geometry.bytes)});
+        out.stats_.read_bytes = checked_add(out.stats_.read_bytes, geometry.bytes, "pinned read");
+        out.stats_.pinned_host_bytes =
+            checked_add(out.stats_.pinned_host_bytes, geometry.bytes, "pinned bytes");
+        const auto divisor =
+            read_divisor(reader, handle, geometry,
+                         {static_cast<const std::byte*>(storage.pinned_data->data()),
+                          static_cast<std::size_t>(geometry.bytes)},
+                         out.stats_);
+        storage.pinned = WeightParent{
+            geometry, static_cast<const std::byte*>(storage.pinned_data->device_data()), divisor};
     }
     std::vector<CopyRange> ranges;
     for (const auto& placement : plan.device_objects) {

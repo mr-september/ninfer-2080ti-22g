@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ninfer/types.h"
+#include "product/defaults.h"
 #include "product/logging/logging.h"
 
 #include <cstddef>
@@ -28,8 +29,8 @@ struct ServeOptions {
     std::string api_key;                          // empty => no auth
     std::optional<std::string> model_id_override; // unset => artifact metadata.name
     std::string request_log_jsonl;                // empty => structured request logging disabled
-    std::uint32_t max_context          = 8192;
-    KvCapacityPolicy kv_capacity       = KvCapacityPolicy::explicit_capacity(8192);
+    std::uint32_t max_context          = product::kDefaultMaxContext;
+    KvCapacityPolicy kv_capacity       = KvCapacityPolicy::explicit_capacity(product::kDefaultMaxContext);
     std::uint32_t max_concurrency      = 1;
     std::uint32_t max_pending_requests = 16;
     std::uint32_t pending_timeout_ms   = 30000;
@@ -43,8 +44,8 @@ struct ServeOptions {
     std::size_t response_store_max_records = kDefaultResponseStoreRecords;
     std::size_t response_store_max_bytes   = kDefaultResponseStoreBytes;
     int device                             = 0;
-    KvCacheStorage kv_cache                = KvCacheStorage::BFloat16;
-    SpeculativeOptions speculative;
+    KvCacheStorage kv_cache                = product::default_kv_cache();
+    SpeculativeOptions speculative         = product::default_speculative();
     ContextCacheOptions context_cache;
     bool enable_vision      = false;
     bool use_cuda_graph     = true;

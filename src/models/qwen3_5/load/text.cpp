@@ -99,8 +99,11 @@ BlockWeights bind_block(Bindings& b, const TextConfig& config, const std::string
 
 TextWeights bind_text(Bindings& b, const TextConfig& config, const LoadOptions& options) {
     TextWeights out;
+    // The embedding gathers one row per token, so it stays in pinned host memory and kernels read
+    // the rows over PCIe: about 1.3 GiB less device memory at 27B scale for a few microseconds.
     out.token_embedding =
-        b.parameter("text/token_embedding", {config.vocab_size, config.hidden_size});
+        b.parameter("text/token_embedding", {config.vocab_size, config.hidden_size}, {}, {},
+                    artifact::Residency::PinnedHost);
     std::vector<std::string> head_inputs{"text/final_hidden"};
     if (options.speculative != SpeculativeBackend::None && !options.proposal_enabled()) {
         head_inputs.push_back(std::string(options.speculative_component()) + "/final_hidden");

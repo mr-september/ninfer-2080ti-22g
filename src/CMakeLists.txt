@@ -1,9 +1,9 @@
 # Components own targets and dependencies; source manifests remain explicit.
 add_subdirectory(core)
+add_subdirectory(ops)
 add_subdirectory(artifact)
 add_subdirectory(text)
 add_subdirectory(media)
-add_subdirectory(ops)
 add_subdirectory(models)
 add_subdirectory(runtime)
 

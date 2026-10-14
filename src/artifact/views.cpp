@@ -13,6 +13,8 @@ WeightView bind_view(const ParameterReference& reference,
     for (const auto& part : reference.binding.parts) {
         const auto& parent = reference.residency == Residency::Device
                                  ? materialized.device_parent(part.object)
+                             : reference.residency == Residency::PinnedHost
+                                 ? materialized.pinned_parent(part.object)
                                  : materialized.host_parent(part.object);
         if (part.begin >= part.end || part.end > parent.geometry.elements) {
             throw ArtifactError(reference.name + ": invalid materialized region");

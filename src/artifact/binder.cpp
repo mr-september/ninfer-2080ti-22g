@@ -48,19 +48,39 @@ ParameterReference Binder::binding(std::string name, const Binding& binding, Sha
          reader_.directory().tensor(binding.parts.at(0).object).shape != shape)) {
         throw ArtifactError(name + ": logical shape differs from Binding coverage");
     }
+    Residency effective = residency;
     for (const auto& part : binding.parts) {
         const auto& geometry = reader_.geometry(part.object);
         if (exact_format && geometry.format != *exact_format) {
             throw ArtifactError(name +
                                 ": representation does not match its mathematical value type");
         }
-        if (residency == Residency::Device) {
+    }
+    if (residency == Residency::PinnedHost) {
+        // All parts pin or the parameter falls back to the device: page-locked memory can be
+        // unavailable on a host that is short of free RAM, and the model must still load.
+        std::vector<ObjectHandle> pinned;
+        bool ok = true;
+        for (const auto& part : binding.parts) {
+            if (!try_require_pinned_host(part.object)) {
+                ok = false;
+                break;
+            }
+            pinned.push_back(part.object);
+        }
+        if (!ok) {
+            for (const ObjectHandle handle : pinned) { demands_.at(handle.index).pinned_buffer.reset(); }
+            effective = Residency::Device;
+        }
+    }
+    for (const auto& part : binding.parts) {
+        if (effective == Residency::Device) {
             require_device(part.object);
-        } else if (residency == Residency::Host) {
+        } else if (effective == Residency::Host) {
             (void)host_object(part.object);
         }
     }
-    return {std::move(name), std::move(shape), binding, residency};
+    return {std::move(name), std::move(shape), binding, effective};
 }
 
 const Use& Binder::use(std::string_view parameter, std::string_view input) const {
@@ -83,6 +103,21 @@ void Binder::require_device(ObjectHandle object, std::uint64_t alignment) {
     auto& demand     = demands_.at(object.index);
     demand.device    = true;
     demand.alignment = std::max({demand.alignment, alignment, geometry.alignment});
+}
+
+bool Binder::try_require_pinned_host(ObjectHandle object) {
+    const auto& geometry = reader_.geometry(object);
+    auto& demand         = demands_.at(object.index);
+    if (demand.pinned_buffer) { return true; }
+    if (geometry.bytes > std::numeric_limits<std::size_t>::max()) { return false; }
+    try {
+        demand.pinned_buffer =
+            std::make_unique<PinnedHostBuffer>(static_cast<std::size_t>(geometry.bytes));
+    } catch (const std::exception&) {
+        (void)cudaGetLastError(); // the failed allocation leaves a non-sticky error behind
+        return false;
+    }
+    return true;
 }
 
 std::span<const std::byte> Binder::host_object(ObjectHandle object) {
@@ -169,6 +204,9 @@ MaterializationPlan Binder::finish() && {
                 align_up(plan.device_capacity_bytes, demand.alignment, "device offset");
             plan.device_objects.push_back({handle, offset, geometry.bytes, demand.alignment});
             plan.device_capacity_bytes = checked_add(offset, geometry.bytes, "device capacity");
+        }
+        if (demand.pinned_buffer) {
+            plan.pinned_objects.push_back({ObjectHandle{i}, std::move(demand.pinned_buffer)});
         }
         if (demand.host) {
             plan.host_objects.push_back({ObjectHandle{i}, std::move(demand.host_data)});

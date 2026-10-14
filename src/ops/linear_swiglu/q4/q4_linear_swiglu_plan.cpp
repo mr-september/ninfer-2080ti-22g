@@ -32,16 +32,22 @@ struct RouteSpec {
 
 constexpr Q4LinearSwiGluProblem kShape{34816, 17408, 5120, 5120, 1};
 
-constexpr std::array<RouteSpec, 10> kRoutes{{
 #if defined(NINFER_SM75)
+constexpr std::array<RouteSpec, 4> kRoutes{{
     // Turing: gate/up through the tuned Linear routes (FP16-mantissa GEMV at T=1, SIMT up to T=4)
     // plus an elementwise SwiGLU beats the fused kernels at these widths.
     {{1, 4}, Q4LinearSwiGluScheduleId::Materialized},
     {{5, 32}, Q4LinearSwiGluScheduleId::SmallTTiled},
+    {{33, 128}, Q4LinearSwiGluScheduleId::Materialized},
+    // Prefill: single-stage 128-token folded tiles, two resident per SM, so one tile's MMA overlaps
+    // the other's loads (cp.async is unavailable). Faster than the 5090 table's tiles and than the
+    // materialized route from 129 columns up, measured on the 2080 Ti.
+    {{129, kAnyCols}, Q4LinearSwiGluScheduleId::MmaTuringPrefill},
+}};
 #else
+constexpr std::array<RouteSpec, 10> kRoutes{{
     {{1, 1}, Q4LinearSwiGluScheduleId::GemvPair},
     {{2, 32}, Q4LinearSwiGluScheduleId::SmallTTiled},
-#endif
     {{33, 128}, Q4LinearSwiGluScheduleId::Materialized},
     {{129, 168}, Q4LinearSwiGluScheduleId::MmaSplitHalfPairR32C128Tail},
     {{169, 224}, Q4LinearSwiGluScheduleId::Materialized},
@@ -51,6 +57,7 @@ constexpr std::array<RouteSpec, 10> kRoutes{{
     {{513, 640}, Q4LinearSwiGluScheduleId::Materialized},
     {{641, kAnyCols}, Q4LinearSwiGluScheduleId::MmaSplitHalfPairR32C128},
 }};
+#endif
 
 constexpr bool catalog_is_closed() noexcept {
     std::int64_t expected = 1;
@@ -95,6 +102,8 @@ const char* q4_linear_swiglu_schedule_name(Q4LinearSwiGluScheduleId schedule) no
         return "linear_swiglu.q4.mma.split_half_pair.r32.c128";
     case Q4LinearSwiGluScheduleId::MmaSplitHalfPairR32C128Tail:
         return "linear_swiglu.q4.mma.split_half_pair.r32.c128.narrow_tail";
+    case Q4LinearSwiGluScheduleId::MmaTuringPrefill:
+        return "linear_swiglu.q4.mma.turing_prefill";
     }
     return "linear_swiglu.q4.unknown";
 }
@@ -120,6 +129,7 @@ Q4LinearSwiGluPlan q4_linear_swiglu_resolve_plan(const Q4LinearSwiGluProblem& pr
         case Q4LinearSwiGluScheduleId::SmallTTiled:
         case Q4LinearSwiGluScheduleId::MmaSplitHalfPairR32C128:
         case Q4LinearSwiGluScheduleId::MmaSplitHalfPairR32C128Tail:
+        case Q4LinearSwiGluScheduleId::MmaTuringPrefill:
             return plan;
         case Q4LinearSwiGluScheduleId::Materialized:
             plan.workspace_bytes = materialized_workspace_bytes(problem.gate_up_rows, problem.cols);
@@ -178,6 +188,9 @@ void q4_linear_swiglu_execute_plan(const Q4LinearSwiGluPlan& plan, const Tensor&
         return;
     case Q4LinearSwiGluScheduleId::MmaSplitHalfPairR32C128Tail:
         q4_linear_swiglu_mma_split_half_pair_r32_c128_tail_launch(x, w, out, stream);
+        return;
+    case Q4LinearSwiGluScheduleId::MmaTuringPrefill:
+        q4_linear_swiglu_mma_turing_prefill_launch(x, w, out, stream);
         return;
     }
     throw std::logic_error("q4 linear_swiglu: unknown schedule");

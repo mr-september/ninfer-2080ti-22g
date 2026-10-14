@@ -30,7 +30,13 @@ constexpr std::array<RouteSpec, 4> kRoutes{{
     {{1, 12}, Q4Q5GdnInputScheduleId::IndependentDirectFixed},
     {{13, 32}, Q4Q5GdnInputScheduleId::GroupedMixedMmaR32C32S2},
     {{33, 64}, Q4Q5GdnInputScheduleId::GroupedMixedMmaR32C64S4},
+#if defined(NINFER_SM75)
+    // Turing: eight-warp single-stage tiles, two resident per SM, so one tile's MMA overlaps the
+    // other's loads (cp.async is unavailable); measured faster than the 5090 tile from 65 columns up.
+    {{65, kAnyCols}, Q4Q5GdnInputScheduleId::GroupedMixedMmaTuringPrefill},
+#else
     {{65, kAnyCols}, Q4Q5GdnInputScheduleId::GroupedMixedMmaR64C128S2},
+#endif
 }};
 
 constexpr bool catalog_is_closed() noexcept {
@@ -60,6 +66,8 @@ const char* q4_q5_gdn_input_schedule_name(Q4Q5GdnInputScheduleId schedule) noexc
         return "gdn_input_proj.q4_q5.grouped_mixed.mma.r32.c64.s4";
     case Q4Q5GdnInputScheduleId::GroupedMixedMmaR64C128S2:
         return "gdn_input_proj.q4_q5.grouped_mixed.mma.r64.c128.s2";
+    case Q4Q5GdnInputScheduleId::GroupedMixedMmaTuringPrefill:
+        return "gdn_input_proj.q4_q5.grouped_mixed.mma.turing_prefill";
     }
     return "gdn_input_proj.q4_q5.unknown";
 }
@@ -131,6 +139,7 @@ void q4_q5_gdn_input_execute_plan(const Q4Q5GdnInputPlan& plan, const Tensor& x,
     case Q4Q5GdnInputScheduleId::GroupedMixedMmaR32C32S2:
     case Q4Q5GdnInputScheduleId::GroupedMixedMmaR32C64S4:
     case Q4Q5GdnInputScheduleId::GroupedMixedMmaR64C128S2:
+    case Q4Q5GdnInputScheduleId::GroupedMixedMmaTuringPrefill:
         q4_q5_gdn_input_grouped_mma_launch(x, qk_weight, value_z_weight, qkv, z, plan.schedule,
                                            stream);
         return;

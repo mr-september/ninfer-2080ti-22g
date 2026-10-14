@@ -19,3 +19,11 @@ function(ninfer_cuda_non_rdc_archive target)
     CUDA_RESOLVE_DEVICE_SYMBOLS OFF)
   target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>)
 endfunction()
+
+# Product executables read argv and paths as UTF-8 on Windows (a no-op on other platforms).
+function(ninfer_windows_utf8 target)
+  if(MSVC)
+    target_link_options(${target} PRIVATE
+      "/MANIFEST:EMBED" "/MANIFESTINPUT:${PROJECT_SOURCE_DIR}/cmake/windows_utf8.manifest")
+  endif()
+endfunction()

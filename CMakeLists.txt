@@ -35,6 +35,16 @@ if(CMAKE_GENERATOR MATCHES "Ninja")
   set(CMAKE_JOB_POOL_LINK ninfer_link)
 endif()
 
+if(MSVC)
+  # Sources and fmt use UTF-8 literals; MSVC otherwise assumes the ANSI code page.
+  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/utf-8> $<$<COMPILE_LANGUAGE:CXX>:/bigobj>)
+endif()
+
+if(WIN32)
+  # <windows.h> arrives through the NVTX headers; keep std::min/max and numeric_limits usable.
+  add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
+endif()
+
 if(CMAKE_CUDA_ARCHITECTURES STREQUAL "75")
   add_compile_definitions(NINFER_SM75=1)
 elseif(CMAKE_CUDA_ARCHITECTURES STREQUAL "86")

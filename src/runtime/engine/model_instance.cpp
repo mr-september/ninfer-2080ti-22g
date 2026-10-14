@@ -122,6 +122,12 @@ ConstructedModel construct_model(EngineOptions& options, DeviceContext& device) 
     const auto start = Clock::now();
     StartupPhaseScope inspect(options.startup_observer, StartupPhase::ArtifactInspect);
     artifact::Reader reader(options.artifact_path);
+    if (options.speculative.proposal_head == ProposalHead::Auto) {
+        const bool available = options.purpose == EnginePurpose::Generation &&
+                               options.speculative.backend != SpeculativeBackend::None &&
+                               reader.directory().component("text").proposal.has_value();
+        options.speculative.proposal_head = available ? ProposalHead::Optimized : ProposalHead::Full;
+    }
     inspect.complete();
     StartupPhaseScope binding(options.startup_observer, StartupPhase::TargetPlan);
     auto plan = models::qwen3_5::plan_load(reader, models::load_options(options));

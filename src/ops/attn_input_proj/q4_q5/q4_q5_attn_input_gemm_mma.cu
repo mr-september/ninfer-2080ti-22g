@@ -142,7 +142,11 @@ void q4_q5_attn_input_pair_r32_c64_s3_launch(const Tensor& x, const Weight& w0, 
 void q4_q5_attn_input_mixed_r64_c128_s2_launch(const Tensor& x, const Weight& w0, const Weight& w1,
                                                Tensor& q, Tensor& g, Tensor& k, Tensor& v,
                                                cudaStream_t stream) {
+#if defined(NINFER_SM75)
+    launch_mixed<TuringPrefillCfg>(x, w0, w1, q, g, k, v, stream);
+#else
     launch_mixed<GemmCfg<64, 128, 64, 64, 16, 2, 2, false, true, true>>(x, w0, w1, q, g, k, v,
                                                                         stream);
+#endif
 }
 } // namespace ninfer::ops::detail

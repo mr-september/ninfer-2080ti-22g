@@ -2,6 +2,7 @@
 
 #include "runtime/contract/request.h"
 #include "core/transfer_work.h"
+#include "core/wide_math.h"
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -51,15 +52,15 @@ struct PrefillWork {
     result.tokens                       = suffix_tokens;
     result.vision_items                 = vision_items;
     result.vision_patches               = vision_patches;
-    const unsigned __int128 suffix      = suffix_tokens;
-    const unsigned __int128 linear      = static_cast<unsigned __int128>(prefix_tokens) * suffix;
-    const unsigned __int128 triangular  = suffix * (suffix + 1U) / 2U;
-    constexpr unsigned __int128 maximum = ~static_cast<unsigned __int128>(0);
-    const unsigned __int128 attention =
-        triangular > maximum - linear ? maximum : linear + triangular;
-    result.attention_pairs = attention > std::numeric_limits<std::uint64_t>::max()
+    // prefix * suffix + suffix * (suffix + 1) / 2, saturated to uint64. The triangular term halves
+    // whichever factor is even so neither factor overflows.
+    const bool odd_suffix      = (suffix_tokens & 1U) != 0;
+    const WideU64 linear       = mul_wide(prefix_tokens, suffix_tokens);
+    const WideU64 triangular   = mul_wide(odd_suffix ? suffix_tokens : suffix_tokens / 2U,
+                                          odd_suffix ? suffix_tokens / 2U + 1U : suffix_tokens + 1U);
+    result.attention_pairs = linear.hi != 0 || triangular.hi != 0
                                  ? std::numeric_limits<std::uint64_t>::max()
-                                 : static_cast<std::uint64_t>(attention);
+                                 : saturating_add(linear.lo, triangular.lo);
     return result;
 }
 

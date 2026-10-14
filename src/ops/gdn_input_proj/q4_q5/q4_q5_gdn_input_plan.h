@@ -15,6 +15,7 @@ enum class Q4Q5GdnInputScheduleId {
     GroupedMixedMmaR32C32S2,
     GroupedMixedMmaR32C64S4,
     GroupedMixedMmaR64C128S2,
+    GroupedMixedMmaTuringPrefill,
 };
 
 enum class Q4Q5GdnInputConvScheduleId {

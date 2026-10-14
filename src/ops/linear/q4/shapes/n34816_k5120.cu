@@ -18,6 +18,15 @@ Q4Launch select_q4_n34816_k5120(std::int32_t tokens) {
     if (tokens <= 16) return launch_q4_a16_sliced_r32_t16_w4_s2;
     if (tokens <= 63) return launch_q4_a16_sliced_r32_t32_w4_s1;
     if (tokens <= 64) return launch_q4_a16_mma_r64_t64_k128_s2_a1;
+#if defined(NINFER_SM75)
+    // Turing prefill: two single-buffered CTAs per SM overlap one tile's MMA with another's loads;
+    // tuned per shape with the 2080 Ti route autotuner.
+    static constexpr TokenRoute<Q4Launch> kTuringPrefill[] = {
+        {768, launch_q4_a16_mma_r64_t64_k64_wr32_wt16_s2_a2_b2},
+        {kAnyTokens, launch_q4_a16_mma_r64_t128_s1_a1},
+    };
+    return select_token_route(kTuringPrefill, tokens);
+#else
     if (tokens <= 80) return launch_q4_a16_mma_r64_t80;
     if (tokens <= 96) return launch_q4_a16_mma_r64_t96;
     if (tokens <= 120) return launch_q4_a16_mma_r64_t120;
@@ -28,5 +37,6 @@ Q4Launch select_q4_n34816_k5120(std::int32_t tokens) {
     if (tokens <= 256) return launch_q4_a16_mma_r64_t128;
     if (tokens <= 288) return launch_q4_a16_mma_r64_t96;
     return launch_q4_a16_mma_r64_t128;
+#endif
 }
 } // namespace ninfer::ops::detail

@@ -14,6 +14,8 @@ void q4_linear_swiglu_mma_split_half_pair_r32_c128_launch(const Tensor& x, const
 // Wide folded tiles for the leading column blocks plus a narrow route for a small remainder.
 void q4_linear_swiglu_mma_split_half_pair_r32_c128_tail_launch(const Tensor& x, const Weight& w,
                                                                Tensor& out, cudaStream_t stream);
+void q4_linear_swiglu_mma_turing_prefill_launch(const Tensor& x, const Weight& w, Tensor& out,
+                                                    cudaStream_t stream);
 void q4_linear_swiglu_small_t_tiled_launch(const Tensor& x, const Weight& w, Tensor& out,
                                            cudaStream_t stream);
 

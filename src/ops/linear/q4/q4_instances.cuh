@@ -84,4 +84,12 @@ using MmaR32T128K64S2A2 = Q4A16MmaSchedule<32, 128, 64, 32, 32, 2, 2, Q4MmaFragm
                                            Cache::cg, Cache::cg, Q4ScaleLoad::Pair32, 2>;
 using SimtR4T4W2G8S2    = Q4A16SimtSchedule<4, 4, 2, 8, 2, Cache::ca, 1>;
 using SimtR4T1W2G8S2    = Q4A16SimtSchedule<4, 1, 2, 8, 2, Cache::ca, 1>;
+using MmaR64T128A1 = Q4A16MmaSchedule<64, 128, 64, 64, 32, 2, 2, Q4MmaFragmentPipeline::Serial,
+                                    Cache::cg, Cache::cg, Q4ScaleLoad::Pair32, 1>;
+using MmaR64T64A1 = Q4A16MmaSchedule<64, 64, 64, 32, 32, 2, 3, Q4MmaFragmentPipeline::Serial,
+                                    Cache::cg, Cache::cg, Q4ScaleLoad::Pair32, 1>;
+using MmaR64T128S1A1 = Q4A16MmaSchedule<64, 128, 64, 64, 32, 1, 2, Q4MmaFragmentPipeline::Serial,
+                                    Cache::cg, Cache::cg, Q4ScaleLoad::Pair32, 1>;
+using MmaR128T64S1A1 = Q4A16MmaSchedule<128, 64, 64, 64, 32, 1, 2, Q4MmaFragmentPipeline::Serial,
+                                    Cache::cg, Cache::cg, Q4ScaleLoad::Pair32, 1>;
 } // namespace ninfer::ops::detail::q4_instances

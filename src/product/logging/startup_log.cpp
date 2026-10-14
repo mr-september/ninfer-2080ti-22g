@@ -5,8 +5,7 @@
 
 #include <spdlog/logger.h>
 
-#include <sys/ioctl.h>
-#include <unistd.h>
+#include "core/os.h"
 
 #include <algorithm>
 #include <array>
@@ -74,9 +73,7 @@ PhasePresentation phase_presentation(StartupPhase phase) noexcept {
 }
 
 std::size_t terminal_columns() noexcept {
-    winsize size{};
-    if (::ioctl(STDERR_FILENO, TIOCGWINSZ, &size) == 0 && size.ws_col != 0) { return size.ws_col; }
-    return 120;
+    return os::stderr_columns(120);
 }
 
 std::string progress_bar(double ratio, std::size_t width) {

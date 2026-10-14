@@ -16,6 +16,7 @@ enum class Q4LinearSwiGluScheduleId {
     Materialized,
     MmaSplitHalfPairR32C128,
     MmaSplitHalfPairR32C128Tail,
+    MmaTuringPrefill,
 };
 
 struct Q4LinearSwiGluProblem {

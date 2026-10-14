@@ -1,5 +1,6 @@
 #include "ops/format_support.h"
 #include "core/weight.h"
+#include <array>
 #include "ninfer/ops/attn_input_proj.h"
 #include "ninfer/ops/weight_input.h"
 
@@ -53,7 +54,7 @@ int verify_output(std::string_view label, const GuardedBf16Tensor& output,
 }
 
 WeightParent physical_parent(const Weight& weight) {
-    const std::array shape{static_cast<std::uint64_t>(weight.n),
+    const std::array<std::uint64_t, 2> shape{static_cast<std::uint64_t>(weight.n),
                            static_cast<std::uint64_t>(weight.k)};
     return {weight_geometry(weight.qtype, weight.layout, shape),
             static_cast<const std::byte*>(weight.payload), weight.weight_scale_divisor};

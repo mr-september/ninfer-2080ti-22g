@@ -1,3 +1,4 @@
+#include "core/os.h"
 #include "options.h"
 #include "product/logging/logging.h"
 #include "product/logging/pretty_format.h"
@@ -231,6 +232,7 @@ void print_generation_summary(const ninfer::GenerationResult& result,
 } // namespace
 
 int main(int argc, char** argv) {
+    ninfer::os::init_console();
     ninfer::cli::Options cli;
     try {
         cli = ninfer::cli::parse_options(argc, argv);

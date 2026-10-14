@@ -857,9 +857,9 @@ std::unique_ptr<SequencePlanImpl> build_sequence_candidate(const SequencePlannin
     impl->kv_storage           = inputs.kv_storage;
     impl->persistent           = persistent_layout(*impl);
     if (!impl->context_cache.host_capacity_bytes) {
-        // Default Host capacity covers 8 GiB of KV bytes plus eight complete StateImages.
+        // Default Host capacity covers kDefaultHostKvBytes of KV plus eight complete StateImages.
         impl->context_cache.host_capacity_bytes =
-            checked_add(8ULL * 1024 * 1024 * 1024,
+            checked_add(kDefaultHostKvBytes,
                         checked_mul(8, impl->persistent.state_images.host.image_bytes,
                                     "Host context state default overflow"),
                         "Host context default overflow");

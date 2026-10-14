@@ -256,6 +256,18 @@ PinnedHostBuffer::PinnedHostBuffer(std::size_t size_bytes) {
 
 PinnedHostBuffer::~PinnedHostBuffer() { free_pinned(data_); }
 
+const void* PinnedHostBuffer::device_data() const {
+    void* device          = nullptr;
+    const cudaError_t err = cudaHostGetDevicePointer(&device, data_, 0);
+    if (err != cudaSuccess) {
+        throw std::runtime_error(cuda_error_message("cudaHostGetDevicePointer failed", err));
+    }
+    if (device != data_) {
+        throw std::runtime_error("pinned host memory is not device-addressable at its host address");
+    }
+    return device;
+}
+
 PinnedHostBuffer::PinnedHostBuffer(PinnedHostBuffer&& other) noexcept
     : data_(other.data_), size_(other.size_) {
     other.data_ = nullptr;

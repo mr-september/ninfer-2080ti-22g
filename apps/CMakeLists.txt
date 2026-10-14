@@ -18,3 +18,7 @@ add_executable(ninfer-perplexity
 ninfer_internal_includes(ninfer-perplexity)
 target_link_libraries(ninfer-perplexity PRIVATE
   ninfer_engine ninfer_product_logging ninfer::json)
+
+ninfer_windows_utf8(ninfer)
+ninfer_windows_utf8(ninfer-serve)
+ninfer_windows_utf8(ninfer-perplexity)

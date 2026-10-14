@@ -103,6 +103,10 @@ public:
     void* data() const noexcept;
     std::size_t size() const noexcept;
 
+    // Address kernels use to read this buffer in place (PCIe zero-copy). Equal to data() under
+    // unified addressing; the call verifies that and throws otherwise.
+    [[nodiscard]] const void* device_data() const;
+
 private:
     void* data_       = nullptr;
     std::size_t size_ = 0;

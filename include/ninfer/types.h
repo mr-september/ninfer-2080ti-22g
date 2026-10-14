@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -64,6 +65,9 @@ struct KvCapacityPolicy {
 enum class ProposalHead : std::uint8_t {
     Full,
     Optimized,
+    // Optimized when speculation is enabled and the artifact carries a proposal head, otherwise Full.
+    // The Engine resolves it once the artifact is open; Engine::options() reports the resolved value.
+    Auto,
 };
 
 enum class SpeculativeBackend : std::uint8_t {
@@ -122,6 +126,14 @@ struct StartupObserver {
     std::function<void(const StartupEvent& event)> callback;
 };
 
+// Host KV budget of the default context cache. Turing builds target desktops that share RAM with
+// other programs, so they pin less by default; --host-context-mib raises it.
+#if defined(NINFER_SM75)
+inline constexpr std::size_t kDefaultHostKvBytes = 2ULL * 1024 * 1024 * 1024;
+#else
+inline constexpr std::size_t kDefaultHostKvBytes = 8ULL * 1024 * 1024 * 1024;
+#endif
+
 struct ContextCacheOptions {
     // Controls cross-request history reads and writes. Request pause/replay resources remain
     // available when history is disabled.
@@ -129,7 +141,8 @@ struct ContextCacheOptions {
     // Extra Device StateImage slots beyond max_concurrency. Defaults to max_concurrency.
     std::optional<std::uint32_t> device_state_slots;
     // Shared Host quota for StateImages, KV, pause snapshots and in-flight destinations. Native
-    // startup defaults to 8 GiB plus eight Host StateImages using the model's actual layout.
+    // startup defaults to kDefaultHostKvBytes plus eight Host StateImages using the model's actual
+    // layout. The memory is page-locked, so it must be free RAM when the process starts.
     // This does not bound total process RAM.
     // Engine::options() returns both resolved capacities after construction.
     std::optional<std::size_t> host_capacity_bytes;

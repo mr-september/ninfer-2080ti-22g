@@ -2,10 +2,19 @@ ninfer_add_test(ninfer_artifact_reader_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_reader.cpp"
   LIBRARIES ninfer_artifact)
 
+# CUDA fault injection interposes the runtime with GNU ld --wrap, which MSVC cannot do.
+if(WIN32)
+  set(NINFER_MATERIALIZATION_FAULT_SOURCE materialization_cuda_errors_unsupported.cpp)
+else()
+  set(NINFER_MATERIALIZATION_FAULT_SOURCE materialization_cuda_errors.cpp)
+endif()
+
 ninfer_add_test(ninfer_artifact_materialization_test
-  SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_materialization.cpp" "${CMAKE_CURRENT_LIST_DIR}/materialization_cuda_errors.cpp"
+  SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_materialization.cpp"
+          "${CMAKE_CURRENT_LIST_DIR}/${NINFER_MATERIALIZATION_FAULT_SOURCE}"
   LIBRARIES ninfer_artifact)
 
+if(NOT WIN32)
 target_link_options(ninfer_artifact_materialization_test PRIVATE
   "LINKER:--wrap=cudaMalloc"
   "LINKER:--wrap=cudaMallocHost"
@@ -15,6 +24,7 @@ target_link_options(ninfer_artifact_materialization_test PRIVATE
   "LINKER:--wrap=cudaEventRecord"
   "LINKER:--wrap=cudaMemcpyAsync"
   "LINKER:--wrap=cudaStreamSynchronize")
+endif()
 
 add_test(NAME ninfer_artifact_writer_interop_test
   COMMAND ${Python3_EXECUTABLE} -B "${CMAKE_CURRENT_LIST_DIR}/writer_interop.py"

@@ -3,6 +3,7 @@
 #include "artifact/materializer.h"
 #include "artifact/reader.h"
 
+#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -10,7 +11,9 @@
 
 namespace ninfer::artifact {
 
-enum class Residency { Device, Host, Values };
+// PinnedHost keeps the object in page-locked host memory that kernels read in place over PCIe;
+// it uses no device memory and suits tables a step touches sparsely (the token embedding).
+enum class Residency { Device, Host, PinnedHost, Values };
 
 struct ParameterReference {
     std::string name;
@@ -46,6 +49,8 @@ public:
     [[nodiscard]] const Reader& reader() const noexcept { return reader_; }
 
     void require_device(ObjectHandle object, std::uint64_t alignment = 256);
+    // Pins the object's host storage now; false (nothing retained) if the allocation fails.
+    [[nodiscard]] bool try_require_pinned_host(ObjectHandle object);
     [[nodiscard]] std::span<const std::byte> host_object(ObjectHandle object);
     [[nodiscard]] ObjectHandle resource(std::string_view component, std::string_view role);
     [[nodiscard]] HostValues values(const Binding& binding, std::optional<QType> format = {});
@@ -54,6 +59,7 @@ public:
 private:
     struct Demand {
         bool device             = false;
+        std::unique_ptr<PinnedHostBuffer> pinned_buffer;
         bool host               = false;
         std::uint64_t alignment = 256;
         std::vector<std::byte> host_data;

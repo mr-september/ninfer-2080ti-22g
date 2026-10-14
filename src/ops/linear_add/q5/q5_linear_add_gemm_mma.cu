@@ -109,11 +109,21 @@ void q5_linear_add_mma_r32_t32_k128_launch(const Tensor& x, const Weight& w, Ten
 
 void q5_linear_add_mma_r32_t128_launch(const Tensor& x, const Weight& w, Tensor& residual,
                                        cudaStream_t stream) {
+#if defined(NINFER_SM75)
+    // Turing: single-buffered activations fit two resident tiles per SM (the finish reuses the
+    // activation buffer as scratch), overlapping one tile's MMA with the other's loads.
+    launch_pointwise<q5_instances::MmaR32T128A1>(x, w, residual, stream);
+#else
     launch_pointwise<q5_instances::MmaR32T128>(x, w, residual, stream);
+#endif
 }
 
 void q5_linear_add_mma_r64_t128_launch(const Tensor& x, const Weight& w, Tensor& residual,
                                        cudaStream_t stream) {
+#if defined(NINFER_SM75)
+    launch_route<q5_instances::MmaR64T128A1>(x, w, residual, stream);
+#else
     launch_route<q5_instances::MmaR64T128>(x, w, residual, stream);
+#endif
 }
 } // namespace ninfer::ops::detail

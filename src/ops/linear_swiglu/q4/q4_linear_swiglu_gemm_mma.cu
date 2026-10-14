@@ -58,6 +58,11 @@ void q4_linear_swiglu_mma_split_half_pair_r32_c128_launch(const Tensor& x, const
     launch_route<GateUpC128Cfg>(x, weight, out, stream);
 }
 
+void q4_linear_swiglu_mma_turing_prefill_launch(const Tensor& x, const Weight& weight,
+                                                    Tensor& out, cudaStream_t stream) {
+    launch_route<TuringPrefillCfg>(x, weight, out, stream);
+}
+
 void q4_linear_swiglu_mma_split_half_pair_r32_c128_tail_launch(const Tensor& x,
                                                                const Weight& weight, Tensor& out,
                                                                cudaStream_t stream) {

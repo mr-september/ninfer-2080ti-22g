@@ -24,9 +24,10 @@ public:
 
 private:
     std::filesystem::path path_;
-    int fd_                = -1;
-    mutable int direct_fd_ = -1;
-    std::uint64_t bytes_   = 0;
+    // POSIX file descriptor or Windows HANDLE; -1 is invalid for both.
+    std::intptr_t fd_                = -1;
+    mutable std::intptr_t direct_fd_ = -1;
+    std::uint64_t bytes_             = 0;
 };
 
 } // namespace ninfer::artifact

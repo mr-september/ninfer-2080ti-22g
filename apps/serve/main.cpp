@@ -1,3 +1,4 @@
+#include "core/os.h"
 #include "product/logging/logging.h"
 #include "product/logging/startup_log.h"
 #include "serve/generation_service.h"
@@ -28,6 +29,7 @@ void handle_signal(int) {
 } // namespace
 
 int main(int argc, char** argv) {
+    ninfer::os::init_console();
     ninfer::serve::ServeOptions options;
     try {
         options = ninfer::serve::parse_serve_options(argc, argv);
