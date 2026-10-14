@@ -11,7 +11,7 @@
 namespace ninfer::product {
 
 // One request's logical ceiling. The KV pool defaults to the same size.
-inline constexpr std::uint32_t kDefaultMaxContext = 32768;
+inline constexpr std::uint32_t kDefaultMaxContext = 65536;
 
 // MTP draft window: best for code (acceptance 79% at 3); prose prefers 1 to 2.
 inline constexpr std::uint32_t kDefaultDraftTokens = 3;

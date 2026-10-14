@@ -3,6 +3,7 @@
 #include "evaluation.h"
 
 #include "ninfer/engine.h"
+#include "product/defaults.h"
 #include "product/logging/logging.h"
 #include "product/logging/pretty_format.h"
 #include "product/logging/startup_log.h"

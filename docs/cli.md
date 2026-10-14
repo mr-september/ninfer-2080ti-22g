@@ -7,7 +7,7 @@ The examples use Qwen3.8-27B NVFP4 with FP8 KV storage.
 
 > **Turing fork.** The commands in this page are upstream's RTX 5090 forms (NVFP4 weights, FP8 KV).
 > On a GeForce RTX 2080 Ti use the `groupwise-int` artifact and the defaults of this build: INT8 KV,
-> 32,768-token context, MTP with three draft tokens and the optimized proposal head when the artifact
+> 65,536-token context, MTP with three draft tokens and the optimized proposal head when the artifact
 > has one. Drop `--kv-dtype fp8`, or write `--kv-dtype int8`; see the [README](../README.md#defaults).
 
 ## Text input
@@ -254,8 +254,8 @@ The table lists executable defaults. The examples above select FP8 KV and MTP3 e
 
 | Option | Meaning | Default |
 |---|---|---:|
-| `--max-context N` | per-sequence logical context ceiling | `32768` |
-| `--kv-capacity N\|auto` | explicit shared Main Text KV capacity, or maximize it from remaining GPU memory; omitted means `--max-context` | `32768` |
+| `--max-context N` | per-sequence logical context ceiling | `65536` |
+| `--kv-capacity N\|auto` | explicit shared Main Text KV capacity, or maximize it from remaining GPU memory; omitted means `--max-context` | `65536` |
 | `--prefill-chunk N` | positive text-prefill chunk, in multiples of 128 | `1024` |
 | `--max-new N` | requested output-token limit | `128` |
 | `--device N` | CUDA device index | `0` |

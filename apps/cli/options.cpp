@@ -98,7 +98,7 @@ std::string usage_text(const char* argv0) {
            "       [--no-cuda-graph]\n"
            "       [--log-level trace|debug|info|warning|error|critical|off]\n"
            "\n"
-           "Defaults: --max-context 32768 (KV capacity the same), --kv-dtype int8 on Turing builds,\n"
+           "Defaults: --max-context 65536 (KV capacity the same), --kv-dtype int8 on Turing builds,\n"
            "--spec mtp --draft-tokens 3 with the optimized proposal head when the artifact has one\n"
            "(--spec none and --no-lm-head-draft switch them off).\n"
            "Streams answer content to stdout and reasoning plus diagnostics to stderr.\n"

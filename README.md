@@ -57,7 +57,7 @@ CLI default is
 
 ```bash
 ./build/apps/ninfer models/qwen3_8_27b.ninfer --prompt "..." \
-  --max-context 32768 --kv-capacity 32768 --kv-dtype int8 \
+  --max-context 65536 --kv-capacity 65536 --kv-dtype int8 \
   --spec mtp --draft-tokens 3 --lm-head-draft \
   --max-new 128 --prefill-chunk 1024 --device 0
 ```
@@ -66,7 +66,7 @@ and the server default is
 
 ```bash
 ./build/apps/ninfer-serve models/qwen3_8_27b.ninfer --port 8080 \
-  --max-context 32768 --kv-capacity 32768 --kv-dtype int8 \
+  --max-context 65536 --kv-capacity 65536 --kv-dtype int8 \
   --spec mtp --draft-tokens 3 --lm-head-draft \
   --max-concurrency 1 --prefill-chunk 1024
 ```
@@ -87,9 +87,10 @@ ones do.) Each default is an ordinary flag, so an ablation changes exactly one o
 | no CUDA Graph decode | `--no-cuda-graph` |
 | another GPU | `--device N` ([multi-GPU notes](docs/multi-gpu.md)) |
 
-At the default settings the model needs about 16 GiB of VRAM; around 64k tokens of context fit with MTP
-(about 97k at most, 110k without it). The card is also a desktop GPU: other programs that hold VRAM
-reduce what is available.
+The default is a 64k-token context with MTP. That needs most of the 22 GB (the embedding table lives in
+host memory to make room), and the limit with MTP is about 97k tokens (110k without it). The card is also
+a desktop GPU: other programs that hold VRAM reduce what is available, and if startup reports out of
+memory, pass `--max-context 32768` or `--kv-capacity auto`.
 
 ## Build
 
@@ -185,9 +186,7 @@ python3 -m tools.convert \
   --out models/qwen3_8_27b.ninfer
 ```
 
-`--proposal` adds the proposal head the default speculative decoding uses. The recipes `qwen3_6_27b` and
-`qwen3_8_27b` select the Q4/Q5 mixture; part of a recipe can be overridden, see
-[Weight conversion](docs/weight-conversion.md) (including the v2 to v3 upgrade tool).
+`--proposal` adds the proposal head the default speculative decoding uses. The recipes `qwen3_6_27b` and `qwen3_8_27b` select the Q4/Q5 mixture; part of a recipe can be overridden, see [Weight conversion](docs/weight-conversion.md) (including the v2 to v3 upgrade tool).
 
 **Shrink an existing artifact.** Re-encoding the output head from Q8 to Q6 is near-lossless (perplexity
 +0.014%) and frees 0.4 GiB of VRAM, without needing the source checkpoint:
@@ -239,20 +238,12 @@ Run the relevant `--help` for the exact current option contract.
 - [Resource scheduling and context cache](docs/maintainer/resource-scheduling-and-context-cache.md)
 - [Contributing](CONTRIBUTING.md)
 
-Based on [Neroued/ninfer](https://github.com/Neroued/ninfer); see the upstream repository for the
-original project and its support options.
+Based on [Neroued/ninfer](https://github.com/Neroued/ninfer); see the upstream repository for the original project and its support options.
 
 ## License
 
 NInfer is licensed under the [Apache License 2.0](LICENSE).
 
 The published artifacts are derived from
-[Qwen/Qwen3.6-27B](https://huggingface.co/Qwen/Qwen3.6-27B),
-[Qwen/Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B), and
-[Qwen/Qwen3.6-35B-A3B](https://huggingface.co/Qwen/Qwen3.6-35B-A3B). The Qwen3.6-27B NVFP4 artifact
-also uses the fixed packed weights from
-[rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm](https://huggingface.co/rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm).
-The Qwen3.8-27B NVFP4 artifact also uses the fixed mixed FP8/NVFP4 weights from
-[unsloth/Qwen3.8-27B-NVFP4](https://huggingface.co/unsloth/Qwen3.8-27B-NVFP4). These source
-repositories are distributed under Apache-2.0. Vendored dependencies retain their own license files
-under `third_party/`.
+[Qwen/Qwen3.6-27B](https://huggingface.co/Qwen/Qwen3.6-27B), [Qwen/Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B), and [Qwen/Qwen3.6-35B-A3B](https://huggingface.co/Qwen/Qwen3.6-35B-A3B). 
+These source repositories are distributed under Apache-2.0. Vendored dependencies retain their own license files under `third_party/`.

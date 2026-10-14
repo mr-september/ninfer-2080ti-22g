@@ -7,7 +7,7 @@ Anthropic-compatible HTTP endpoints over one resident NInfer Engine.
 
 > **Turing fork.** The commands in this page are upstream's RTX 5090 forms (NVFP4 weights, FP8 KV).
 > On a GeForce RTX 2080 Ti use the `groupwise-int` artifact and the defaults of this build: INT8 KV,
-> 32,768-token context, MTP with three draft tokens and the optimized proposal head when the artifact
+> 65,536-token context, MTP with three draft tokens and the optimized proposal head when the artifact
 > has one. Drop `--kv-dtype fp8`, or write `--kv-dtype int8`; see the [README](../README.md#defaults).
 
 See [CUDA synchronization](cli.md#cuda-synchronization) for the shared `NINFER_CUDA_SYNC` setting.
@@ -885,8 +885,8 @@ The table lists executable defaults. The startup example selects a long-context 
 | `--port N` | listen port | `8080` |
 | `--api-key KEY` | required bearer or `x-api-key` value | unset |
 | `--model-id ID` | override the public OpenAI model alias | artifact `metadata.name`, or architecture name |
-| `--max-context N` | logical context ceiling of each sequence | `32768` |
-| `--kv-capacity N\|auto` | explicit shared Main Text KV capacity, or maximize it from remaining GPU memory; omitted means `--max-context` | `32768` |
+| `--max-context N` | logical context ceiling of each sequence | `65536` |
+| `--kv-capacity N\|auto` | explicit shared Main Text KV capacity, or maximize it from remaining GPU memory; omitted means `--max-context` | `65536` |
 | `--max-concurrency N` | resident execution lanes; valid range `1..8` | `1` |
 | `--max-pending-requests N` | additional requests allowed to wait for admission | `16` |
 | `--pending-timeout-ms N` | maximum preparation-plus-admission wait | `30000` |
