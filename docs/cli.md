@@ -5,6 +5,11 @@ download an artifact using the [project README](../README.md) before following t
 
 The examples use Qwen3.8-27B NVFP4 with FP8 KV storage.
 
+> **Turing fork.** The commands in this page are upstream's RTX 5090 forms (NVFP4 weights, FP8 KV).
+> On a GeForce RTX 2080 Ti use the `groupwise-int` artifact and the defaults of this build: INT8 KV,
+> 32,768-token context, MTP with three draft tokens and the optimized proposal head when the artifact
+> has one. Drop `--kv-dtype fp8`, or write `--kv-dtype int8`; see the [README](../README.md#defaults).
+
 ## Text input
 
 ```bash
@@ -127,7 +132,8 @@ output capacity for the inserted suffix and the answer:
 
 GPU residency is frozen when the Engine starts:
 
-- no `--spec` omits MTP/DFlash/DFlash2 weights and state and the optimized proposal head;
+- `--spec none` omits MTP/DFlash/DFlash2 weights and state and the optimized proposal head (the
+  executable default is `--spec mtp --draft-tokens 3`);
 - `--spec mtp`, `--spec dflash` (35B-A3B), and `--spec dflash2` (Qwen3.8-27B) load only
   the selected speculative backend;
 - a speculative backend with the full proposal head omits the optimized proposal head;
@@ -244,19 +250,19 @@ block length eight, while fifteen uses the maximum supported block length sixtee
 
 ## Common options
 
-The table lists executable defaults. The examples above select FP8 KV and MTP3.
+The table lists executable defaults. The examples above select FP8 KV and MTP3 explicitly.
 
 | Option | Meaning | Default |
 |---|---|---:|
-| `--max-context N` | per-sequence logical context ceiling | `2048` |
-| `--kv-capacity N\|auto` | explicit shared Main Text KV capacity, or maximize it from remaining GPU memory; omitted means `--max-context` | `2048` |
+| `--max-context N` | per-sequence logical context ceiling | `32768` |
+| `--kv-capacity N\|auto` | explicit shared Main Text KV capacity, or maximize it from remaining GPU memory; omitted means `--max-context` | `32768` |
 | `--prefill-chunk N` | positive text-prefill chunk, in multiples of 128 | `1024` |
 | `--max-new N` | requested output-token limit | `128` |
 | `--device N` | CUDA device index | `0` |
-| `--kv-dtype bf16\|int8\|fp8\|nvfp4\|k8v4` | KV-cache storage | `bf16` |
-| `--spec mtp\|dflash\|dflash2` | speculative backend | off |
-| `--draft-tokens N` | MTP `1..5`; DFlash/DFlash2 `1..15` | unset |
-| `--lm-head-draft` | optimized proposal head | off |
+| `--kv-dtype bf16\|int8\|fp8\|nvfp4\|k8v4` | KV-cache storage | `int8` on Turing builds, `bf16` otherwise |
+| `--spec none\|mtp\|dflash\|dflash2` | speculative backend | `mtp` |
+| `--draft-tokens N` | MTP `1..5`; DFlash/DFlash2 `1..15` (DFlash needs it explicitly) | `3` |
+| `--lm-head-draft` / `--no-lm-head-draft` | force the optimized or the full proposal head | automatic: optimized when the artifact has one |
 | `--vision` | enable image/video input and load Vision GPU allocations | off |
 | `--no-cuda-graph` | disable CUDA Graph decode | graphs on |
 | `--chat-template FILE` | use a local Jinja template | artifact template |

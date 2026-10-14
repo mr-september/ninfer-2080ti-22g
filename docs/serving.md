@@ -5,6 +5,11 @@ Anthropic-compatible HTTP endpoints over one resident NInfer Engine.
 
 ## Start the server
 
+> **Turing fork.** The commands in this page are upstream's RTX 5090 forms (NVFP4 weights, FP8 KV).
+> On a GeForce RTX 2080 Ti use the `groupwise-int` artifact and the defaults of this build: INT8 KV,
+> 32,768-token context, MTP with three draft tokens and the optimized proposal head when the artifact
+> has one. Drop `--kv-dtype fp8`, or write `--kv-dtype int8`; see the [README](../README.md#defaults).
+
 See [CUDA synchronization](cli.md#cuda-synchronization) for the shared `NINFER_CUDA_SYNC` setting.
 
 ```bash
@@ -27,7 +32,7 @@ when running alone. Requests acquire KV pages as execution advances; if concurre
 the pool, the scheduler can pause a request and restore it later.
 
 With `C=2` and two extra Device slots, the process owns four Device StateImages. The default shared
-pinned Host budget is 8 GiB plus eight model StateImages. It holds retained state, KV and pause
+pinned Host budget is 2 GiB (8 GiB on non-Turing builds) plus eight model StateImages. It holds retained state, KV and pause
 snapshots, including in-flight destinations; `--host-context-mib` sets an explicit total instead.
 
 Other artifacts use the same command shape with their own path. For 35B-A3B DFlash, replace the MTP
@@ -44,8 +49,9 @@ HTTP alias override and does not select or alter model execution.
 Vision is disabled by default: its weights and Vision-specific unified-workspace extent are not
 allocated, and media requests and token-count requests fail with HTTP 400 `vision_disabled`. Add
 `--vision` when the server must accept image or video input. Speculative residency is likewise
-frozen by `--spec mtp|dflash|dflash2` and `--draft-tokens`; omitting `--spec` loads no speculative backend.
-`--lm-head-draft` additionally loads the optimized proposal head. DFlash on 35B-A3B and DFlash2 on Qwen3.8-27B can be combined
+frozen by `--spec none|mtp|dflash|dflash2` and `--draft-tokens`; the default is `--spec mtp --draft-tokens 3`
+and `--spec none` loads no speculative backend. The optimized proposal head is loaded automatically when the
+artifact has one; `--lm-head-draft` requires it and `--no-lm-head-draft` omits it. DFlash on 35B-A3B and DFlash2 on Qwen3.8-27B can be combined
 with `--vision`; each accelerates generated-text decode after multimodal prefill, while Vision encode
 and prefill remain outside speculative acceleration. A later request cannot enable a capability
 omitted at startup. The artifact need only contain the Text backbone and the optional components
@@ -879,8 +885,8 @@ The table lists executable defaults. The startup example selects a long-context 
 | `--port N` | listen port | `8080` |
 | `--api-key KEY` | required bearer or `x-api-key` value | unset |
 | `--model-id ID` | override the public OpenAI model alias | artifact `metadata.name`, or architecture name |
-| `--max-context N` | logical context ceiling of each sequence | `8192` |
-| `--kv-capacity N\|auto` | explicit shared Main Text KV capacity, or maximize it from remaining GPU memory; omitted means `--max-context` | `8192` |
+| `--max-context N` | logical context ceiling of each sequence | `32768` |
+| `--kv-capacity N\|auto` | explicit shared Main Text KV capacity, or maximize it from remaining GPU memory; omitted means `--max-context` | `32768` |
 | `--max-concurrency N` | resident execution lanes; valid range `1..8` | `1` |
 | `--max-pending-requests N` | additional requests allowed to wait for admission | `16` |
 | `--pending-timeout-ms N` | maximum preparation-plus-admission wait | `30000` |
@@ -896,17 +902,17 @@ The table lists executable defaults. The startup example selects a long-context 
 | `--request-log-jsonl FILE` | append full-precision server/request records | disabled |
 | `--response-store-max-records N` | maximum locally retained Responses objects | `1024` |
 | `--response-store-max-mib N` | total local Response envelope/Item/context budget | `256` |
-| `--kv-dtype bf16\|int8\|fp8\|nvfp4\|k8v4` | KV-cache storage | `bf16` |
-| `--spec mtp\|dflash\|dflash2` | speculative backend | off |
-| `--draft-tokens N` | MTP `1..5`; DFlash/DFlash2 `1..15` | unset |
-| `--lm-head-draft` | optimized proposal head | off |
+| `--kv-dtype bf16\|int8\|fp8\|nvfp4\|k8v4` | KV-cache storage | `int8` on Turing builds, `bf16` otherwise |
+| `--spec none\|mtp\|dflash\|dflash2` | speculative backend | `mtp` |
+| `--draft-tokens N` | MTP `1..5`; DFlash/DFlash2 `1..15` (DFlash needs it explicitly) | `3` |
+| `--lm-head-draft` / `--no-lm-head-draft` | force the optimized or the full proposal head | automatic: optimized when the artifact has one |
 | `--default-max-tokens N` | output limit when omitted by a request | `8192` |
 | `--default-thinking-budget N` | positive thinking cap inherited by thinking-enabled requests | unset |
 | `--vision` | enable media input and load Vision GPU allocations | off |
 | `--no-cuda-graph` | disable CUDA Graph decode | graphs on |
 | `--no-prefix-reuse` | disable compatible-prefix caching | prefix reuse on |
 | `--device-state-slots N` | extra Device StateImages beyond `max-concurrency` | `max-concurrency` |
-| `--host-context-mib N` | shared pinned Host budget for StateImages, KV and pause snapshots, including in-flight destinations | `8192 MiB + 8 native StateImages` |
+| `--host-context-mib N` | shared pinned Host budget for StateImages, KV and pause snapshots, including in-flight destinations | `2048 MiB + 8 native StateImages` (Turing builds; `8192 MiB` otherwise) |
 | `--no-thinking` | disable thinking by default | thinking on |
 | `--preserve-thinking` | preserve closed-turn assistant reasoning by default | off |
 | `--cors` | permissive browser CORS headers | off |
