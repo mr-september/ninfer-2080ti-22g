@@ -80,6 +80,8 @@ repository's own frequency ranking shows the cost: its top 131,072 tokens (the p
 to 98.2% for other languages, so up to a few percent of tokens could never be generated. With the
 embedding already on the host and a Q6 head available, that trade was not taken.
 
+A bottom-up variant (keep every special, template and byte token and every real word; cut only tokens with no legitimate use) was audited on the Qwen3.8 tokenizer and is not worth building: of 248,320 head rows only 243 are padding, and the junk-shaped tokens (long symbol runs, control characters, replacement characters, mojibake, hex runs, unused code points) number about 450 rows, 1.7 MiB at Q6. One head row costs 4,000 bytes at Q6, so 0.1 GiB needs about 27,000 rows, and those would be real words: a large share of the tokens never chosen in the ranking corpus are ordinary Korean, Thai, Vietnamese and code-identifier words. Frequency alone cannot separate artifacts from rare words.
+
 **MTP depth and the proposal head.** `--lm-head-draft` is free speed: +3% decode on average (+1.7%,
 +2.6%, +4.7% in paired runs), identical acceptance and byte-identical output, so the README examples use
 it. Depth 3 is best for code (decode tok/s at depth 1 to 5: 31.8, 37.0, 39.3, 31.4, 32.9; acceptance 92%
