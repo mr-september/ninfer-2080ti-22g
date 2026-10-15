@@ -172,8 +172,10 @@ hf download neroued/Qwen3.8-27B-NInfer qwen3_8_27b.ninfer --local-dir models
 **Convert from the original checkpoint.** Start from the original BF16 Hugging Face checkpoint (a local
 directory of safetensors). The converter quantizes once with group-wise absolute-max rounding; it reads
 safetensors and already-quantized NVFP4/FP8 checkpoints, and has no GGUF reader (converting a quantized
-file would round twice anyway). It needs Python 3.11 with PyTorch and NumPy, uses CUDA by default and
-`--device cpu` otherwise. From the repository root:
+file would round twice anyway). It needs Python 3.10 or newer with PyTorch and NumPy and runs the same on
+native Windows and on Linux/WSL2 (use `python` instead of `python3` on Windows); it uses CUDA by default and
+`--device cpu` otherwise. Windows CPU-only setup: `python -m pip install torch numpy safetensors`, with a CUDA
+build of PyTorch from pytorch.org for GPU conversion. From the repository root:
 
 ```bash
 python3 -m tools.convert \
@@ -195,6 +197,9 @@ python3 -m tools.convert \
 python3 -m tools.artifact.requantize_tensor models/qwen3_8_27b.ninfer models/qwen3_8_27b.q6head.ninfer \
   --object text/output_head --format q6_g64_fp16
 ```
+
+The Windows and Linux paths produce the same weights: re-encoding the Qwen3.8-27B head natively on Windows gave
+tensor data byte-identical to the WSL run (only the artifact ID and provenance metadata differ).
 
 ## Performance (one RTX 2080 Ti 22 GB)
 
