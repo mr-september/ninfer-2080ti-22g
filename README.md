@@ -32,7 +32,13 @@ Download the artifact (or [convert your own](#models-formats-and-converting-your
 ./build/apps/ninfer-serve models/qwen3_8_27b.ninfer
 ```
 
-On native Windows the binaries are `build-windows\apps\ninfer.exe` and `ninfer-serve.exe`. Add `--vision` for image and video input and `--messages FILE` for structured input; see the [CLI guide](docs/cli.md), [HTTP serving](docs/serving.md) and [committed examples](examples/cli/).
+On native Windows the binaries are `build-windows\apps\ninfer.exe` and `ninfer-serve.exe`, for example:
+
+```bat
+build-windows\apps\ninfer.exe E:\path\to\qwen3_8_27b.ninfer --prompt "Hello"
+```
+
+Add `--vision` for image and video input and `--messages FILE` for structured input; see the [CLI guide](docs/cli.md), [HTTP serving](docs/serving.md) and [committed examples](examples/cli/).
 
 ```bash
 curl http://127.0.0.1:8080/v1/chat/completions -H 'Content-Type: application/json' \
@@ -47,7 +53,8 @@ Those two commands already use the best-tested configuration for this GPU. Writt
 ./build/apps/ninfer models/qwen3_8_27b.ninfer --prompt "..." \
   --max-context 65536 --kv-capacity 65536 --kv-dtype int8 \
   --spec mtp --draft-tokens 3 --lm-head-draft \
-  --max-new 128 --prefill-chunk 1024 --device 0 \n  --chat-template tools/chat_templates/qwen3_8_sharp_v22_5.jinja
+  --max-new 128 --prefill-chunk 1024 --device 0 \
+  --chat-template tools/chat_templates/qwen3_8_sharp_v22_5.jinja
 ```
 
 and the server default is
@@ -56,7 +63,8 @@ and the server default is
 ./build/apps/ninfer-serve models/qwen3_8_27b.ninfer --port 8080 \
   --max-context 65536 --kv-capacity 65536 --kv-dtype int8 \
   --spec mtp --draft-tokens 3 --lm-head-draft \
-  --max-concurrency 1 --prefill-chunk 1024 \n  --chat-template tools/chat_templates/qwen3_8_sharp_v22_5.jinja
+  --max-concurrency 1 --prefill-chunk 1024 \
+  --chat-template tools/chat_templates/qwen3_8_sharp_v22_5.jinja
 ```
 
 (`--lm-head-draft` is applied automatically when the artifact carries a proposal head, as the official ones do.) Each default is an ordinary flag, so an ablation changes exactly one of them:
@@ -96,18 +104,22 @@ Binaries are `build/apps/ninfer`, `ninfer-serve` and `ninfer-perplexity`.
 
 ### Native Windows
 
-Requires Windows 10/11 x64, the NVIDIA driver, CUDA 12.8+ (validated with 12.9), Visual Studio 2022 or Build Tools with the "Desktop development with C++" workload (MSVC v143 and a Windows SDK), CMake 3.28+, Ninja and [vcpkg](https://github.com/microsoft/vcpkg). Install the two native libraries once (FFmpeg compiles from source; allow about 20 minutes):
+In short: install the prerequisites below, open an **"x64 Native Tools Command Prompt for VS 2022"** (plain PowerShell or cmd will not find the compiler), then run the `cmake` commands at the end of this section. Run `vcpkg install` once beforehand.
+
+Requires Windows 10/11 x64, the NVIDIA driver, CUDA 12.8+ (validated with 12.9), Visual Studio 2022 or Build Tools with the "Desktop development with C++" workload (MSVC v143 and a Windows SDK), CMake 3.28+, Ninja and [vcpkg](https://github.com/microsoft/vcpkg). Install the two native libraries once into your vcpkg checkout (FFmpeg compiles from source; allow about 20 minutes). Run this from the vcpkg directory, or give `vcpkg.exe` by full path:
 
 ```bat
+cd /d C:\path\to\vcpkg
 vcpkg install "ffmpeg[core,avcodec,avformat,swscale,zlib,dav1d]:x64-windows" "curl[ssl]:x64-windows"
 ```
 
 (`zlib` provides the PNG decoder and `dav1d` the AV1 decoder; without `zlib` image prompts fail with "media codec is not supported".)
 
-Then, from an "x64 Native Tools Command Prompt for VS 2022":
+Then, from an "x64 Native Tools Command Prompt for VS 2022" (it provides `cl`, `cmake` and `ninja`; set `VCPKG_ROOT` to the same vcpkg directory):
 
 ```bat
 set VCPKG_ROOT=C:\path\to\vcpkg
+cd /d C:\path\to\ninfer
 cmake --preset windows
 cmake --build build-windows -j
 ```
@@ -116,7 +128,7 @@ Binaries are `build-windows\apps\ninfer.exe`, `ninfer-serve.exe` and `ninfer-per
 
 Page-locked memory has to be free RAM: the server pins about 3 GiB by default (the 2 GiB host-context budget plus state images), the embedding table another 1.3 GiB. If startup reports `cudaMallocHost ... out of memory`, close memory-hungry programs or lower `--host-context-mib`.
 
-A cold build compiles the Q8 split-K kernels and takes tens of minutes on either platform. Tests and benchmarks are off by default (`BUILD_TESTING`, `NINFER_BUILD_BENCHMARKS`; see [build organization](docs/maintainer/build-system.md)). There is no install target; run from the build tree.
+A cold build compiles the Q8 split-K kernels and takes tens of minutes on either platform, plus the one-time FFmpeg build on Windows. Tests and benchmarks are off by default (`BUILD_TESTING`, `NINFER_BUILD_BENCHMARKS`; see [build organization](docs/maintainer/build-system.md)). There is no install target; run from the build tree.
 
 ## Models, formats and converting your own weights
 
