@@ -34,6 +34,19 @@ int main() {
     failures +=
         check(!defaults.preserve_thinking, "thinking history is unexpectedly preserved by default");
     failures += check(!defaults.enable_vision, "Vision is not disabled by default");
+    failures += check(defaults.vision_max_item_tokens == ninfer::kMaximumVisionItemTokens,
+                      "serve did not default to the native Vision item extent");
+    failures += check(parse({"ninfer-serve", "model.ninfer", "--vision", "--vision-max-item-tokens",
+                             "4096"})
+                              .vision_max_item_tokens == 4096,
+                      "serve lost --vision-max-item-tokens");
+    for (const char* bad : {"0", "255", "16385", "x"}) {
+        bool rejected = false;
+        try {
+            (void)parse({"ninfer-serve", "model.ninfer", "--vision", "--vision-max-item-tokens", bad});
+        } catch (const std::invalid_argument&) { rejected = true; }
+        failures += check(rejected, "serve accepted an invalid --vision-max-item-tokens");
+    }
     failures += check(defaults.chat_template_path == NINFER_DEFAULT_CHAT_TEMPLATE,
                       "the vendored Sharp template is not the server default");
     failures += check(parse({"ninfer-serve", "model.ninfer", "--artifact-chat-template"})

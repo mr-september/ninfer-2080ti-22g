@@ -22,6 +22,10 @@ inline constexpr std::uint32_t kMaximumConcurrency               = 8;
 inline constexpr std::size_t kMaximumContextCacheSessionKeyBytes = 256;
 inline constexpr std::size_t kMaximumExplicitPromptCacheMarkers  = 4;
 // Aggregate encoded image/video payload retained by one prompt, independent of item count.
+// Single-item Vision extent in merged tokens: the model's native image geometry limit (4096^2 px)
+// is the upper bound; Engine options may lower it to shrink the Vision workspace.
+inline constexpr std::uint32_t kMaximumVisionItemTokens = 16'384;
+inline constexpr std::uint32_t kMinimumVisionItemTokens = 256;
 inline constexpr std::size_t kMaximumPromptMediaBytes = 256ULL << 20;
 inline constexpr std::size_t kDefaultMediaCacheBytes  = 1ULL << 30;
 inline constexpr std::size_t kDefaultMediaLiveBytes   = 2ULL << 30;
@@ -174,6 +178,9 @@ struct EngineOptions {
     // Zero selects a bounded worker count from the detected host concurrency.
     std::uint32_t media_preprocess_threads = 0;
     bool enable_vision                     = false;
+    // Largest single image or video item in merged tokens. It sizes the Vision workspace and
+    // bounds media geometry: larger media is downscaled to fit. Valid in [256, 16384].
+    std::uint32_t vision_max_item_tokens = kMaximumVisionItemTokens;
     bool use_cuda_graph                    = true;
     ContextCacheOptions context_cache;
     ContextCostOptions context_cost;

@@ -495,6 +495,7 @@ std::string format_server_start_json(
              {"max_request_bytes", options.max_request_bytes},
              {"media_cache_bytes", options.media_cache_bytes},
              {"media_live_bytes", options.media_live_bytes},
+             {"vision_max_item_tokens", options.vision_max_item_tokens},
              {"media_preprocess_threads", options.media_preprocess_threads},
              {"request_log_jsonl", options.request_log_jsonl},
              {"default_output_tokens", options.default_max_tokens},

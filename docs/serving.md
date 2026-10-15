@@ -246,7 +246,7 @@ curl http://127.0.0.1:8080/v1/chat/completions \
 
 OpenAI image and video sources may be HTTP(S) URLs or base64 data URLs.
 
-Text and media requests use one complete-prompt context contract. After chat-template rendering and media-token expansion, the result must fit Engine `--max-context`. The current Vision runtime also has a 32,768 merged-token envelope (131,072 raw patches); the effective Vision limit is therefore `min(--max-context, 32768)`. There is no fixed image/video item-count limit: item count is admitted through aggregate source-byte, decoded-pixel, raw-patch, Vision-token, and live-memory budgets.
+Text and media requests use one complete-prompt context contract. After chat-template rendering and media-token expansion, the result must fit Engine `--max-context`. The current Vision runtime also has a 32,768 merged-token envelope (131,072 raw patches); the effective aggregate Vision limit is therefore `min(--max-context, 32768)`. One image or video item is further bounded by `--vision-max-item-tokens` (default 16,384, the native 4096x4096 geometry): the processor downscales larger media to fit. There is no fixed image/video item-count limit: item count is admitted through aggregate source-byte, decoded-pixel, raw-patch, Vision-token, and live-memory budgets.
 
 Media cache misses run as independent decode → resize → BF16-pack tasks on a bounded host worker pool. Prepared payloads are keyed by SHA-256 of the acquired bytes plus modality, so repeated media in later requests reuses the exact immutable BF16 patch input; concurrent identical misses use one single-flight build. `--media-cache-mib` bounds LRU-retained payloads, while `--media-live-mib` bounds every cache-, request-, or runtime-referenced payload. Cache eviction does not invalidate a request reference, and live bytes are returned only when the final reference is released. A request-level preparation gate derived from the live limit prevents concurrent partial builds from deadlocking the memory account.
 
@@ -565,6 +565,7 @@ The table lists executable defaults. The startup example selects a long-context 
 | `--default-max-tokens N` | output limit when omitted by a request | `8192` |
 | `--default-thinking-budget N` | positive thinking cap inherited by thinking-enabled requests | unset |
 | `--vision` | enable media input and load Vision GPU allocations | off |
+| `--vision-max-item-tokens N` | with `--vision`, largest single image or video item in merged tokens (`256..16384`); larger media is downscaled, or rejected under `oversized_image: error`; a smaller value shrinks the Vision workspace | `16384` |
 | `--no-cuda-graph` | disable CUDA Graph decode | graphs on |
 | `--no-prefix-reuse` | disable compatible-prefix caching | prefix reuse on |
 | `--device-state-slots N` | extra Device StateImages beyond `max-concurrency` | `max-concurrency` |

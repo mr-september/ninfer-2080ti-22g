@@ -80,6 +80,7 @@ struct SequencePlanningInputs {
     KvCacheStorage kv_storage               = KvCacheStorage::BFloat16;
     ProposalHead proposal_head              = ProposalHead::Full;
     models::LoadOptions features;
+    std::uint32_t vision_max_item_tokens = 0;
     bool use_cuda_graph               = true;
     bool causal_scoring               = false;
     int device                        = 0;
@@ -99,6 +100,7 @@ struct SequencePlanImpl {
     KvCacheStorage kv_storage               = KvCacheStorage::BFloat16;
     ProposalHead proposal_head              = ProposalHead::Full;
     models::LoadOptions features;
+    std::uint32_t vision_max_item_tokens = 0;
     bool use_cuda_graph               = true;
     bool causal_scoring               = false;
     int device                        = 0;

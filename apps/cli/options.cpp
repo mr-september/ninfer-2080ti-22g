@@ -96,6 +96,7 @@ std::string usage_text(const char* argv0) {
            "        --regex PATTERN | --choice TEXT ...]\n"
            "       [--raw-output] [--print-token-ids] [--no-thinking] [--thinking-budget N]\n"
            "       [--reasoning-effort none|minimal|low|medium|high|xhigh|max] [--vision]\n"
+           "       [--vision-max-item-tokens N]\n"
            "       [--no-cuda-graph]\n"
            "       [--log-level trace|debug|info|warning|error|critical|off]\n"
            "\n"
@@ -106,6 +107,8 @@ std::string usage_text(const char* argv0) {
            "Structured message content accepts text, image/image_url, and video/video_url parts;\n"
            "media sources may be local paths, HTTP(S) URLs, or base64 data URIs.\n"
            "--vision enables image/video input and loads the fixed Vision GPU allocations.\n"
+           "--vision-max-item-tokens N (256..16384, default 16384) bounds one image or video item;\n"
+           "larger media is downscaled, and a smaller N shrinks the Vision workspace.\n"
            "--thinking-budget caps model-origin thinking tokens; inserted control tokens count "
            "toward --max-new.\n"
            "--kv-capacity auto leaves " +
@@ -185,6 +188,12 @@ Options parse_options(int argc, char** argv) {
             options.reasoning_effort = parse_reasoning_effort(value(arg));
         } else if (arg == "--vision") {
             options.enable_vision = true;
+        } else if (arg == "--vision-max-item-tokens") {
+            options.vision_max_item_tokens = parse_u32(value(arg), "vision-max-item-tokens");
+            if (options.vision_max_item_tokens < kMinimumVisionItemTokens ||
+                options.vision_max_item_tokens > kMaximumVisionItemTokens) {
+                throw std::invalid_argument("--vision-max-item-tokens must be in [256,16384]");
+            }
         } else if (arg == "--no-cuda-graph") {
             options.use_cuda_graph = false;
         } else if (arg == "--stop-token-id") {

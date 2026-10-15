@@ -296,6 +296,7 @@ int main(int argc, char** argv) {
         engine_options.kv_cache           = cli.kv_cache;
         engine_options.speculative        = cli.speculative;
         engine_options.enable_vision      = cli.enable_vision;
+        engine_options.vision_max_item_tokens = cli.vision_max_item_tokens;
         engine_options.use_cuda_graph     = cli.use_cuda_graph;
         // One CLI invocation owns exactly one request and needs neither history nor pause
         // storage, so select those resource capacities explicitly.

@@ -93,6 +93,9 @@ struct ProcessorOptions {
     double max_video_duration_seconds      = 600.0;
     std::uint64_t max_raw_patches          = kMaximumPromptVisionRawPatches;
     std::uint64_t max_vision_tokens        = kMaximumPromptVisionTokens;
+    // Largest single image or video item. Native geometry limits are tightened to this extent,
+    // so oversized media is downscaled by the same resize rule rather than rejected.
+    std::uint64_t max_item_tokens          = kMaximumVisionItemTokens;
     double video_fps                       = 2.0;
     int video_min_frames                   = 4;
     int video_max_frames                   = 768;

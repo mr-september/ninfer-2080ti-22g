@@ -23,6 +23,7 @@ struct FrontendOptions {
     Architecture architecture              = Architecture::Qwen3_5;
     bool vision_enabled                    = true;
     std::uint32_t max_context              = 2'048;
+    std::uint32_t vision_max_item_tokens   = kMaximumVisionItemTokens;
     std::size_t media_cache_bytes          = kDefaultMediaCacheBytes;
     std::size_t media_live_bytes           = kDefaultMediaLiveBytes;
     std::uint32_t media_preprocess_threads = 0;

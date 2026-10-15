@@ -740,7 +740,7 @@ WorkspacePlan build_workspace_plan(const SequencePlanImpl& plan) {
     out.capacity = out.general_capacity;
     if (plan.features.vision) {
         const std::uint32_t merged = static_cast<std::uint32_t>(
-            std::min<std::uint64_t>(plan.capacity, kMaximumVisionItemTokens));
+            std::min<std::uint64_t>(plan.capacity, plan.vision_max_item_tokens));
         out.vision = execution::VisionContext::plan_workspace(
             *parameters.model.config().vision, *parameters.vision, merged, out.general_capacity);
         out.capacity = std::max(out.capacity, out.vision->capacity_bytes);
@@ -849,6 +849,7 @@ std::unique_ptr<SequencePlanImpl> build_sequence_candidate(const SequencePlannin
     impl->speculative_backend  = inputs.speculative_backend;
     impl->proposal_head        = inputs.proposal_head;
     impl->features             = inputs.features;
+    impl->vision_max_item_tokens = inputs.vision_max_item_tokens;
     impl->use_cuda_graph       = inputs.use_cuda_graph;
     impl->causal_scoring       = inputs.causal_scoring;
     impl->device               = inputs.device;
@@ -932,6 +933,7 @@ make_sequence_planner_impl(const execution::Parameters& parameters, DeviceContex
         .kv_storage           = options.kv_cache,
         .proposal_head        = options.speculative.proposal_head,
         .features             = models::load_options(options),
+        .vision_max_item_tokens = options.vision_max_item_tokens,
         .use_cuda_graph       = options.use_cuda_graph,
         .causal_scoring       = options.purpose == EnginePurpose::CausalScoring,
         .device               = options.device,

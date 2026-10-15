@@ -139,7 +139,7 @@ std::string serve_usage_text(const char* argv0) {
            "[--response-store-max-records N] [--response-store-max-mib N] "
            "[--kv-dtype bf16|int8|fp8|nvfp4|k8v4] [--spec none|mtp|dflash|dflash2] [--draft-tokens N] "
            "[--default-max-tokens N] [--default-thinking-budget N] "
-           "[--vision] [--no-cuda-graph] [--no-prefix-reuse] "
+           "[--vision] [--vision-max-item-tokens N] [--no-cuda-graph] [--no-prefix-reuse] "
            "[--chat-template FILE | --artifact-chat-template] [--lm-head-draft|--no-lm-head-draft] [--no-thinking] [--preserve-thinking] "
            "[--cors] "
            "[--temperature F] [--top-p F] [--top-k N] [--min-p F] [--presence-penalty F] "
@@ -159,6 +159,8 @@ std::string serve_usage_text(const char* argv0) {
            "default\n"
            "       --log-stats-interval-ms defaults to 5000; 0 disables periodic throughput logs\n"
            "       --vision enables media and loads the fixed Vision GPU allocations\n"
+           "       --vision-max-item-tokens bounds one image/video item in [256,16384] (default 16384);\n"
+           "       larger media is downscaled, and a smaller value shrinks the Vision workspace\n"
            "       --kv-capacity auto leaves " +
            std::to_string(kDefaultKvCapacityHeadroomBytes / (1024ULL * 1024ULL)) +
            " MiB of sizing headroom\n"
@@ -322,6 +324,13 @@ ServeOptions parse_serve_options(int argc, char** argv) {
             options.default_thinking_budget = static_cast<std::uint32_t>(budget);
         } else if (arg == "--vision") {
             options.enable_vision = true;
+        } else if (arg == "--vision-max-item-tokens") {
+            const std::uint64_t tokens =
+                parse_u64(require_value("--vision-max-item-tokens"), "vision-max-item-tokens");
+            if (tokens < kMinimumVisionItemTokens || tokens > kMaximumVisionItemTokens) {
+                throw std::invalid_argument("--vision-max-item-tokens must be in [256,16384]");
+            }
+            options.vision_max_item_tokens = static_cast<std::uint32_t>(tokens);
         } else if (arg == "--no-cuda-graph") {
             options.use_cuda_graph = false;
         } else if (arg == "--no-prefix-reuse") {

@@ -1420,6 +1420,36 @@ int test_image_resize_rejection_policy() {
     return failures;
 }
 
+int test_vision_item_token_cap() {
+    FrontendResources owned = resources();
+    owned.preprocessor_config_json =
+        R"({"patch_size":16,"temporal_patch_size":2,"merge_size":2,"image_mean":[0.5,0.5,0.5],"image_std":[0.5,0.5,0.5],"size":{"shortest_edge":65536,"longest_edge":16777216}})";
+    const auto vision_tokens = [&](std::uint32_t cap, ninfer::ImageResizePolicy policy) {
+        ninfer::models::qwen3_5::FrontendOptions options;
+        options.max_context           = std::numeric_limits<std::uint32_t>::max();
+        options.vision_max_item_tokens = cap;
+        const Frontend frontend       = make_frontend(owned, options);
+        ninfer::PromptInput input = image_text_input(block_ppm(2048, 1024, 127), {}, "large.ppm");
+        input.messages[0].parts[0].media.image_resize_policy = policy;
+        const auto prepared = frontend.prepare(std::move(input));
+        return FrontendFactory::inspect(prepared).prepare.vision_tokens;
+    };
+    const auto automatic = ninfer::ImageResizePolicy::Downsize;
+    int failures         = check(vision_tokens(16'384, automatic) == 2048,
+                                 "the default item cap changed an image within native geometry");
+    const auto capped    = vision_tokens(256, automatic);
+    failures += check(capped > 0 && capped <= 256,
+                      "the Vision item cap did not downscale an oversized image");
+    try {
+        (void)vision_tokens(256, ninfer::ImageResizePolicy::RejectOversized);
+        failures += check(false, "oversized_image=error accepted an image above the item cap");
+    } catch (const ninfer::RequestError& error) {
+        failures += check(error.kind() == ninfer::RequestErrorKind::InvalidMedia,
+                          "an image above the item cap used the wrong request-error class");
+    }
+    return failures;
+}
+
 int test_explicit_leading_instruction_cache_boundary() {
     const Frontend frontend           = make_frontend(resources(), false);
     constexpr std::string_view stable = "stable cache section.";
@@ -2617,6 +2647,7 @@ int main() {
     failures += test_media_token_ids_come_from_tokenizer();
     failures += test_template_media_contract();
     failures += test_image_resize_rejection_policy();
+    failures += test_vision_item_token_cap();
     failures += test_explicit_leading_instruction_cache_boundary();
     failures += test_trimmed_source_cache_boundaries();
     failures += test_source_part_recovery_boundary();

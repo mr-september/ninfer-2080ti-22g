@@ -54,6 +54,10 @@ void validate_options(const EngineOptions& options) {
         throw std::invalid_argument(
             "Engine media_live_bytes must be nonzero when Vision is enabled");
     }
+    if (options.enable_vision && (options.vision_max_item_tokens < kMinimumVisionItemTokens ||
+                                  options.vision_max_item_tokens > kMaximumVisionItemTokens)) {
+        throw std::invalid_argument("Engine vision_max_item_tokens must be in [256,16384]");
+    }
     if (options.media_preprocess_threads > 64) {
         throw std::invalid_argument("Engine media_preprocess_threads must be in [0,64]");
     }
@@ -110,6 +114,7 @@ ModelInstance::ModelInstance(std::unique_ptr<models::qwen3_5::Model> source,
                                .architecture             = model->config().text.architecture,
                                .vision_enabled           = options.enable_vision,
                                .max_context              = options.max_context,
+                               .vision_max_item_tokens   = options.vision_max_item_tokens,
                                .media_cache_bytes        = options.media_cache_bytes,
                                .media_live_bytes         = options.media_live_bytes,
                                .media_preprocess_threads = options.media_preprocess_threads})),
