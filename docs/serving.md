@@ -167,7 +167,7 @@ Messages enter the selected template in their input order. The maintained Qwen t
 
 Prompt-bearing JSON objects retain their received member order through request parsing and prompt rendering, including tool schemas and historical tool inputs. Canonical model-origin tool arguments retain that member order in aggregate and streaming responses, so an unmodified replay reconstructs the same ordered tool call. NInfer does not canonicalize semantically equivalent JSON: if a client reorders members, inserts defaults, or otherwise rewrites a tool object, the changed rendered input does not match the model-held endpoint and can reuse only an earlier exact checkpoint. Generated token segmentation can also differ from re-encoding the same text, limiting prefix reuse.
 
-`--chat-template FILE` selects a local Jinja template; by default, the server uses the template stored in the artifact. See the [CLI guide](cli.md#text-input) for an example.
+`--chat-template FILE` selects a local Jinja template; by default, the server uses the vendored Sharp v22.5.0 template, and `--artifact-chat-template` selects the template stored in the artifact instead. See the [CLI guide](cli.md#text-input) for an example. The Sharp template accepts `chat_template_kwargs: {"terse": false}` to omit its terse-answer instruction.
 
 Control-token spellings quoted in message content, tool data or ordinary template kwargs are encoded as text. Media placeholders come from the template and bind to actual image/video inputs.
 
@@ -509,7 +509,7 @@ Documents, Search Results, Files, Structured Outputs, server-tool results, conta
 
 Every Messages response carries a `request-id` header; error bodies also carry `request_id` and use Anthropic error categories. Local admission overload maps to HTTP 529 and queue/media timeouts to HTTP 504. Streaming owns the full Anthropic block lifecycle for Thinking, text, and tool use.
 
-`POST /v1/messages/count_tokens` uses the artifact's tokenizer, chat template, and media expansion without generation. It shares the same prompt normalization, tools, Thinking mode, Assistant prefill, media processing, and cache-marker interpretation as Messages; output-only sampling and streaming fields do not affect the count:
+`POST /v1/messages/count_tokens` uses the artifact's tokenizer, the active chat template, and media expansion without generation. It shares the same prompt normalization, tools, Thinking mode, Assistant prefill, media processing, and cache-marker interpretation as Messages; output-only sampling and streaming fields do not affect the count:
 
 ```bash
 curl http://127.0.0.1:8080/v1/messages/count_tokens \

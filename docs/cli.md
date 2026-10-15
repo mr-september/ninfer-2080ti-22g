@@ -31,12 +31,15 @@ Answer content is streamed to stdout. Human-readable startup milestones and runt
   > answer.txt 2> run.log
 ```
 
-`--chat-template FILE` overrides the artifact's built-in template with a local Jinja file. Changes to the file take effect after restarting NInfer:
+By default prompts are rendered with the vendored [Sharp v22.5.0 template](../tools/chat_templates/qwen3_8_sharp_v22_5.jinja), resolved from the source tree at build time (it adds about 150 prompt tokens to the system block and steers answers to be terse). `--chat-template FILE` uses a different local Jinja file, and `--artifact-chat-template` uses the template stored in the artifact; the two cannot be combined. Changes to a template file take effect after restarting NInfer:
 
 ```bash
 ./build/apps/ninfer models/qwen3_8_27b.ninfer \
   --chat-template tools/chat_templates/qwen3_8.jinja --prompt "Hello"
+./build/apps/ninfer models/qwen3_8_27b.ninfer --artifact-chat-template --prompt "Hello"
 ```
+
+The Sharp template takes `{"terse": false}` through `chat_template_kwargs` (server requests only) to drop its terse-answer instruction.
 
 `--grammar-file FILE` constrains the answer with a GBNF grammar whose entry rule is `root`:
 
@@ -200,7 +203,8 @@ The table lists executable defaults. The examples above select FP8 KV and MTP3 e
 | `--lm-head-draft` / `--no-lm-head-draft` | force the optimized or the full proposal head | automatic: optimized when the artifact has one |
 | `--vision` | enable image/video input and load Vision GPU allocations | off |
 | `--no-cuda-graph` | disable CUDA Graph decode | graphs on |
-| `--chat-template FILE` | use a local Jinja template | artifact template |
+| `--chat-template FILE` | use a local Jinja template | vendored Sharp v22.5.0 |
+| `--artifact-chat-template` | use the template stored in the artifact | off |
 | `--no-thinking` | disable thinking | template default |
 | `--thinking-budget N` | positive model-origin thinking-token cap; omitted means unlimited | unset |
 | `--reasoning-effort none\|minimal\|low\|medium\|high\|xhigh\|max` | pass an effort value to the selected template | template default |

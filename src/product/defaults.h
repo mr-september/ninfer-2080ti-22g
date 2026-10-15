@@ -7,11 +7,27 @@
 #include "ninfer/types.h"
 
 #include <cstdint>
+#include <filesystem>
+#include <stdexcept>
 
 namespace ninfer::product {
 
 // One request's logical ceiling. The KV pool defaults to the same size.
 inline constexpr std::uint32_t kDefaultMaxContext = 65536;
+
+// The executables render prompts with the vendored Sharp template unless --chat-template names
+// another file or --artifact-chat-template selects the template stored in the artifact.
+[[nodiscard]] inline std::filesystem::path resolve_chat_template(std::filesystem::path requested,
+                                                                 bool artifact_template) {
+    if (artifact_template) {
+        if (!requested.empty()) {
+            throw std::invalid_argument(
+                "--artifact-chat-template cannot be combined with --chat-template");
+        }
+        return {};
+    }
+    return requested.empty() ? std::filesystem::path(NINFER_DEFAULT_CHAT_TEMPLATE) : requested;
+}
 
 // MTP draft window: best for code (acceptance 79% at 3); prose prefers 1 to 2.
 inline constexpr std::uint32_t kDefaultDraftTokens = 3;

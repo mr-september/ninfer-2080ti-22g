@@ -90,12 +90,12 @@ Same machine, same 2080 Ti 22 GB, Qwen3.8-27B `groupwise-int`, INT8 KV, greedy, 
 
 Decode is at parity. Prefill is about 6% lower natively on a short prompt and about 2.5% on an 8k prompt (medians), consistent with a small fixed per-launch cost under WDDM; the kernels are identical. Absolute figures vary by around 15% between sessions with GPU clocks and background load, so only same-session interleaved comparisons mean anything. Native vision output (image, image+video) and the OpenAI/Anthropic server behavior match WSL2; the CUDA fault-injection part of the artifact-materialization test is Linux-only (it needs GNU `ld --wrap`).
 
-## Custom chat style
+## Default chat template
 
-The former `--chat-style sharp-v22.1` option is the Jinja template `tools/chat_templates/qwen3_8_sharp_v22_1.jinja`:
+The former `--chat-style sharp-v22.1` option is now the vendored Sharp v22.5.0 Jinja template `tools/chat_templates/qwen3_8_sharp_v22_5.jinja`, which `ninfer` and `ninfer-serve` use by default. `--artifact-chat-template` selects the artifact's own template and `--chat-template FILE` another file:
 
 ```bash
-./build/apps/ninfer model.ninfer --chat-template tools/chat_templates/qwen3_8_sharp_v22_1.jinja --prompt "..."
+./build/apps/ninfer model.ninfer --artifact-chat-template --prompt "..."
 ```
 
 ## Measured on one RTX 2080 Ti 22 GB

@@ -79,7 +79,7 @@ Campaigns select workloads by purpose:
 | `preprocess` | Default versus single-thread heavy-media preparation. |
 | `smoke` | One short cold case. |
 
-The default is `resource` with one sample. Select `--serve` and `--artifact` explicitly when using another binary or artifact. Fixture token facts still need to match the selected tokenizer/template.
+The default is `resource` with one sample. Select `--serve` and `--artifact` explicitly when using another binary or artifact. Fixture token facts still need to match the selected tokenizer/template. The fixtures' token facts come from the artifact's template, so add `--artifact-chat-template` to the profile's `common_args` (the default Sharp template adds about 150 tokens per request).
 
 `--profile-config FILE` replaces the built-in profile catalog. This allows a preserved baseline binary to use its own CLI without compatibility flags in the candidate:
 

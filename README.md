@@ -47,7 +47,7 @@ Those two commands already use the best-tested configuration for this GPU. Writt
 ./build/apps/ninfer models/qwen3_8_27b.ninfer --prompt "..." \
   --max-context 65536 --kv-capacity 65536 --kv-dtype int8 \
   --spec mtp --draft-tokens 3 --lm-head-draft \
-  --max-new 128 --prefill-chunk 1024 --device 0
+  --max-new 128 --prefill-chunk 1024 --device 0 \n  --chat-template tools/chat_templates/qwen3_8_sharp_v22_5.jinja
 ```
 
 and the server default is
@@ -56,7 +56,7 @@ and the server default is
 ./build/apps/ninfer-serve models/qwen3_8_27b.ninfer --port 8080 \
   --max-context 65536 --kv-capacity 65536 --kv-dtype int8 \
   --spec mtp --draft-tokens 3 --lm-head-draft \
-  --max-concurrency 1 --prefill-chunk 1024
+  --max-concurrency 1 --prefill-chunk 1024 \n  --chat-template tools/chat_templates/qwen3_8_sharp_v22_5.jinja
 ```
 
 (`--lm-head-draft` is applied automatically when the artifact carries a proposal head, as the official ones do.) Each default is an ordinary flag, so an ablation changes exactly one of them:
@@ -71,6 +71,7 @@ and the server default is
 | the largest KV pool that fits | `--kv-capacity auto` |
 | image and video input | `--vision` |
 | more retained-prefix memory in RAM | `--host-context-mib N` (default 2 GiB plus eight state images) |
+| the artifact's own chat template instead of Sharp v22.5.0 | `--artifact-chat-template` |
 | no CUDA Graph decode | `--no-cuda-graph` |
 | another GPU | `--device N` ([multi-GPU notes](docs/multi-gpu.md)) |
 

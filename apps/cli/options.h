@@ -17,6 +17,7 @@ struct Options {
 
     std::filesystem::path artifact_path;
     std::filesystem::path chat_template_path;
+    bool artifact_chat_template = false;
     std::filesystem::path grammar_path;
     std::filesystem::path json_schema_path;
     std::optional<std::string> regex;

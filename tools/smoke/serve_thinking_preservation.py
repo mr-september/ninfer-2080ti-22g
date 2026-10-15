@@ -294,6 +294,7 @@ def main() -> None:
         command = [
             str(server_bin),
             str(artifact),
+            "--artifact-chat-template",
             "--host",
             "127.0.0.1",
             "--port",

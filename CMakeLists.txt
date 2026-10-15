@@ -53,6 +53,9 @@ else()
   add_compile_definitions(NINFER_SM120A=1)
 endif()
 
+# The shipped executables render prompts with this vendored template unless --artifact-chat-template.
+add_compile_definitions(NINFER_DEFAULT_CHAT_TEMPLATE="${CMAKE_CURRENT_SOURCE_DIR}/tools/chat_templates/qwen3_8_sharp_v22_5.jinja")
+
 # Tests also exercise product input, logging and protocol adapters.
 set(NINFER_BUILD_PRODUCT_SUPPORT OFF)
 if(NINFER_BUILD_APPS OR BUILD_TESTING)

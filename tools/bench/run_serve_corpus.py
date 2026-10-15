@@ -774,6 +774,7 @@ def server_command(
         "--kv-dtype",
         spec.kv_dtype,
         "--no-prefix-reuse",
+        "--artifact-chat-template",
         "--device-state-slots",
         "0",
         "--host-context-mib",

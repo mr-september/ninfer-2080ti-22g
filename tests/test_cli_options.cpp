@@ -1,6 +1,7 @@
 #include "options.h"
 #include "product/defaults.h"
 
+#include <filesystem>
 #include <functional>
 #include <iostream>
 #include <stdexcept>
@@ -46,6 +47,22 @@ int main() {
                           defaults.speculative.draft_tokens == ninfer::product::kDefaultDraftTokens &&
                           defaults.speculative.proposal_head == ninfer::ProposalHead::Auto,
                       "MTP with the automatic proposal head is not the CLI default");
+    failures += check(defaults.chat_template_path == NINFER_DEFAULT_CHAT_TEMPLATE &&
+                          std::filesystem::exists(defaults.chat_template_path),
+                      "the vendored Sharp template is not the CLI default");
+    failures += check(parse({"ninfer", "model.ninfer", "--prompt", "hello", "--chat-template",
+                             "x.jinja"})
+                              .chat_template_path == "x.jinja",
+                      "--chat-template did not override the default template");
+    failures += check(parse({"ninfer", "model.ninfer", "--prompt", "hello",
+                             "--artifact-chat-template"})
+                          .chat_template_path.empty(),
+                      "--artifact-chat-template did not select the artifact template");
+    failures += check(rejects([] {
+                          (void)parse({"ninfer", "model.ninfer", "--prompt", "hello",
+                                       "--artifact-chat-template", "--chat-template", "x.jinja"});
+                      }),
+                      "--artifact-chat-template was accepted with --chat-template");
     const auto plain = parse({"ninfer", "model.ninfer", "--prompt", "hello", "--spec", "none"});
     failures += check(plain.speculative.backend == ninfer::SpeculativeBackend::None &&
                           plain.speculative.draft_tokens == 0 &&

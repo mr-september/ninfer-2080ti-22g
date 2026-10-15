@@ -280,7 +280,7 @@ The official conversion examples select these maintained templates:
 | Qwen3.6 Dense/MoE | [qwen3_6.jinja](../tools/chat_templates/qwen3_6.jinja) | thinking on; closed-turn reasoning omitted |
 | Qwen3.8 | [qwen3_8.jinja](../tools/chat_templates/qwen3_8.jinja) | thinking on; effort `xhigh`; closed-turn reasoning retained |
 
-Use your own Jinja file to change the artifact's default template. A startup [`--chat-template FILE`](cli.md#text-input) overrides the stored template. `generation_config.json` is preserved; sampling presets remain determined by the architecture and explicit application/request settings.
+Use your own Jinja file to change the artifact's default template. The executables do not use the stored template by default: they render with the vendored Sharp template, and `--artifact-chat-template` selects the stored one. A startup [`--chat-template FILE`](cli.md#text-input) overrides either. `generation_config.json` is preserved; sampling presets remain determined by the architecture and explicit application/request settings.
 
 The default maximum file size is 32,000,000,000 bytes, including framing. Smaller artifacts remain one file. Larger artifacts use an entry such as `models/my_qwen.ninfer` plus `my_qwen.ninfer.part-0001`, `my_qwen.ninfer.part-0002`, and so on in the same directory. Pass only the entry path to NInfer and keep all its recorded parts together. `--max-file-bytes` changes the limit.
 

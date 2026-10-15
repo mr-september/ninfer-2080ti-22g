@@ -7,6 +7,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 
 namespace ninfer::cli {
 namespace {
@@ -90,7 +91,7 @@ std::string usage_text(const char* argv0) {
            "       [--temperature F] [--top-p F] [--top-k N] [--min-p F]\n"
            "       [--presence-penalty F] [--frequency-penalty F] [--seed N] [--greedy]\n"
            "       [--stop-token-id N]... [--stop <text>]... [--reasoning-stop <text>]...\n"
-           "       [--chat-template FILE]\n"
+           "       [--chat-template FILE | --artifact-chat-template]\n"
            "       [--grammar-file FILE | --json-object | --json-schema-file FILE |\n"
            "        --regex PATTERN | --choice TEXT ...]\n"
            "       [--raw-output] [--print-token-ids] [--no-thinking] [--thinking-budget N]\n"
@@ -136,6 +137,8 @@ Options parse_options(int argc, char** argv) {
             options.prompt = value(arg);
         } else if (arg == "--chat-template") {
             options.chat_template_path = value(arg);
+        } else if (arg == "--artifact-chat-template") {
+            options.artifact_chat_template = true;
         } else if (arg == "--grammar-file") {
             options.grammar_path = value(arg);
         } else if (arg == "--json-object") {
@@ -258,6 +261,8 @@ Options parse_options(int argc, char** argv) {
         throw std::invalid_argument("--thinking-budget cannot be combined with --no-thinking");
     }
     if (options.greedy) { options.sampling.temperature = 0.0F; }
+    options.chat_template_path = product::resolve_chat_template(
+        std::move(options.chat_template_path), options.artifact_chat_template);
     return options;
 }
 

@@ -34,6 +34,11 @@ int main() {
     failures +=
         check(!defaults.preserve_thinking, "thinking history is unexpectedly preserved by default");
     failures += check(!defaults.enable_vision, "Vision is not disabled by default");
+    failures += check(defaults.chat_template_path == NINFER_DEFAULT_CHAT_TEMPLATE,
+                      "the vendored Sharp template is not the server default");
+    failures += check(parse({"ninfer-serve", "model.ninfer", "--artifact-chat-template"})
+                          .chat_template_path.empty(),
+                      "--artifact-chat-template did not select the artifact template");
     failures += check(defaults.request_log_jsonl.empty(),
                       "request JSONL logging is not disabled by default");
     failures += check(defaults.context_cost_presets.empty(),

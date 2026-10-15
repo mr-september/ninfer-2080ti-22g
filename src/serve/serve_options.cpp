@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace ninfer::serve {
 namespace {
@@ -139,7 +140,7 @@ std::string serve_usage_text(const char* argv0) {
            "[--kv-dtype bf16|int8|fp8|nvfp4|k8v4] [--spec none|mtp|dflash|dflash2] [--draft-tokens N] "
            "[--default-max-tokens N] [--default-thinking-budget N] "
            "[--vision] [--no-cuda-graph] [--no-prefix-reuse] "
-           "[--chat-template FILE] [--lm-head-draft|--no-lm-head-draft] [--no-thinking] [--preserve-thinking] "
+           "[--chat-template FILE | --artifact-chat-template] [--lm-head-draft|--no-lm-head-draft] [--no-thinking] [--preserve-thinking] "
            "[--cors] "
            "[--temperature F] [--top-p F] [--top-k N] [--min-p F] [--presence-penalty F] "
            "[--frequency-penalty F] [--seed N] [--greedy]\n"
@@ -331,6 +332,8 @@ ServeOptions parse_serve_options(int argc, char** argv) {
             options.speculative.proposal_head = ProposalHead::Full;
         } else if (arg == "--chat-template") {
             options.chat_template_path = require_value("--chat-template");
+        } else if (arg == "--artifact-chat-template") {
+            options.artifact_chat_template = true;
         } else if (arg == "--no-thinking") {
             options.enable_thinking = false;
         } else if (arg == "--preserve-thinking") {
@@ -394,6 +397,8 @@ ServeOptions parse_serve_options(int argc, char** argv) {
         throw std::invalid_argument("--prefill-chunk must be a positive multiple of 128");
     }
     product::finalize_speculative_cli_options(options.speculative, draft_tokens_explicit);
+    options.chat_template_path = product::resolve_chat_template(
+        std::move(options.chat_template_path), options.artifact_chat_template);
     if (default_max_tokens_explicit) {
         if (options.default_max_tokens <= 0) {
             throw std::invalid_argument("--default-max-tokens must be positive");

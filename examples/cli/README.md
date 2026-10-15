@@ -101,7 +101,7 @@ The boxed integer answers for cases 01, 15, and 30 are respectively `277`, `83`,
 
 ## Long context
 
-These prompt lengths include the chat template with thinking disabled. Each input freezes one long document with the same retrieval needle placed at 50% depth.
+These prompt lengths include the artifact's chat template with thinking disabled (run them with `--artifact-chat-template`; the default Sharp template adds about 150 tokens). Each input freezes one long document with the same retrieval needle placed at 50% depth.
 
 ```bash
 $CLI "$MODEL" --messages examples/cli/messages/long_niah_8k.json \
