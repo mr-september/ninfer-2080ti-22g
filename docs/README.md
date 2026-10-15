@@ -1,7 +1,6 @@
 # NInfer documentation
 
-Start with the [project README](../README.md) to build NInfer, download a published artifact, and
-run the CLI or HTTP server.
+Start with the [project README](../README.md) to build NInfer, download a published artifact, and run the CLI or HTTP server.
 
 ## User guides
 
@@ -37,12 +36,9 @@ The executable `--help` output is the exact source for command-line option spell
 
 ## Maintainer references
 
-The active references under [`maintainer/`](maintainer/) record current architecture, model,
-artifact, and maintenance contracts. These files are not additional user workflows or installed
-API documentation.
+The active references under [`maintainer/`](maintainer/) record current architecture, model, artifact, and maintenance contracts. These files are not additional user workflows or installed API documentation.
 
-[Engine architecture](maintainer/engine-architecture.md) is the single top-level reference. The
-other references own narrower contracts:
+[Engine architecture](maintainer/engine-architecture.md) is the single top-level reference. The other references own narrower contracts:
 
 | Document | Responsibility |
 |---|---|
@@ -62,7 +58,4 @@ other references own narrower contracts:
 | [Linear benchmark](maintainer/linear-benchmark.md) | pure Linear measurement, metrics and suites |
 | [Linear tuning and reports](maintainer/linear-tuning.md) | tuning ranges, priority points, dispatch tradeoffs and final performance report format |
 
-Model cards contain official artifact facts and source provenance. The
-[conversion guide](weight-conversion.md) is the entry point for making an artifact. Exact config
-fields, parameter expansion and native supported domains are maintained by the code linked from
-these references.
+Model cards contain official artifact facts and source provenance. The [conversion guide](weight-conversion.md) is the entry point for making an artifact. Exact config fields, parameter expansion and native supported domains are maintained by the code linked from these references.

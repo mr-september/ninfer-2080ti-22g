@@ -148,9 +148,7 @@ NInfer 显式提供这些分类。上游 `TokenizerInfo` 对 special token 的�
 
 JSON 源以保序方式解析和序列化；声明的属性顺序是生成布局的一部分，不能为提高命中率任意排序后假装语义完全相同。regex 使用源文本和编译选项作为键。
 
-复用库的一套线程安全编译缓存。并发相同 key 的冷编译共享一个构建结果；缓存锁不覆盖不同 key 的整个编译过程。
-每模型最多两个冷编译同时运行，各自在 submit 调用线程执行，编译内部单线程；缓存命中不占用冷编译名额。
-GBNF、JSON object、JSON Schema、regex 以种类、源文本和模型输出封装作为缓存键；choice 使用规范化后的字面量集合。校验、转换、封装和词表编译均在缓存 miss 的同一个受限构建内完成；命中不重新解析或转换。continuation bytes 仅用于初始化 matcher。
+复用库的一套线程安全编译缓存。并发相同 key 的冷编译共享一个构建结果；缓存锁不覆盖不同 key 的整个编译过程。 每模型最多两个冷编译同时运行，各自在 submit 调用线程执行，编译内部单线程；缓存命中不占用冷编译名额。 GBNF、JSON object、JSON Schema、regex 以种类、源文本和模型输出封装作为缓存键；choice 使用规范化后的字面量集合。校验、转换、封装和词表编译均在缓存 miss 的同一个受限构建内完成；命中不重新解析或转换。continuation bytes 仅用于初始化 matcher。
 
 设计默认编译缓存预算为 256 MiB，配置为 Engine 启动选项 `grammar_cache_bytes`。该预算限制缓存保留的编译结果；请求正在使用的对象被逐出缓存后仍可存活，因此不是进程 RAM 的总硬上限。词表索引、活跃 matcher 和编译临时内存分别计量，不扣入 KV/GDN Host cache 配额。
 
@@ -162,11 +160,7 @@ GBNF 使用 vendor 版本支持的 EBNF/GBNF 文本语法，以 `root` 为入口
 
 首个公开 grammar 合同采用语言约束本身。库中能够改变 temperature、额外 token budget 或生成行为的扩展不作为隐式运行参数；这些能力继续由 NInfer 的采样与预算合同控制。token 级终结符经当前模型 token domain 和控制 token 规则校验。
 
-Token 终结符采用 vendor 的 `Token(id, ...)` / `ExcludeToken(id, ...)` 写法。
-GBNF 入口不暴露上游的 `TagDispatch`、`TokenTagDispatch`、`Regex`、`Substring` 构造器。
-保留 XGrammar 的 `(= ...)` lookahead 注解语法，用于描述规则之后的合法后缀，辅助编译 token mask；
-完整语言由规则正文定义，注解应与后续规则一致。它沿用上游的编译提示语义，不作为独立的正则前瞻约束。
-用户直接 grammar 可以引用普通可生成 token；EOS 与保留的模型控制 token 由外层完成/阶段规则拥有，不作为可见正文终结符。模型封装可以使用相应控制 token 的精确 ID。
+Token 终结符采用 vendor 的 `Token(id, ...)` / `ExcludeToken(id, ...)` 写法。 GBNF 入口不暴露上游的 `TagDispatch`、`TokenTagDispatch`、`Regex`、`Substring` 构造器。 保留 XGrammar 的 `(= ...)` lookahead 注解语法，用于描述规则之后的合法后缀，辅助编译 token mask； 完整语言由规则正文定义，注解应与后续规则一致。它沿用上游的编译提示语义，不作为独立的正则前瞻约束。 用户直接 grammar 可以引用普通可生成 token；EOS 与保留的模型控制 token 由外层完成/阶段规则拥有，不作为可见正文终结符。模型封装可以使用相应控制 token 的精确 ID。
 
 Choice 通过字面量 grammar 分支构造，精确保留字符串的大小写、空白与 Unicode，支持多 token 选项和共享前缀。候选列表不能为空；允许空字符串，重复候选去重，候选顺序不参与权重。短候选若也是长候选的前缀，匹配短候选后既允许 EOS，也允许继续生成。公共接口为 `OutputConstraint::choice(vector<string>)`。
 
@@ -378,9 +372,7 @@ Program 在启动容量规划中为所选 backend 和最大 B 分配 pinned Host
 
 `Unreachable` 不意味着 kernel 不会读取这一列：已有批量候选构造可能预计算多列。固定 buffer 的所有被读取字段都必须有效；占位分布不进入可见接受前缀。
 
-实现用 nullable `SamplingMask` 表达无约束行，packed words 表达 Ready，Host 位集记录 DeadEnd 位置。
-DeadEnd/Unreachable 的 device 列填入安全占位；Program 按实际 licensed extent 检查是否经过 DeadEnd，
-通过 PendingBatch 单行失败交给 Engine。失败行不提交占位 token，其余行正常提交。
+实现用 nullable `SamplingMask` 表达无约束行，packed words 表达 Ready，Host 位集记录 DeadEnd 位置。 DeadEnd/Unreachable 的 device 列填入安全占位；Program 按实际 licensed extent 检查是否经过 DeadEnd， 通过 PendingBatch 单行失败交给 Engine。失败行不提交占位 token，其余行正常提交。
 
 第一处非法 draft 所在的预测位置本身仍为 Ready，拥有其之前合法前缀的 mask。非法的是 proposal token，不是用来拒绝它的 target 分布。
 
@@ -468,16 +460,13 @@ EOS 已被临时接受之后，不再调用 terminated matcher。固定宽度 GP
 
 ### 8.4 MTP
 
-MTP 的本轮 draft 随上一轮 egress 返回 Host，并保存于 sequence。Forward 阶段使用这些 draft
-执行 target forward；Finish 阶段完成 acceptance、MTP 状态对齐和下一轮 proposal。下一轮
-proposal 保持不受约束。首 token、extent=0 和输出预算尾部使用各自的有效行数。
+MTP 的本轮 draft 随上一轮 egress 返回 Host，并保存于 sequence。Forward 阶段使用这些 draft 执行 target forward；Finish 阶段完成 acceptance、MTP 状态对齐和下一轮 proposal。下一轮 proposal 保持不受约束。首 token、extent=0 和输出预算尾部使用各自的有效行数。
 
 ## 9. Speculative CPU/GPU 时序
 
 ### 9.1 两段执行
 
-MTP、DFlash、DFlash2 的每个 decode unit 都由 Forward 和 Finish 两段组成。Graph 与 eager
-使用相同的 native 调用；约束、无约束和混合 batch 使用同一套两段 Graph。
+MTP、DFlash、DFlash2 的每个 decode unit 都由 Forward 和 Finish 两段组成。Graph 与 eager 使用相同的 native 调用；约束、无约束和混合 batch 使用同一套两段 Graph。
 
 | 阶段 | MTP | DFlash / DFlash2 |
 |---|---|---|
@@ -485,18 +474,13 @@ MTP、DFlash、DFlash2 的每个 decode unit 都由 Forward 和 Finish 两段组
 | CPU mask | 使用 sequence 中已有的 draft IDs | 等待 Forward 中的 draft-ready event，读取 pinned IDs |
 | Finish | acceptance、MTP 状态对齐、下一轮 proposal、egress | acceptance、egress |
 
-Engine 传入一个借用本批 OutputSession 的 mask provider，映射 compact row 与 request。Program
-在 worker 调用栈上同步使用它进行 lookahead、填充 mask 和回退；provider 的借用止于 decode 返回。
-`Program::decode()` 返回 PendingBatch，随后仍由 Engine 完成 preview、Program commit 和输出提交。
+Engine 传入一个借用本批 OutputSession 的 mask provider，映射 compact row 与 request。Program 在 worker 调用栈上同步使用它进行 lookahead、填充 mask 和回退；provider 的借用止于 decode 返回。 `Program::decode()` 返回 PendingBatch，随后仍由 Engine 完成 preview、Program commit 和输出提交。
 
 ### 9.2 提交与依赖
 
-Program 在 Forward 前绑定 sampling 中的 Device mask 地址、步长和逐行启用状态。CPU 在 Forward
-提交后填内容，再将 mask 上传到同一 compute stream，Finish 排在上传之后。
+Program 在 Forward 前绑定 sampling 中的 Device mask 地址、步长和逐行启用状态。CPU 在 Forward 提交后填内容，再将 mask 上传到同一 compute stream，Finish 排在上传之后。
 
-DFlash 的 Forward Graph 在草稿 D2H 后通过 `cudaEventRecordExternal` 记录事件，随后继续 target
-forward。CPU 等待该事件即可读取本轮草稿，因此 mask 计算可以与 target forward 重叠。Eager 在
-同一位置记录普通 CUDA event。MTP 的草稿已经在 Host，提交 Forward 后即可计算 mask。
+DFlash 的 Forward Graph 在草稿 D2H 后通过 `cudaEventRecordExternal` 记录事件，随后继续 target forward。CPU 等待该事件即可读取本轮草稿，因此 mask 计算可以与 target forward 重叠。Eager 在 同一位置记录普通 CUDA event。MTP 的草稿已经在 Host，提交 Forward 后即可计算 mask。
 
 ```mermaid
 flowchart LR
@@ -511,25 +495,17 @@ flowchart LR
     B --> E["preview → commit → 发布"]
 ```
 
-无约束 batch 直接连续提交两段，跳过 CPU 等待和 mask 处理。DFlash 的小型草稿拷贝与 event 保留在
-固定 Forward 中。混合 batch 保持同一组成员，无约束行的 mask 标记 disabled。
+无约束 batch 直接连续提交两段，跳过 CPU 等待和 mask 处理。DFlash 的小型草稿拷贝与 event 保留在 固定 Forward 中。混合 batch 保持同一组成员，无约束行的 mask 标记 disabled。
 
-Graph 按 exact-B 和各阶段实际拓扑捕获。DFlash Forward 保留 draft 的上下文档位；Finish 不依赖
-上下文长度，每个 B 只有一份。MTP 两段各自复用更新兼容的上下文 profile。Schema 内容、请求 ID
-和 mask bytes 都是执行输入。启动时验证 profile 更新，并按 Forward→Finish 成对 warmup。
+Graph 按 exact-B 和各阶段实际拓扑捕获。DFlash Forward 保留 draft 的上下文档位；Finish 不依赖 上下文长度，每个 B 只有一份。MTP 两段各自复用更新兼容的上下文 profile。Schema 内容、请求 ID 和 mask bytes 都是执行输入。启动时验证 profile 更新，并按 Forward→Finish 成对 warmup。
 
 ### 9.3 所有权与存活期
 
-Program 持有两段 Graph、pinned IDs、Host/Device mask 和 ready event。Graph 先于其引用的事件与
-buffers 销毁。重复 launch、profile 更新和构造失败清理遵循同一存活期。
+Program 持有两段 Graph、pinned IDs、Host/Device mask 和 ready event。Graph 先于其引用的事件与 buffers 销毁。重复 launch、profile 更新和构造失败清理遵循同一存活期。
 
-从 unit 入场到 PendingBatch 消费，membership、sequence、block tables 和 buffers 保持稳定。
-Target logits、hidden、ReplaySSM records 和 proposal 数据保留到各自的最后消费者；两段的临时
-workspace 独立从 arena 起点使用。Host mask 在 H2D 完成前保持有效，Device mask 保留至 Finish
-结束。DFlash2 的 q 和 candidate IDs 始终留在 GPU。
+从 unit 入场到 PendingBatch 消费，membership、sequence、block tables 和 buffers 保持稳定。 Target logits、hidden、ReplaySSM records 和 proposal 数据保留到各自的最后消费者；两段的临时 workspace 独立从 arena 起点使用。Host mask 在 H2D 完成前保持有效，Device mask 保留至 Finish 结束。DFlash2 的 q 和 candidate IDs 始终留在 GPU。
 
-CPU lookahead 失败时先恢复 matcher 的临时状态；Program 收束已提交的 GPU 工作后再释放该 unit。
-DFlash pending features 按实际提交的前缀更新上下文，MTP 的下一轮草稿沿用原有提交与失效规则。
+CPU lookahead 失败时先恢复 matcher 的临时状态；Program 收束已提交的 GPU 工作后再释放该 unit。 DFlash pending features 按实际提交的前缀更新上下文，MTP 的下一轮草稿沿用原有提交与失效规则。
 
 ## 10. 错误、终止和单行失败
 

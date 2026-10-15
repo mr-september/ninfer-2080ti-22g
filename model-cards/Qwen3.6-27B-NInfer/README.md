@@ -58,13 +58,9 @@ model-index:
 
 # Qwen3.6-27B for NInfer
 
-This model card is the version-controlled source for
-[neroued/Qwen3.6-27B-NInfer](https://huggingface.co/neroued/Qwen3.6-27B-NInfer).
+This model card is the version-controlled source for [neroued/Qwen3.6-27B-NInfer](https://huggingface.co/neroued/Qwen3.6-27B-NInfer).
 
-The repository contains
-[Qwen3.6-27B](https://huggingface.co/Qwen/Qwen3.6-27B) converted to the native
-[NInfer](https://github.com/Neroued/ninfer) `.ninfer` artifact format. The artifact is intended
-only for NInfer; it is not a Transformers checkpoint, Safetensors distribution, or GGUF file.
+The repository contains [Qwen3.6-27B](https://huggingface.co/Qwen/Qwen3.6-27B) converted to the native [NInfer](https://github.com/Neroued/ninfer) `.ninfer` artifact format. The artifact is intended only for NInfer; it is not a Transformers checkpoint, Safetensors distribution, or GGUF file.
 
 ## Artifact
 
@@ -79,9 +75,7 @@ only for NInfer; it is not a Transformers checkpoint, Safetensors distribution, 
 | Chat template | [qwen3_6.jinja](https://github.com/Neroued/ninfer/blob/98dada0e03cb073fd07f905400b5904bc6e82759/tools/chat_templates/qwen3_6.jinja); override with `--chat-template FILE` |
 | Template defaults | thinking on; closed-turn reasoning omitted |
 
-The file contains Text, Vision, MTP, the optimized proposal head, and frontend resources. Text
-projections use Q4/Q5, vocabulary weights use Q6, and MTP projections use Q8. Vision and speculative
-weights are loaded only when selected at startup.
+The file contains Text, Vision, MTP, the optimized proposal head, and frontend resources. Text projections use Q4/Q5, vocabulary weights use Q6, and MTP projections use Q8. Vision and speculative weights are loaded only when selected at startup.
 
 Verify a downloaded file with:
 
@@ -93,18 +87,14 @@ printf '%s  %s\n' \
 
 ## Requirements
 
-- [NInfer](https://github.com/Neroued/ninfer) revision
-  [`98dada0`](https://github.com/Neroued/ninfer/commit/98dada0e03cb073fd07f905400b5904bc6e82759)
-  or later, built from source;
+- [NInfer](https://github.com/Neroued/ninfer) revision [`98dada0`](https://github.com/Neroued/ninfer/commit/98dada0e03cb073fd07f905400b5904bc6e82759) or later, built from source;
 - 64-bit Linux;
 - NVIDIA GeForce RTX 5090 (`sm_120a`);
 - CUDA Toolkit 13.1 or newer.
 
-Already have the official v2 file? [Upgrade it locally](https://github.com/Neroued/ninfer/blob/master/docs/weight-conversion.md#upgrade-an-existing-v2-artifact)
-without downloading the weights again.
+Already have the official v2 file? [Upgrade it locally](https://github.com/Neroued/ninfer/blob/master/docs/weight-conversion.md#upgrade-an-existing-v2-artifact) without downloading the weights again.
 
-NInfer does not provide an install target or packaged binary. See the
-[repository README](https://github.com/Neroued/ninfer#quick-start) for source-build dependencies.
+NInfer does not provide an install target or packaged binary. See the [repository README](https://github.com/Neroued/ninfer#quick-start) for source-build dependencies.
 
 ## Download and run a CLI example
 
@@ -122,8 +112,7 @@ hf download neroued/Qwen3.6-27B-NInfer \
   --lm-head-draft
 ```
 
-For images, videos, and structured chat history, see the
-[CLI guide](https://github.com/Neroued/ninfer/blob/master/docs/cli.md).
+For images, videos, and structured chat history, see the [CLI guide](https://github.com/Neroued/ninfer/blob/master/docs/cli.md).
 
 ## Start a local server
 
@@ -141,15 +130,9 @@ For images, videos, and structured chat history, see the
   --preserve-thinking
 ```
 
-Each request has a 240,000-token logical ceiling. The shared 240,000-token Device KV pool grows
-with resident execution; resource pressure can pause a request for later Snapshot or Replay
-recovery. Either request may use the full pool while running alone. Two extra Device StateImages
-and the default shared pinned Host budget (8 GiB plus eight model StateImages) retain state, KV
-and pause snapshots.
+Each request has a 240,000-token logical ceiling. The shared 240,000-token Device KV pool grows with resident execution; resource pressure can pause a request for later Snapshot or Replay recovery. Either request may use the full pool while running alone. Two extra Device StateImages and the default shared pinned Host budget (8 GiB plus eight model StateImages) retain state, KV and pause snapshots.
 
-See the [HTTP serving guide](https://github.com/Neroued/ninfer/blob/master/docs/serving.md) for the
-API surface and the [resource scheduling reference](https://github.com/Neroued/ninfer/blob/master/docs/maintainer/resource-scheduling-and-context-cache.md)
-for cache and admission semantics.
+See the [HTTP serving guide](https://github.com/Neroued/ninfer/blob/master/docs/serving.md) for the API surface and the [resource scheduling reference](https://github.com/Neroued/ninfer/blob/master/docs/maintainer/resource-scheduling-and-context-cache.md) for cache and admission semantics.
 
 ## Supported use
 
@@ -166,19 +149,11 @@ The artifact supports:
 
 ## Performance
 
-The single-request serving measurements below were collected on an NVIDIA GeForce RTX 5090 with
-CUDA 13.1. Requests were submitted serially to a persistent `ninfer-serve` process with CUDA Graph
-enabled, a 1,024-token prefill chunk, INT8 group-64 KV cache, and prefix reuse disabled. Each
-single-request value is the arithmetic mean ± sample standard deviation over five fixed seeds;
-warm-up requests are excluded. These results use the `groupwise-int` recipe.
+The single-request serving measurements below were collected on an NVIDIA GeForce RTX 5090 with CUDA 13.1. Requests were submitted serially to a persistent `ninfer-serve` process with CUDA Graph enabled, a 1,024-token prefill chunk, INT8 group-64 KV cache, and prefix reuse disabled. Each single-request value is the arithmetic mean ± sample standard deviation over five fixed seeds; warm-up requests are excluded. These results use the `groupwise-int` recipe.
 
 ### Concurrent MTP=3 decode saturation
 
-The concurrent campaign uses CUDA driver API 13.3 and one 293-token prompt followed by an
-8,192-token generation per active request. Each concurrency point starts a fresh server with MTP3,
-INT8 group-64 KV, CUDA Graphs, a 16,384-token per-request context limit, and prefix reuse disabled.
-Aggregate throughput includes only complete one-second intervals whose actual decode batch remains
-equal to C. Each row is one sustained wave.
+The concurrent campaign uses CUDA driver API 13.3 and one 293-token prompt followed by an 8,192-token generation per active request. Each concurrency point starts a fresh server with MTP3, INT8 group-64 KV, CUDA Graphs, a 16,384-token per-request context limit, and prefix reuse disabled. Aggregate throughput includes only complete one-second intervals whose actual decode batch remains equal to C. Each row is one sustained wave.
 
 | C | Steady decode (tok/s) | Speedup vs. C1 | Wave makespan |
 |---:|---:|---:|---:|
@@ -208,8 +183,7 @@ Thinking was enabled and the output limit was 65,536 tokens.
 
 ### MTP=3 cross-scenario decode
 
-Each category contains three fixtures and five seeds per fixture (15 samples). Thinking was
-disabled and the output limit was 4,096 tokens.
+Each category contains three fixtures and five seeds per fixture (15 samples). Thinking was disabled and the output limit was 4,096 tokens.
 
 | Category | Decode phase (tok/s) | MTP acceptance | MTP tokens/round |
 |---|---:|---:|---:|
@@ -218,16 +192,11 @@ disabled and the output limit was 4,096 tokens.
 | Translation | 161.5 ± 11.3 | 68.3% ± 7.2% | 3.05 ± 0.22 |
 | Structured output | 193.0 ± 18.8 | 88.7% ± 11.7% | 3.66 ± 0.35 |
 
-See the
-[full methodology and results](https://github.com/Neroued/ninfer/blob/master/docs/performance/qwen3.6-27b.md),
-including metric definitions and the exact reproduction command.
+See the [full methodology and results](https://github.com/Neroued/ninfer/blob/master/docs/performance/qwen3.6-27b.md), including metric definitions and the exact reproduction command.
 
 ## Evaluation
 
-The artifact was evaluated through NInfer's OpenAI-compatible serving route with thinking enabled,
-MTP=3, and a 262,144-token context limit. EvalScope 1.9.0 used 0-shot prompts, rule-based scoring,
-and one sample per problem with temperature 0.6, top-p 0.95, top-k 20, presence penalty 1.0, and
-seed 42. All 258 configured samples completed and were scored.
+The artifact was evaluated through NInfer's OpenAI-compatible serving route with thinking enabled, MTP=3, and a 262,144-token context limit. EvalScope 1.9.0 used 0-shot prompts, rule-based scoring, and one sample per problem with temperature 0.6, top-p 0.95, top-k 20, presence penalty 1.0, and seed 42. All 258 configured samples completed and were scored.
 
 | Benchmark | Accuracy | Correct / total |
 |---|---:|---:|
@@ -239,10 +208,8 @@ These are single-sample results under the stated NInfer evaluation profile, not 
 
 ## Limits
 
-- NInfer executes on one RTX 5090 and one CUDA device, with a startup-fixed capacity of 1–8 active
-  requests per Engine.
-- It does not provide large-scale continuous batching, priority/QoS scheduling,
-  multi-GPU execution, CPU/GPU offload, or distributed serving.
+- NInfer executes on one RTX 5090 and one CUDA device, with a startup-fixed capacity of 1–8 active requests per Engine.
+- It does not provide large-scale continuous batching, priority/QoS scheduling, multi-GPU execution, CPU/GPU offload, or distributed serving.
 - Context allocation is subject to GPU memory and the selected KV-cache type.
 - NInfer does not execute generated tool calls.
 
@@ -256,13 +223,8 @@ These are single-sample results under the stated NInfer evaluation profile, not 
 | Converter repository | `https://github.com/Neroued/ninfer` |
 | Minimum runtime revision | `98dada0e03cb073fd07f905400b5904bc6e82759` |
 
-The artifact identity, summarized object inventory, and conversion provenance are published in
-[`artifact-manifest.json`](https://huggingface.co/neroued/Qwen3.6-27B-NInfer/blob/main/artifact-manifest.json).
-The exact storage contract is maintained in the
-[v3 container reference](https://github.com/Neroued/ninfer/blob/master/docs/maintainer/artifact-container.md).
+The artifact identity, summarized object inventory, and conversion provenance are published in [`artifact-manifest.json`](https://huggingface.co/neroued/Qwen3.6-27B-NInfer/blob/main/artifact-manifest.json). The exact storage contract is maintained in the [v3 container reference](https://github.com/Neroued/ninfer/blob/master/docs/maintainer/artifact-container.md).
 
 ## License
 
-This NInfer artifact is distributed under the Apache License 2.0. The source
-[Qwen3.6-27B](https://huggingface.co/Qwen/Qwen3.6-27B) repository is also licensed under
-Apache-2.0. Users remain responsible for complying with the license and applicable laws.
+This NInfer artifact is distributed under the Apache License 2.0. The source [Qwen3.6-27B](https://huggingface.co/Qwen/Qwen3.6-27B) repository is also licensed under Apache-2.0. Users remain responsible for complying with the license and applicable laws.

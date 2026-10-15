@@ -103,20 +103,11 @@ model-index:
 
 # Qwen3.8-27B NVFP4 for NInfer
 
-This model card is the version-controlled source for
-[neroued/Qwen3.8-27B-nvfp4-NInfer](https://huggingface.co/neroued/Qwen3.8-27B-nvfp4-NInfer).
+This model card is the version-controlled source for [neroued/Qwen3.8-27B-nvfp4-NInfer](https://huggingface.co/neroued/Qwen3.8-27B-nvfp4-NInfer).
 
-The repository contains a mixed NVFP4/FP8 representation of
-[Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B). It combines the official BF16 checkpoint
-with the fixed packed Text weights from
-[unsloth/Qwen3.8-27B-NVFP4](https://huggingface.co/unsloth/Qwen3.8-27B-NVFP4) in the native
-[NInfer](https://github.com/Neroued/ninfer) `.ninfer` artifact format. The artifact is intended
-only for NInfer; it is not a Transformers checkpoint, Safetensors distribution, or GGUF file.
+The repository contains a mixed NVFP4/FP8 representation of [Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B). It combines the official BF16 checkpoint with the fixed packed Text weights from [unsloth/Qwen3.8-27B-NVFP4](https://huggingface.co/unsloth/Qwen3.8-27B-NVFP4) in the native [NInfer](https://github.com/Neroued/ninfer) `.ninfer` artifact format. The artifact is intended only for NInfer; it is not a Transformers checkpoint, Safetensors distribution, or GGUF file.
 
-The artifact uses the Qwen3.5 Dense architecture. Text layers 0–55 use NVFP4 MLP weights,
-while the token embedding, attention input/output
-projections, GDN Q/K/V/Z and output projections, full output head, and Text layers 56–63 MLP weights
-use row-scaled FP8. Control weights use BF16, with separate MTP, Vision and DFlash2 weights.
+The artifact uses the Qwen3.5 Dense architecture. Text layers 0–55 use NVFP4 MLP weights, while the token embedding, attention input/output projections, GDN Q/K/V/Z and output projections, full output head, and Text layers 56–63 MLP weights use row-scaled FP8. Control weights use BF16, with separate MTP, Vision and DFlash2 weights.
 
 ## Artifact
 
@@ -134,10 +125,7 @@ use row-scaled FP8. Control weights use BF16, with separate MTP, Vision and DFla
 | NVFP4 tensors | 112 |
 | Row-scaled FP8 tensors | 146 |
 
-The file contains Text, Vision, MTP, DFlash2, the optimized proposal head and frontend resources.
-Vision and speculative weights are loaded only when selected at startup. Source-derived NVFP4 and
-FP8 words are preserved without decode and requantization; only the official BF16 token embedding
-is encoded locally as row-scaled FP8.
+The file contains Text, Vision, MTP, DFlash2, the optimized proposal head and frontend resources. Vision and speculative weights are loaded only when selected at startup. Source-derived NVFP4 and FP8 words are preserved without decode and requantization; only the official BF16 token embedding is encoded locally as row-scaled FP8.
 
 Verify a downloaded file with:
 
@@ -147,27 +135,18 @@ printf '%s  %s\n' \
   'qwen3_8_27b_nvfp4.ninfer' | sha256sum --check
 ```
 
-This release includes the complete DFlash2 companion weights from
-`z-lab/Qwen3.8-27B-DFlash2` at revision
-`50307d4c4cde6860d4eee73e2547cd786fe8e8a4`. Select
-`--spec dflash2 --draft-tokens 7 --lm-head-draft`; draft counts 1..15 are supported.
-DFlash2 requires the runtime revision listed below. Existing performance and evaluation tables
-retain their stated MTP configurations and revisions.
+This release includes the complete DFlash2 companion weights from `z-lab/Qwen3.8-27B-DFlash2` at revision `50307d4c4cde6860d4eee73e2547cd786fe8e8a4`. Select `--spec dflash2 --draft-tokens 7 --lm-head-draft`; draft counts 1..15 are supported. DFlash2 requires the runtime revision listed below. Existing performance and evaluation tables retain their stated MTP configurations and revisions.
 
 ## Requirements
 
-- [NInfer](https://github.com/Neroued/ninfer) revision
-  [`98dada0e`](https://github.com/Neroued/ninfer/commit/98dada0e03cb073fd07f905400b5904bc6e82759)
-  or later, built from source;
+- [NInfer](https://github.com/Neroued/ninfer) revision [`98dada0e`](https://github.com/Neroued/ninfer/commit/98dada0e03cb073fd07f905400b5904bc6e82759) or later, built from source;
 - 64-bit Linux;
 - NVIDIA GeForce RTX 5090 (`sm_120a`);
 - CUDA Toolkit 13.1 or newer.
 
-Already have the official v2 file? [Upgrade it locally](https://github.com/Neroued/ninfer/blob/master/docs/weight-conversion.md#upgrade-an-existing-v2-artifact)
-without downloading the weights again.
+Already have the official v2 file? [Upgrade it locally](https://github.com/Neroued/ninfer/blob/master/docs/weight-conversion.md#upgrade-an-existing-v2-artifact) without downloading the weights again.
 
-NInfer does not provide an install target or packaged binary. See the
-[repository README](https://github.com/Neroued/ninfer#quick-start) for source-build dependencies.
+NInfer does not provide an install target or packaged binary. See the [repository README](https://github.com/Neroued/ninfer#quick-start) for source-build dependencies.
 
 ## Download and run a CLI example
 
@@ -185,8 +164,7 @@ hf download neroued/Qwen3.8-27B-nvfp4-NInfer \
   --lm-head-draft
 ```
 
-For images, videos, and structured chat history, see the
-[CLI guide](https://github.com/Neroued/ninfer/blob/master/docs/cli.md).
+For images, videos, and structured chat history, see the [CLI guide](https://github.com/Neroued/ninfer/blob/master/docs/cli.md).
 
 ## Start a local server
 
@@ -204,15 +182,9 @@ For images, videos, and structured chat history, see the
   --preserve-thinking
 ```
 
-Each request has a 240,000-token logical ceiling. The shared 240,000-token Device KV pool grows
-with resident execution; resource pressure can pause a request for later Snapshot or Replay
-recovery. Either request may use the full pool while running alone. Two extra Device StateImages
-and the default shared pinned Host budget (8 GiB plus eight model StateImages) retain state, KV
-and pause snapshots.
+Each request has a 240,000-token logical ceiling. The shared 240,000-token Device KV pool grows with resident execution; resource pressure can pause a request for later Snapshot or Replay recovery. Either request may use the full pool while running alone. Two extra Device StateImages and the default shared pinned Host budget (8 GiB plus eight model StateImages) retain state, KV and pause snapshots.
 
-See the [HTTP serving guide](https://github.com/Neroued/ninfer/blob/master/docs/serving.md) for the
-API surface and the [resource scheduling reference](https://github.com/Neroued/ninfer/blob/master/docs/maintainer/resource-scheduling-and-context-cache.md)
-for cache and admission semantics.
+See the [HTTP serving guide](https://github.com/Neroued/ninfer/blob/master/docs/serving.md) for the API surface and the [resource scheduling reference](https://github.com/Neroued/ninfer/blob/master/docs/maintainer/resource-scheduling-and-context-cache.md) for cache and admission semantics.
 
 ## Supported use
 
@@ -221,8 +193,7 @@ The artifact supports:
 - text generation in thinking and non-thinking modes;
 - image, multi-image, video, and mixed multimodal messages;
 - MTP speculative decoding with draft windows from one to five;
-- DFlash2 with draft windows from one to fifteen using the included
-  DFlash2 companion weights (`--spec dflash2 --draft-tokens 7`, optionally `--lm-head-draft`);
+- DFlash2 with draft windows from one to fifteen using the included DFlash2 companion weights (`--spec dflash2 --draft-tokens 7`, optionally `--lm-head-draft`);
 - BF16, INT8, FP8, NVFP4, and K8V4 KV cache;
 - CUDA Graph decode and compatible-prefix reuse;
 - startup-bounded small-scale concurrent serving with true batched decode;
@@ -231,19 +202,11 @@ The artifact supports:
 
 ## Performance
 
-Measured on September 28–29, 2026 with NInfer revision
-[`7f6aafed`](https://github.com/Neroued/ninfer/commit/7f6aafedb5f20200def820cfe51ab81c09c20eeb),
-one RTX 5090, driver 617.14, and CUDA 13.4 compile/runtime/driver API.
-These serving runs use FP8 E4M3 row-256 KV, CUDA Graphs, a 1,024-token prefill chunk, disabled
-prefix reuse, and temperature 0.6 / top-p 0.95 / top-k 20 / min-p 0 / presence penalty 1.0 /
-frequency penalty 0. MTP0 has a 262,144-token context ceiling; MTP3 uses 131,072 tokens per
-request, three draft tokens, the optimized proposal head, and automatic shared KV capacity.
+Measured on September 28–29, 2026 with NInfer revision [`7f6aafed`](https://github.com/Neroued/ninfer/commit/7f6aafedb5f20200def820cfe51ab81c09c20eeb), one RTX 5090, driver 617.14, and CUDA 13.4 compile/runtime/driver API. These serving runs use FP8 E4M3 row-256 KV, CUDA Graphs, a 1,024-token prefill chunk, disabled prefix reuse, and temperature 0.6 / top-p 0.95 / top-k 20 / min-p 0 / presence penalty 1.0 / frequency penalty 0. MTP0 has a 262,144-token context ceiling; MTP3 uses 131,072 tokens per request, three draft tokens, the optimized proposal head, and automatic shared KV capacity.
 
 ### Concurrent MTP=3 corpus makespan
 
-Each C is one complete 75-request corpus, with three reasoning and twelve cross-scenario fixtures,
-five seeds per fixture, and a fixed shuffled send order. Makespan includes prefill, decode,
-admission waits, transitions, and drain; actual output lengths vary.
+Each C is one complete 75-request corpus, with three reasoning and twelve cross-scenario fixtures, five seeds per fixture, and a fixed shuffled send order. Makespan includes prefill, decode, admission waits, transitions, and drain; actual output lengths vary.
 
 | C | Requests | Computed prefill tokens | Decode tokens | Makespan (s) | Requests/s | Corpus prefill (tok/s) | Corpus decode (tok/s) | Avg batch | MTP acceptance |
 |---|---|---|---|---|---|---|---|---|---|
@@ -252,10 +215,7 @@ admission waits, transitions, and drain; actual output lengths vary.
 | 4 | 75 | 15,460 | 722,202 | 1,640.17 | 0.0457 | 9.4 | 440.3 | 3.13 | 58.5% |
 | 8 | 75 | 15,460 | 708,589 | 1,443.37 | 0.0520 | 10.7 | 490.9 | 3.52 | 59.5% |
 
-All 300 requests completed without request, CUDA, or allocation errors. At C=1/2/4/8,
-automatic KV capacity is 131,072 / 262,144 / 253,632 / 225,024 tokens. C=8 has average batch 3.52
-and up to five waiting requests in the sampled intervals. The resident MTP3 weights occupy
-19.729 GiB, and the workspace arena is 243.3 MiB.
+All 300 requests completed without request, CUDA, or allocation errors. At C=1/2/4/8, automatic KV capacity is 131,072 / 262,144 / 253,632 / 225,024 tokens. C=8 has average batch 3.52 and up to five waiting requests in the sampled intervals. The resident MTP3 weights occupy 19.729 GiB, and the workspace arena is 243.3 MiB.
 
 ### Long-context serving (MTP disabled)
 
@@ -289,20 +249,13 @@ Each category pools three fixtures × five seeds. Values are mean ± sample stan
 | Translation | 15 | 202.9 ± 12.3 | 75.2% ± 6.6% | 3.26 ± 0.20 |
 | Structured | 15 | 231.7 ± 10.6 | 90.6% ± 5.6% | 3.72 ± 0.17 |
 
-All five AIME 15 samples reach the 65,536-token output budget. The C=1 corpus contains
-40 stop-token and 35 output-limit results; all are retained in the statistics. These measurements
-do not score answer accuracy or task completion.
+All five AIME 15 samples reach the 65,536-token output budget. The C=1 corpus contains 40 stop-token and 35 output-limit results; all are retained in the statistics. These measurements do not score answer accuracy or task completion.
 
-The [full results and reproduction commands](https://github.com/Neroued/ninfer/blob/master/docs/performance/qwen3.8-27b.md)
-also cover DFlash2 K=7, MTP3 decode saturation, and completion outcomes.
+The [full results and reproduction commands](https://github.com/Neroued/ninfer/blob/master/docs/performance/qwen3.8-27b.md) also cover DFlash2 K=7, MTP3 decode saturation, and completion outcomes.
 
 ## Evaluation
 
-The artifact was evaluated through NInfer's OpenAI-compatible serving route with thinking enabled,
-MTP=3, and INT8 group-64 KV. EvalScope 1.9.0 used 0-shot prompts, rule-based scoring, and one sample
-per problem with temperature 1.0, top-p 0.95, top-k 20, presence penalty 0.0, and seed 42. The text
-suite ran at a 252,928-token context limit; the multimodal suite ran with `--vision` at a
-81,920-token limit.
+The artifact was evaluated through NInfer's OpenAI-compatible serving route with thinking enabled, MTP=3, and INT8 group-64 KV. EvalScope 1.9.0 used 0-shot prompts, rule-based scoring, and one sample per problem with temperature 1.0, top-p 0.95, top-k 20, presence penalty 0.0, and seed 42. The text suite ran at a 252,928-token context limit; the multimodal suite ran with `--vision` at a 81,920-token limit.
 
 | Benchmark | NInfer NVFP4 | Correct / total | Official Qwen3.8-27B BF16 |
 |---|---:|---:|---:|
@@ -313,22 +266,14 @@ suite ran at a 252,928-token context limit; the multimodal suite ran with `--vis
 | ERQA | 66.25% | 265 / 400 | 65.5 |
 | RealWorldQA | 83.53% | 639 / 765 | 85.9 |
 
-All 1,723 configured samples completed and were scored. IFBench additionally reports 80.50%
-instruction-level strict, 80.33% prompt-level loose, and 83.50% instruction-level loose. These are
-single-sample results, not pass@k.
+All 1,723 configured samples completed and were scored. IFBench additionally reports 80.50% instruction-level strict, 80.33% prompt-level loose, and 83.50% instruction-level loose. These are single-sample results, not pass@k.
 
-The official Qwen3.8-27B BF16 figures come from the
-[upstream model card](https://huggingface.co/Qwen/Qwen3.8-27B); its sampling settings and IFBench
-metric level are not stated there, so the last column is not a same-protocol comparison. The NVFP4
-deltas stay within ±2.5 points on the four overlapping benchmarks, and the upstream card reports no
-AIME results.
+The official Qwen3.8-27B BF16 figures come from the [upstream model card](https://huggingface.co/Qwen/Qwen3.8-27B); its sampling settings and IFBench metric level are not stated there, so the last column is not a same-protocol comparison. The NVFP4 deltas stay within ±2.5 points on the four overlapping benchmarks, and the upstream card reports no AIME results.
 
 ## Limits
 
-- NInfer executes on one RTX 5090 and one CUDA device, with a startup-fixed capacity of 1–8 active
-  requests per Engine.
-- It does not provide large-scale continuous batching, priority/QoS scheduling,
-  multi-GPU execution, CPU/GPU offload, or distributed serving.
+- NInfer executes on one RTX 5090 and one CUDA device, with a startup-fixed capacity of 1–8 active requests per Engine.
+- It does not provide large-scale continuous batching, priority/QoS scheduling, multi-GPU execution, CPU/GPU offload, or distributed serving.
 - Context allocation is subject to GPU memory and the selected KV-cache type.
 - NInfer does not execute generated tool calls.
 
@@ -347,14 +292,8 @@ AIME results.
 | Minimum runtime revision | `98dada0e03cb073fd07f905400b5904bc6e82759` |
 | Ranking input SHA-256 | `c692dc76388132c910547589b4fb4a0503fbd6ad50aaac6a509bbcb192a8afa5` |
 
-The artifact identity, summarized object inventory, and conversion provenance are published in
-[`artifact-manifest.json`](https://huggingface.co/neroued/Qwen3.8-27B-nvfp4-NInfer/blob/main/artifact-manifest.json).
-The exact storage contract is maintained in the
-[v3 container reference](https://github.com/Neroued/ninfer/blob/master/docs/maintainer/artifact-container.md).
+The artifact identity, summarized object inventory, and conversion provenance are published in [`artifact-manifest.json`](https://huggingface.co/neroued/Qwen3.8-27B-nvfp4-NInfer/blob/main/artifact-manifest.json). The exact storage contract is maintained in the [v3 container reference](https://github.com/Neroued/ninfer/blob/master/docs/maintainer/artifact-container.md).
 
 ## License
 
-This NInfer artifact is distributed under the Apache License 2.0. The
-[Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B) base repository and the
-[quantized source repository](https://huggingface.co/unsloth/Qwen3.8-27B-NVFP4) are also licensed
-under Apache-2.0. Users remain responsible for complying with the license and applicable laws.
+This NInfer artifact is distributed under the Apache License 2.0. The [Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B) base repository and the [quantized source repository](https://huggingface.co/unsloth/Qwen3.8-27B-NVFP4) are also licensed under Apache-2.0. Users remain responsible for complying with the license and applicable laws.

@@ -1,31 +1,20 @@
 # tools/bench
 
-Maintainer orchestration for the public `ninfer_bench` throughput tool, serving corpus/concurrency
-runners, and the external Serve TTFT client. Correctness is owned by the affected suites under
-[`tests/`](../../tests/README.md).
+Maintainer orchestration for the public `ninfer_bench` throughput tool, serving corpus/concurrency runners, and the external Serve TTFT client. Correctness is owned by the affected suites under [`tests/`](../../tests/README.md).
 
 ## External Serve TTFT
 
-[`ttft/README.md`](ttft/README.md) defines the black-box latency benchmark. The measurement runner
-uses frozen text/media requests and public streaming protocols without calling Engine. A separate
-controller manages the fixed Qwen3.8-27B NVFP4/FP8 Serve profiles and fresh-process isolation.
+[`ttft/README.md`](ttft/README.md) defines the black-box latency benchmark. The measurement runner uses frozen text/media requests and public streaming protocols without calling Engine. A separate controller manages the fixed Qwen3.8-27B NVFP4/FP8 Serve profiles and fresh-process isolation.
 
 ```bash
 python3 tools/bench/run_serve_ttft_campaign.py --campaign resource --samples 5
 ```
 
-The controller chooses the profile, starts and stops Serve for every sample, runs the external
-client, stages the NVFP4 artifact once in `/dev/shm`, stores raw/progress/Serve artifacts below
-`profiles/bench/ttft/`, records structured per-request Serve diagnostics, and writes Markdown,
-JSON, and CSV summaries. The case catalog, exact profiles, TTFT boundary, and fixture qualification
-are documented in the dedicated README.
+The controller chooses the profile, starts and stops Serve for every sample, runs the external client, stages the NVFP4 artifact once in `/dev/shm`, stores raw/progress/Serve artifacts below `profiles/bench/ttft/`, records structured per-request Serve diagnostics, and writes Markdown, JSON, and CSV summaries. The case catalog, exact profiles, TTFT boundary, and fixture qualification are documented in the dedicated README.
 
 ## Corpus baker
 
-`ninfer_bench` benchmarks prefill at an exact length by slicing the first `P` token ids of a
-committed corpus, so the corpus must be real, in-distribution text (not random tokens) and at
-least as long as the largest prefill you want to run. `make_bench_corpus.py` bakes that corpus
-offline with a local Hugging Face Qwen3.6 tokenizer.
+`ninfer_bench` benchmarks prefill at an exact length by slicing the first `P` token ids of a committed corpus, so the corpus must be real, in-distribution text (not random tokens) and at least as long as the largest prefill you want to run. `make_bench_corpus.py` bakes that corpus offline with a local Hugging Face Qwen3.6 tokenizer.
 
 Outputs (committed):
 
@@ -36,14 +25,8 @@ bench/fixtures/bench_corpus.manifest.json  tokenizer id, token count, and source
 
 Content sources:
 
-- Built-in curated multi-domain prose (Chinese / English / code / math) — the default. It is
-  encoded WITHOUT the chat template or special tokens, then tiled (paragraphs rotated each cycle)
-  and truncated to exactly `--tokens`. Repetition only fills length; because prefill/decode
-  throughput is token-count / bandwidth bound, it does not bias the numbers.
-- `--source-text <file>` (repeatable) — tokenize your own long meaningful text instead, e.g. a
-  downloaded public-domain book or a concatenated document set, for genuinely diverse very long
-  content. The committed default is `~64k` tokens; raise `--tokens` and/or pass `--source-text`
-  for more.
+- Built-in curated multi-domain prose (Chinese / English / code / math) — the default. It is encoded WITHOUT the chat template or special tokens, then tiled (paragraphs rotated each cycle) and truncated to exactly `--tokens`. Repetition only fills length; because prefill/decode throughput is token-count / bandwidth bound, it does not bias the numbers.
+- `--source-text <file>` (repeatable) — tokenize your own long meaningful text instead, e.g. a downloaded public-domain book or a concatenated document set, for genuinely diverse very long content. The committed default is `~64k` tokens; raise `--tokens` and/or pass `--source-text` for more.
 
 The binary slices `[0:P]`; the manifest is provenance only.
 
@@ -55,8 +38,7 @@ Install the tokenizer dependencies into the active Python environment:
 pip install -r tools/bench/requirements.txt
 ```
 
-The tokenizer is loaded locally only; the tool never downloads from the network. Pass
-`--tokenizer-path` or set `NINFER_TOKENIZER_PATH`.
+The tokenizer is loaded locally only; the tool never downloads from the network. Pass `--tokenizer-path` or set `NINFER_TOKENIZER_PATH`.
 
 ## Regenerate / check
 
@@ -75,13 +57,11 @@ python3 tools/bench/make_bench_corpus.py \
 python3 tools/bench/make_bench_corpus.py --check
 ```
 
-`--tokens` is the exact committed corpus size and the ceiling on prefill length; increase it (and
-optionally use `--source-text`) to benchmark longer prefills, memory permitting.
+`--tokens` is the exact committed corpus size and the ceiling on prefill length; increase it (and optionally use `--source-text`) to benchmark longer prefills, memory permitting.
 
 ## NInfer performance matrix
 
-`run_ninfer_bench_matrix.py` runs the layered public-Engine `ninfer_bench` matrix against the native
-`.ninfer` artifact and stores its local reports under `profiles/bench/`. Its defaults are:
+`run_ninfer_bench_matrix.py` runs the layered public-Engine `ninfer_bench` matrix against the native `.ninfer` artifact and stores its local reports under `profiles/bench/`. Its defaults are:
 
 ```text
 artifact: out/qwen3_6_27b.ninfer
@@ -89,9 +69,7 @@ binary:   build/bench/ninfer_bench
 corpus:   bench/fixtures/bench_corpus.ids
 ```
 
-The matrix treats MTP `k=3` with the optimized proposal head as the primary path, keeps `k=0` and
-`k=5` as controls, and sweeps `k=0..5` on representative context-decode cases. Decode-bearing cases
-cover CUDA Graph and eager execution; prefill-only cases vary prompt length and prefill chunk.
+The matrix treats MTP `k=3` with the optimized proposal head as the primary path, keeps `k=0` and `k=5` as controls, and sweeps `k=0..5` on representative context-decode cases. Decode-bearing cases cover CUDA Graph and eager execution; prefill-only cases vary prompt length and prefill chunk.
 
 ```bash
 # Configure the benchmark targets once; they are off in the default public build.
@@ -122,62 +100,25 @@ profiles/bench/ninfer-<preset>-<timestamp>/
   summary.json
 ```
 
-Use `--resume` to skip completed JSON reports in an existing `--output-dir`, and `--preset smoke`
-for a minimal script/runner check. `--no-build` uses the binary supplied by `--bench` without
-building it.
+Use `--resume` to skip completed JSON reports in an existing `--output-dir`, and `--preset smoke` for a minimal script/runner check. `--no-build` uses the binary supplied by `--bench` without building it.
 
-Each raw report must be `ninfer_bench_report` schema v17. The flattened summary and schema-v4 matrix
-manifest carry native facts from the report: architecture, public name, actual formats, prefill signature, artifact,
-load/read/upload/staging values, Engine memory arenas including the non-additive Vision layout
-inside the unified workspace and CUDA Graph allowance, per-test planned logical and
-allocator-observed workspace peaks, KV capacity and
-payload, configured proposal head and graph mode, phase timings and throughput, and speculative
-rounds/drafts/acceptance/fallbacks. The matrix manifest is descriptive and records the commands and
-selected local inputs; it does not make repository state part of report validity.
+Each raw report must be `ninfer_bench_report` schema v17. The flattened summary and schema-v4 matrix manifest carry native facts from the report: architecture, public name, actual formats, prefill signature, artifact, load/read/upload/staging values, Engine memory arenas including the non-additive Vision layout inside the unified workspace and CUDA Graph allowance, per-test planned logical and allocator-observed workspace peaks, KV capacity and payload, configured proposal head and graph mode, phase timings and throughput, and speculative rounds/drafts/acceptance/fallbacks. The matrix manifest is descriptive and records the commands and selected local inputs; it does not make repository state part of report validity.
 
 ## Serving corpus benchmark
 
-[Published coverage and model results](../../docs/performance.md) identify the recorded runs.
-The [serving methodology](../../docs/performance/methodology.md) owns workload definitions,
-metric boundaries, aggregation, comparison rules, and publication format. This section describes
-runner usage and output files.
+[Published coverage and model results](../../docs/performance.md) identify the recorded runs. The [serving methodology](../../docs/performance/methodology.md) owns workload definitions, metric boundaries, aggregation, comparison rules, and publication format. This section describes runner usage and output files.
 
-`run_serve_corpus.py` accepts explicit `--artifact LABEL=PATH` entries. Labels identify report groups;
-the selected artifact supplies the architecture, public name and weight bindings.
-Omitting `--mode` selects MTP0 and MTP3; repeat `--mode` to select a subset. Use `dflash7` for
-Qwen3.6-35B-A3B DFlash K=7 and `dflash2_7` for Qwen3.8-27B DFlash2 K=7, with companion weights
-in the selected artifact. `--sampling greedy` selects exact argmax; the default is stochastic.
-Run commands with a selected Python 3.11 interpreter, as in the model-page reproduction entries.
-Both serving runners accept `--kv-dtype bf16|int8|fp8|nvfp4|k8v4` (default: `int8`).
-Specify it explicitly when recording a new campaign; the Qwen3.8 performance profile uses
-`--kv-dtype fp8`. The runner verifies the loaded KV representation and records the selection in
-its results. A serial run cannot resume records collected with a different KV dtype.
+`run_serve_corpus.py` accepts explicit `--artifact LABEL=PATH` entries. Labels identify report groups; the selected artifact supplies the architecture, public name and weight bindings. Omitting `--mode` selects MTP0 and MTP3; repeat `--mode` to select a subset. Use `dflash7` for Qwen3.6-35B-A3B DFlash K=7 and `dflash2_7` for Qwen3.8-27B DFlash2 K=7, with companion weights in the selected artifact. `--sampling greedy` selects exact argmax; the default is stochastic. Run commands with a selected Python 3.11 interpreter, as in the model-page reproduction entries. Both serving runners accept `--kv-dtype bf16|int8|fp8|nvfp4|k8v4` (default: `int8`). Specify it explicitly when recording a new campaign; the Qwen3.8 performance profile uses `--kv-dtype fp8`. The runner verifies the loaded KV representation and records the selection in its results. A serial run cannot resume records collected with a different KV dtype.
 
-The serial runner writes `run.jsonl`, `summary.csv`, `summary.md`, and per-server logs under
-`server/`. JSONL contains the completed requests and responses; CSV/Markdown contain fixture and
-category summaries. The output directory is supplied explicitly with `--output`.
+The serial runner writes `run.jsonl`, `summary.csv`, `summary.md`, and per-server logs under `server/`. JSONL contains the completed requests and responses; CSV/Markdown contain fixture and category summaries. The output directory is supplied explicitly with `--output`.
 
-Its schema-v8 result and flattened summaries retain the KV dtype, actual `prefill_signature`, request Host
-exposure, and decode Host/Device-wait time per round received from the schema-v24 serving records.
-Request exposure is a latency distribution value and is never summed across concurrent requests;
-worker aggregation uses the serving `throughput.host_work` interval deltas. The stochastic route pins its complete
-temperature/top-p/top-k/min-p/presence/frequency profile explicitly, so model-default changes do
-not alter the measurement method.
+Its schema-v8 result and flattened summaries retain the KV dtype, actual `prefill_signature`, request Host exposure, and decode Host/Device-wait time per round received from the schema-v24 serving records. Request exposure is a latency distribution value and is never summed across concurrent requests; worker aggregation uses the serving `throughput.host_work` interval deltas. The stochastic route pins its complete temperature/top-p/top-k/min-p/presence/frequency profile explicitly, so model-default changes do not alter the measurement method.
 
 ## Concurrent serving benchmark
 
-`run_serve_concurrency.py` selects `--suite decode-saturation` or `--suite corpus-makespan`.
-Their distinct time boundaries and workload dispatch are defined in the
-[serving methodology](../../docs/performance/methodology.md#workloads-and-measurement-boundaries).
-Repeat `--concurrency` to select C points; each point starts a fresh server. The point report
-records the actual Engine configuration, automatic KV capacity, shuffle seed where applicable,
-dispatch method, and per-request positions.
-Both serving runners disable prefix reuse and set extra Device state and Host context capacity to zero.
+`run_serve_concurrency.py` selects `--suite decode-saturation` or `--suite corpus-makespan`. Their distinct time boundaries and workload dispatch are defined in the [serving methodology](../../docs/performance/methodology.md#workloads-and-measurement-boundaries). Repeat `--concurrency` to select C points; each point starts a fresh server. The point report records the actual Engine configuration, automatic KV capacity, shuffle seed where applicable, dispatch method, and per-request positions. Both serving runners disable prefix reuse and set extra Device state and Host context capacity to zero.
 
-Schema-v4 outputs include `points/*.json`, `server/*.jsonl`, and combined `summary.json`, `summary.csv`, and
-`summary.md`. C=1 corpus runs also write complete responses in `corpus/<point>/results.jsonl` and
-per-request phase summaries in that directory; older campaigns may have only point reports and
-server logs. Historical model pages identify the report directory associated with each table.
+Schema-v4 outputs include `points/*.json`, `server/*.jsonl`, and combined `summary.json`, `summary.csv`, and `summary.md`. C=1 corpus runs also write complete responses in `corpus/<point>/results.jsonl` and per-request phase summaries in that directory; older campaigns may have only point reports and server logs. Historical model pages identify the report directory associated with each table.
 
 ```bash
 python3 tools/bench/run_serve_concurrency.py \
@@ -196,6 +137,4 @@ python3 tools/bench/run_serve_concurrency.py \
   --output profiles/bench/concurrent-corpus
 ```
 
-Use `--kv-capacity auto` when the fixed corpus needs more shared KV than the default 262,144-token
-pool. A point is intentionally not resumable: combining fragments from separate server processes
-would not preserve either a steady interval or one continuous makespan.
+Use `--kv-capacity auto` when the fixed corpus needs more shared KV than the default 262,144-token pool. A point is intentionally not resumable: combining fragments from separate server processes would not preserve either a steady interval or one continuous makespan.
