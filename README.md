@@ -25,8 +25,11 @@ re-applying a small `sm_75` layer on each sync, not by merging (see
 
 Checked on one 2080 Ti 22 GB with Qwen3.8-27B `groupwise-int`, natively on Windows: CLI text, image and
 image+video prompts, a 64k-token needle retrieval, and `ninfer-serve` answering OpenAI chat, SSE
-streaming, Responses, Anthropic messages, tool calls and two concurrent requests. The full op test suite
-(119 tests) passes on Linux/WSL2.
+streaming, Responses, Anthropic messages, tool calls and two concurrent requests. The CTest suite
+(130 entries) was run on Linux/WSL2: everything passes except the real-model tests that exercise FP8 KV, which
+this build does not support, and two real-model tests (`prefix_real`, `agent_continuation_real`) that fail on
+artifact-template and request-validation checks not yet traced. The Python-oracle tests need `jinja2` and
+`jsonschema`, and the real-model tests need `NINFER_TEST_ARTIFACT`. See [Tests](tests/README.md).
 
 ## Quick start
 

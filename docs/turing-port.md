@@ -122,8 +122,8 @@ Windows-specific runtime cautions: keep the artifact on NTFS; the card is in WDD
 and other GPU programs (browsers, image-generation tools) take VRAM that `--kv-capacity auto` can no
 longer use; if the NVIDIA driver allows CUDA allocations to spill into system memory, disable that
 ("CUDA - Sysmem Fallback Policy") for these executables so a full card fails instead of slowing down.
-`ninfer-serve` pins about 9 GiB of host memory by default; on a desktop with little free RAM pass a
-smaller `--host-context-mib`. FFmpeg needs the `zlib` feature for PNG; see the README.
+`ninfer-serve` pins about 3 GiB of host memory by default (a 2 GiB context budget plus state images, and the
+embedding table); on a desktop with little free RAM pass a smaller `--host-context-mib`. FFmpeg needs the `zlib` feature for PNG; see the README.
 
 ### Native Windows versus WSL2
 
