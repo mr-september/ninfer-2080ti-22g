@@ -6,7 +6,6 @@
 #include <cuda_runtime.h>
 
 #include <cstdint>
-#include <cstring>
 
 namespace ninfer::ops {
 

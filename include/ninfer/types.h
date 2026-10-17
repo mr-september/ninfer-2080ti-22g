@@ -21,11 +21,11 @@ using TokenId = std::int32_t;
 inline constexpr std::uint32_t kMaximumConcurrency               = 8;
 inline constexpr std::size_t kMaximumContextCacheSessionKeyBytes = 256;
 inline constexpr std::size_t kMaximumExplicitPromptCacheMarkers  = 4;
-// Aggregate encoded image/video payload retained by one prompt, independent of item count.
 // Single-item Vision extent in merged tokens: the model's native image geometry limit (4096^2 px)
 // is the upper bound; Engine options may lower it to shrink the Vision workspace.
 inline constexpr std::uint32_t kMaximumVisionItemTokens = 16'384;
 inline constexpr std::uint32_t kMinimumVisionItemTokens = 256;
+// Aggregate encoded image/video payload retained by one prompt, independent of item count.
 inline constexpr std::size_t kMaximumPromptMediaBytes = 256ULL << 20;
 inline constexpr std::size_t kDefaultMediaCacheBytes  = 1ULL << 30;
 inline constexpr std::size_t kDefaultMediaLiveBytes   = 2ULL << 30;

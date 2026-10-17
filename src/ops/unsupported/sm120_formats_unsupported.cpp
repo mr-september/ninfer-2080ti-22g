@@ -1,4 +1,4 @@
-// Throwing definitions for the sm_120a-only routes on Turing/Ampere builds.
+// Throwing definitions for the sm_120a-only routes on Turing builds.
 //
 // The FP8/NVFP4 weight kernels, the FP8/NVFP4/K8V4 KV-cache kernels and the TMA/block-scaled MMA
 // launchers are excluded from the build on these targets (see src/ops/CMakeLists.txt). Shared
@@ -45,7 +45,7 @@ namespace {
 [[noreturn]] void unsupported(const char* route) {
     throw std::runtime_error(std::string(route) +
                              " requires an sm_120a (Blackwell) build; this build targets "
-                             "Turing/Ampere and supports BF16 and grouped-integer artifacts "
+                             "Turing and supports BF16 and grouped-integer artifacts "
                              "with BF16/INT8 KV");
 }
 

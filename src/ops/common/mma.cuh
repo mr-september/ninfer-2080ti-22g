@@ -8,12 +8,6 @@
 
 namespace ninfer::ops {
 
-__device__ __forceinline__ void ldmatrix_x1(unsigned& r0, unsigned addr) {
-    asm volatile("ldmatrix.sync.aligned.m8n8.x1.shared.b16 {%0}, [%1];\n"
-                 : "=r"(r0)
-                 : "r"(addr));
-}
-
 __device__ __forceinline__ void ldmatrix_x2(unsigned& r0, unsigned& r1, unsigned addr) {
     asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0,%1}, [%2];\n"
                  : "=r"(r0), "=r"(r1)
@@ -24,12 +18,6 @@ __device__ __forceinline__ void ldmatrix_x4(unsigned& r0, unsigned& r1, unsigned
                                             unsigned addr) {
     asm volatile("ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0,%1,%2,%3}, [%4];\n"
                  : "=r"(r0), "=r"(r1), "=r"(r2), "=r"(r3)
-                 : "r"(addr));
-}
-
-__device__ __forceinline__ void ldmatrix_x1_t(unsigned& r0, unsigned addr) {
-    asm volatile("ldmatrix.sync.aligned.m8n8.x1.trans.shared.b16 {%0}, [%1];\n"
-                 : "=r"(r0)
                  : "r"(addr));
 }
 
@@ -44,14 +32,6 @@ __device__ __forceinline__ void ldmatrix_x4_t(unsigned& r0, unsigned& r1, unsign
     asm volatile("ldmatrix.sync.aligned.m8n8.x4.trans.shared.b16 {%0,%1,%2,%3}, [%4];\n"
                  : "=r"(r0), "=r"(r1), "=r"(r2), "=r"(r3)
                  : "r"(addr));
-}
-
-// Convert a 32-bit register holding 2x BF16 values to 2x FP16 values.
-__device__ __forceinline__ unsigned bf162_to_f162(unsigned b) {
-    const auto* bf_ptr = reinterpret_cast<const __nv_bfloat162*>(&b);
-    float2 f = __bfloat1622float2(*bf_ptr);
-    half2 h  = __float22half2_rn(f);
-    return *reinterpret_cast<const unsigned*>(&h);
 }
 
 // Turing-native FP16 MMA: 16x8x8
@@ -209,7 +189,7 @@ __device__ __forceinline__ void mma_s8(int& c0, int& c1, int& c2, int& c3, unsig
 __device__ __forceinline__ void mma_fp8_e4m3(float& c0, float& c1, float& c2, float& c3,
                                              unsigned a0, unsigned a1, unsigned a2, unsigned a3,
                                              unsigned b0, unsigned b1) {
-#if !defined(NINFER_SM75) && !defined(NINFER_SM86)
+#if !defined(NINFER_SM75)
     // On RTX 5090, block-scaled FP8 avoids the plain form's half-rate FP32 accumulation.
     // UE8M0 0x7f is exactly 1: preserve the raw E4M3 dot product and keep the callers'
     // existing row scales in FP32 after the MMA. No operand repacking is needed.
@@ -225,10 +205,11 @@ __device__ __forceinline__ void mma_fp8_e4m3(float& c0, float& c1, float& c2, fl
                    "h"(kScaleBlockId), "h"(kScaleThreadId), "r"(kUnitScale8), "h"(kScaleBlockId),
                    "h"(kScaleThreadId));
 #else
-    // Fallback if ever called on pre-sm_90
+    // Only the sm_120a routes call this; fail loudly rather than leave the accumulator untouched.
     (void)c0; (void)c1; (void)c2; (void)c3;
     (void)a0; (void)a1; (void)a2; (void)a3;
     (void)b0; (void)b1;
+    __trap();
 #endif
 }
 
@@ -299,7 +280,7 @@ __device__ __forceinline__ void mma_nvfp4_e4m3(float& c0, float& c1, float& c2, 
                                                unsigned a0, unsigned a1, unsigned a2, unsigned a3,
                                                unsigned b0, unsigned b1, unsigned sfa,
                                                unsigned sfb) {
-#if !defined(NINFER_SM75) && !defined(NINFER_SM86)
+#if !defined(NINFER_SM75)
     constexpr unsigned short kScaleBlockId  = 0;
     constexpr unsigned short kScaleThreadId = 0;
     asm volatile("mma.sync.aligned.kind::mxf4nvf4.block_scale.scale_vec::4X."
@@ -317,9 +298,11 @@ __device__ __forceinline__ void mma_nvfp4_e4m3(float& c0, float& c1, float& c2, 
                    "h"(kScaleBlockId), "h"(kScaleThreadId), "r"(sfb), "h"(kScaleBlockId),
                    "h"(kScaleThreadId));
 #else
+    // Only the sm_120a routes call this; fail loudly rather than leave the accumulator untouched.
     (void)c0; (void)c1; (void)c2; (void)c3;
     (void)a0; (void)a1; (void)a2; (void)a3;
     (void)b0; (void)b1; (void)sfa; (void)sfb;
+    __trap();
 #endif
 }
 

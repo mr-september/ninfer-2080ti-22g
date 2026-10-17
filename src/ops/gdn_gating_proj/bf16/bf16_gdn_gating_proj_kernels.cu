@@ -258,7 +258,7 @@ void require_shape35(const Weight& w, const char* name) {
     }
 }
 
-#if defined(NINFER_SM75) || defined(NINFER_SM86)
+#if defined(NINFER_SM75)
 // Residency of a cooperative grid is a property of the compiled kernel on the actual
 // architecture (registers and the 40/24 KiB dynamic shared memory against a 64 KiB Turing SM),
 // so it is queried from the occupancy calculator instead of being a qualified constant.
@@ -386,7 +386,7 @@ bool launch_bf16_prefill_mma(Bf16GdnGatingTokenVariant variant, const Tensor& x,
     } else {
         constexpr std::int64_t kCtasPerTokenTile =
             static_cast<std::int64_t>(Geometry::kHeads / kBf16GdnBlockM) * SplitK;
-#if defined(NINFER_SM75) || defined(NINFER_SM86)
+#if defined(NINFER_SM75)
         const std::int32_t kResidentCtasPerSm =
             cooperative_resident_ctas_per_sm<Geometry, SplitK, Warps, NormalizeInput,
                                              NormTokenCapacity>();
