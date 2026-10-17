@@ -43,7 +43,8 @@ int main() {
     for (const char* bad : {"0", "255", "16385", "x"}) {
         bool rejected = false;
         try {
-            (void)parse({"ninfer-serve", "model.ninfer", "--vision", "--vision-max-item-tokens", bad});
+            (void)parse(
+                {"ninfer-serve", "model.ninfer", "--vision", "--vision-max-item-tokens", bad});
         } catch (const std::invalid_argument&) { rejected = true; }
         failures += check(rejected, "serve accepted an invalid --vision-max-item-tokens");
     }
@@ -67,12 +68,13 @@ int main() {
                       "default KV capacity does not follow max context");
     failures += check(!defaults.context_cache.host_capacity_bytes.has_value(),
                       "default Host context capacity was resolved before Engine startup");
-    failures += check(defaults.speculative.backend == ninfer::product::default_speculative().backend &&
-                          defaults.speculative.draft_tokens ==
-                              ninfer::product::default_speculative().draft_tokens &&
-                          defaults.speculative.proposal_head ==
-                              ninfer::product::default_speculative().proposal_head,
-                      "speculation does not follow the product defaults");
+    failures +=
+        check(defaults.speculative.backend == ninfer::product::default_speculative().backend &&
+                  defaults.speculative.draft_tokens ==
+                      ninfer::product::default_speculative().draft_tokens &&
+                  defaults.speculative.proposal_head ==
+                      ninfer::product::default_speculative().proposal_head,
+              "speculation does not follow the product defaults");
     failures += check(defaults.max_context == ninfer::product::kDefaultServeMaxContext &&
                           defaults.kv_cache == ninfer::product::default_kv_cache(),
                       "default context or KV representation does not follow the product defaults");
@@ -171,7 +173,8 @@ int main() {
     try {
         (void)parse({"ninfer-serve", "model.ninfer", "--spec", "none", "--draft-tokens", "3"});
     } catch (const std::invalid_argument&) { draft_without_backend_rejected = true; }
-    failures += check(draft_without_backend_rejected, "--draft-tokens was accepted with --spec none");
+    failures +=
+        check(draft_without_backend_rejected, "--draft-tokens was accepted with --spec none");
     bool dflash_without_window_rejected = false;
     try {
         (void)parse({"ninfer-serve", "model.ninfer", "--spec", "dflash"});

@@ -78,7 +78,8 @@ __launch_bounds__((TileCols / 16) * 32, kQ8PairMmaMinBlocks<TileCols>) void q8_p
             const int nn = n0 + nl;
             auto* dst    = &Bs[stage][nl * BK + q8_g32_swz64(nl, k8 * 8)];
             if constexpr (Full) {
-                stage_activation_operand<16, Cache::cg>(dst, &x[static_cast<std::int64_t>(nn) * k + kk]);
+                stage_activation_operand<16, Cache::cg>(dst,
+                                                        &x[static_cast<std::int64_t>(nn) * k + kk]);
             } else {
                 const int valid = (nn < n && kk < k) ? min(8, k - kk) * 2 : 0;
                 ninfer::ops::stage_activation_operand_zfill<16>(

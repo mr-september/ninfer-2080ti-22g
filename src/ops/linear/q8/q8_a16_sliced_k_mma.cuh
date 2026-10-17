@@ -300,8 +300,8 @@ __device__ __forceinline__ void q8_a16_sliced_k_mma(Q8LinearOperands operands, O
                         bf0, bf1,
                         smem_addr(&b_shared[k_split][br * kTileK + q8_sliced_k_swizzle_64(
                                                                        br, ks * 16 + b_koff)]));
-                    mma_integer_weights(group_acc[ni][0], group_acc[ni][1], group_acc[ni][2], group_acc[ni][3],
-                             af0, af1, af2, af3, bf0, bf1);
+                    mma_integer_weights(group_acc[ni][0], group_acc[ni][1], group_acc[ni][2],
+                                        group_acc[ni][3], af0, af1, af2, af3, bf0, bf1);
                 }
             }
             const unsigned top_bits = group == 0 ? top_scale_pair & 0xffffu : top_scale_pair >> 16;

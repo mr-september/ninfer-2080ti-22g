@@ -69,8 +69,9 @@ struct KvCapacityPolicy {
 enum class ProposalHead : std::uint8_t {
     Full,
     Optimized,
-    // Optimized when speculation is enabled and the artifact carries a proposal head, otherwise Full.
-    // The Engine resolves it once the artifact is open; Engine::options() reports the resolved value.
+    // Optimized when speculation is enabled and the artifact carries a proposal head, otherwise
+    // Full. The Engine resolves it once the artifact is open; Engine::options() reports the
+    // resolved value.
     Auto,
 };
 

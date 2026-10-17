@@ -47,9 +47,9 @@ struct GemmCfg {
 };
 
 // Turing prefill tile of the folded SwiGLU and the grouped input projections: 64 weight rows by 128
-// tokens, eight warps, one stage, two resident CTAs per SM. cp.async does not exist there, so a second
-// stage would only cost shared memory; one stage fits two CTAs, and one tile's MMA overlaps the other's
-// decode and loads (about 2x the two-stage tile, which fits one CTA per SM).
+// tokens, eight warps, one stage, two resident CTAs per SM. cp.async does not exist there, so a
+// second stage would only cost shared memory; one stage fits two CTAs, and one tile's MMA overlaps
+// the other's decode and loads (about 2x the two-stage tile, which fits one CTA per SM).
 using TuringPrefillCfg = GemmCfg<64, 128, 64, 64, 16, 1, 2, false, true, true>;
 
 template <int Bytes, class Cfg>

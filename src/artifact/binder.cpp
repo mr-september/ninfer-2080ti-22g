@@ -69,7 +69,9 @@ ParameterReference Binder::binding(std::string name, const Binding& binding, Sha
             pinned.push_back(part.object);
         }
         if (!ok) {
-            for (const ObjectHandle handle : pinned) { demands_.at(handle.index).pinned_buffer.reset(); }
+            for (const ObjectHandle handle : pinned) {
+                demands_.at(handle.index).pinned_buffer.reset();
+            }
             effective = Residency::Device;
         }
     }

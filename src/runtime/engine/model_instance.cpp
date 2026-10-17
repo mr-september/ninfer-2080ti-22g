@@ -131,7 +131,8 @@ ConstructedModel construct_model(EngineOptions& options, DeviceContext& device) 
         const bool available = options.purpose == EnginePurpose::Generation &&
                                options.speculative.backend != SpeculativeBackend::None &&
                                reader.directory().component("text").proposal.has_value();
-        options.speculative.proposal_head = available ? ProposalHead::Optimized : ProposalHead::Full;
+        options.speculative.proposal_head =
+            available ? ProposalHead::Optimized : ProposalHead::Full;
     }
     inspect.complete();
     StartupPhaseScope binding(options.startup_observer, StartupPhase::TargetPlan);

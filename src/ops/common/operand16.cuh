@@ -66,9 +66,9 @@ __device__ __forceinline__ unsigned scaled_weight_pair_operand(int q0, int q1, _
 }
 
 // FP16 x FP16 -> FP32 m16n8k16 over operands that are already resident as FP16.
-__device__ __forceinline__ void mma_operands(float& c0, float& c1, float& c2, float& c3, unsigned a0,
-                                             unsigned a1, unsigned a2, unsigned a3, unsigned b0,
-                                             unsigned b1) {
+__device__ __forceinline__ void mma_operands(float& c0, float& c1, float& c2, float& c3,
+                                             unsigned a0, unsigned a1, unsigned a2, unsigned a3,
+                                             unsigned b0, unsigned b1) {
     mma_f16(c0, c1, c2, c3, a0, a1, a2, a3, b0, b1);
 }
 
@@ -95,9 +95,9 @@ __device__ __forceinline__ unsigned scaled_weight_pair_operand(int q0, int q1, _
     return pair.bits;
 }
 
-__device__ __forceinline__ void mma_operands(float& c0, float& c1, float& c2, float& c3, unsigned a0,
-                                             unsigned a1, unsigned a2, unsigned a3, unsigned b0,
-                                             unsigned b1) {
+__device__ __forceinline__ void mma_operands(float& c0, float& c1, float& c2, float& c3,
+                                             unsigned a0, unsigned a1, unsigned a2, unsigned a3,
+                                             unsigned b0, unsigned b1) {
     mma_bf16(c0, c1, c2, c3, a0, a1, a2, a3, b0, b1);
 }
 

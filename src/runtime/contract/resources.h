@@ -57,7 +57,7 @@ struct PrefillWork {
     const bool odd_suffix      = (suffix_tokens & 1U) != 0;
     const WideU64 linear       = mul_wide(prefix_tokens, suffix_tokens);
     const WideU64 triangular   = mul_wide(odd_suffix ? suffix_tokens : suffix_tokens / 2U,
-                                          odd_suffix ? suffix_tokens / 2U + 1U : suffix_tokens + 1U);
+                                        odd_suffix ? suffix_tokens / 2U + 1U : suffix_tokens + 1U);
     result.attention_pairs = linear.hi != 0 || triangular.hi != 0
                                  ? std::numeric_limits<std::uint64_t>::max()
                                  : saturating_add(linear.lo, triangular.lo);

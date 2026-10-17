@@ -80,9 +80,11 @@ __launch_bounds__(Cfg::THREADS, Cfg::MIN_BLOCKS) void q4_linear_swiglu_mma_split
             const int kk       = k0 + kl;
             __nv_bfloat16* dst = &Bs[stage][tl * BK + gemm_swz64(tl, kl)];
             if constexpr (FullTiles) {
-                stage_activation_operand<16, Cfg::CG_LOAD ? Cache::cg : Cache::ca>(dst, &x[static_cast<std::int64_t>(col) * k + kk]);
+                stage_activation_operand<16, Cfg::CG_LOAD ? Cache::cg : Cache::ca>(
+                    dst, &x[static_cast<std::int64_t>(col) * k + kk]);
             } else if (col < t && kk + 8 <= k) {
-                stage_activation_operand<16, Cfg::CG_LOAD ? Cache::cg : Cache::ca>(dst, &x[static_cast<std::int64_t>(col) * k + kk]);
+                stage_activation_operand<16, Cfg::CG_LOAD ? Cache::cg : Cache::ca>(
+                    dst, &x[static_cast<std::int64_t>(col) * k + kk]);
             } else {
                 store_vec(dst, make_int4(0, 0, 0, 0));
             }

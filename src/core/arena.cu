@@ -263,7 +263,8 @@ const void* PinnedHostBuffer::device_data() const {
         throw std::runtime_error(cuda_error_message("cudaHostGetDevicePointer failed", err));
     }
     if (device != data_) {
-        throw std::runtime_error("pinned host memory is not device-addressable at its host address");
+        throw std::runtime_error(
+            "pinned host memory is not device-addressable at its host address");
     }
     return device;
 }

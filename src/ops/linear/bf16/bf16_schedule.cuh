@@ -139,7 +139,8 @@ struct Bf16A16MmaSchedule {
     // keep the tile shape and shorten the cp.async ring (down to one stage) until it fits.
     static constexpr int kStagesFit =
         kBf16MaxSharedBytes / ((BlockRows + BlockTokens) * BlockK * 2);
-    static constexpr int kStages = Stages <= kStagesFit ? Stages : (kStagesFit < 1 ? 1 : kStagesFit);
+    static constexpr int kStages =
+        Stages <= kStagesFit ? Stages : (kStagesFit < 1 ? 1 : kStagesFit);
     static constexpr int kMinBlocksPerSm                       = MinBlocksPerSm;
     static constexpr Cache kWeightCache                        = WeightCache;
     static constexpr Cache kActivationCache                    = ActivationCache;

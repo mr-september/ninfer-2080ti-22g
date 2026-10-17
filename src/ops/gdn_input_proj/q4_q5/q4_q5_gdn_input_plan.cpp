@@ -32,7 +32,8 @@ constexpr std::array<RouteSpec, 4> kRoutes{{
     {{33, 64}, Q4Q5GdnInputScheduleId::GroupedMixedMmaR32C64S4},
 #if defined(NINFER_SM75)
     // Turing: eight-warp single-stage tiles, two resident per SM, so one tile's MMA overlaps the
-    // other's loads (cp.async is unavailable); measured faster than the 5090 tile from 65 columns up.
+    // other's loads (cp.async is unavailable); measured faster than the 5090 tile from 65 columns
+    // up.
     {{65, kAnyCols}, Q4Q5GdnInputScheduleId::GroupedMixedMmaTuringPrefill},
 #else
     {{65, kAnyCols}, Q4Q5GdnInputScheduleId::GroupedMixedMmaR64C128S2},

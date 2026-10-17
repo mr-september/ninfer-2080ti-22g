@@ -173,8 +173,9 @@ __launch_bounds__(Schedule::kThreads, Schedule::kMinBlocksPerSm) void q5_a16_sli
                     ldmatrix_x2(
                         b0, b1,
                         smem_addr(&shared.staging.x[slot][warp][br][q5_sliced_k_swizzle(br, bk)]));
-                    mma_integer_weights(group_acc[mi][ni][0], group_acc[mi][ni][1], group_acc[mi][ni][2],
-                             group_acc[mi][ni][3], a0, a1, a2, a3, b0, b1);
+                    mma_integer_weights(group_acc[mi][ni][0], group_acc[mi][ni][1],
+                                        group_acc[mi][ni][2], group_acc[mi][ni][3], a0, a1, a2, a3,
+                                        b0, b1);
                 }
             }
         }

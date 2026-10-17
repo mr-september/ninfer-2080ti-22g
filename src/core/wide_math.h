@@ -31,7 +31,8 @@ struct WideU64 {
 }
 
 // min(left * right, UINT64_MAX)
-[[nodiscard]] inline std::uint64_t saturating_mul(std::uint64_t left, std::uint64_t right) noexcept {
+[[nodiscard]] inline std::uint64_t saturating_mul(std::uint64_t left,
+                                                  std::uint64_t right) noexcept {
     const WideU64 product = mul_wide(left, right);
     return product.hi != 0 ? std::numeric_limits<std::uint64_t>::max() : product.lo;
 }

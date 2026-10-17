@@ -864,9 +864,10 @@ Processor::Processor(const Tokenizer& tokenizer, const CompiledChatTemplate& cha
     options_.image_max_pixels =
         std::min(options_.image_max_pixels,
                  checked_mul(options_.max_item_tokens, std::uint64_t{kFactor} * kFactor, "item"));
-    options_.video_max_pixels = std::min(
-        options_.video_max_pixels,
-        checked_mul(options_.max_item_tokens, std::uint64_t{kTemporal} * kFactor * kFactor, "item"));
+    options_.video_max_pixels =
+        std::min(options_.video_max_pixels,
+                 checked_mul(options_.max_item_tokens, std::uint64_t{kTemporal} * kFactor * kFactor,
+                             "item"));
     if (options_.max_encoded_media_bytes == 0 || options_.max_decoded_pixels == 0 ||
         options_.max_decoded_video_pixels == 0 || options_.max_raw_patches == 0 ||
         options_.max_vision_tokens == 0 || options_.max_item_tokens == 0 ||

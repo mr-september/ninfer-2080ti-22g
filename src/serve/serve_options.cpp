@@ -137,10 +137,12 @@ std::string serve_usage_text(const char* argv0) {
            "[--device-state-slots N] [--host-context-mib N] "
            "[--request-log-jsonl FILE] "
            "[--response-store-max-records N] [--response-store-max-mib N] "
-           "[--kv-dtype bf16|int8|fp8|nvfp4|k8v4] [--spec none|mtp|dflash|dflash2] [--draft-tokens N] "
+           "[--kv-dtype bf16|int8|fp8|nvfp4|k8v4] [--spec none|mtp|dflash|dflash2] [--draft-tokens "
+           "N] "
            "[--default-max-tokens N] [--default-thinking-budget N] "
            "[--vision] [--vision-max-item-tokens N] [--no-cuda-graph] [--no-prefix-reuse] "
-           "[--chat-template FILE | --artifact-chat-template] [--lm-head-draft|--no-lm-head-draft] [--no-thinking] [--preserve-thinking] "
+           "[--chat-template FILE | --artifact-chat-template] [--lm-head-draft|--no-lm-head-draft] "
+           "[--no-thinking] [--preserve-thinking] "
            "[--cors] "
            "[--temperature F] [--top-p F] [--top-k N] [--min-p F] [--presence-penalty F] "
            "[--frequency-penalty F] [--seed N] [--greedy]\n"
@@ -159,7 +161,8 @@ std::string serve_usage_text(const char* argv0) {
            "default\n"
            "       --log-stats-interval-ms defaults to 5000; 0 disables periodic throughput logs\n"
            "       --vision enables media and loads the fixed Vision GPU allocations\n"
-           "       --vision-max-item-tokens bounds one image/video item in [256,16384] (default 16384);\n"
+           "       --vision-max-item-tokens bounds one image/video item in [256,16384] (default "
+           "16384);\n"
            "       larger media is downscaled, and a smaller value shrinks the Vision workspace\n"
            "       --kv-capacity auto leaves " +
            std::to_string(kDefaultKvCapacityHeadroomBytes / (1024ULL * 1024ULL)) +
@@ -168,7 +171,8 @@ std::string serve_usage_text(const char* argv0) {
            "resources remain available\n" +
            product::defaults_help(product::kDefaultServeMaxContext, "       ") +
            "       context defaults: device-state=max-concurrency; Host budget is resolved from " +
-           std::to_string(kDefaultHostKvBytes >> 20) + " MiB plus eight native StateImages\n"
+           std::to_string(kDefaultHostKvBytes >> 20) +
+           " MiB plus eight native StateImages\n"
            "       --device-state-slots is extra capacity beyond active lanes; "
            "--host-context-mib bounds shared Host State/KV and in-flight storage in MiB\n"
            "       --host-context-mib accepts decimal MiB values that resolve to whole bytes\n"

@@ -17,8 +17,8 @@ __device__ __forceinline__ unsigned integer_pair_operand(int q0, int q1) {
     const unsigned biased = (static_cast<unsigned>(q0 + 128) & 0xffu) |
                             ((static_cast<unsigned>(q1 + 128) & 0xffu) << 16) | 0x64006400u;
     const unsigned bias = 0x64806480u; // half2(1152)
-    const __half2 result =
-        __hsub2(*reinterpret_cast<const __half2*>(&biased), *reinterpret_cast<const __half2*>(&bias));
+    const __half2 result = __hsub2(*reinterpret_cast<const __half2*>(&biased),
+                                   *reinterpret_cast<const __half2*>(&bias));
     return *reinterpret_cast<const unsigned*>(&result);
 }
 
@@ -26,15 +26,16 @@ __device__ __forceinline__ unsigned integer_pair_operand(int q0, int q1) {
 __device__ __forceinline__ unsigned s8x2_pair_operand(unsigned values) {
     const unsigned biased = (__byte_perm(values, 0x64646464u, 0x5140) ^ 0x00800080u);
     const unsigned bias   = 0x64806480u; // half2(1152)
-    const __half2 result =
-        __hsub2(*reinterpret_cast<const __half2*>(&biased), *reinterpret_cast<const __half2*>(&bias));
+    const __half2 result  = __hsub2(*reinterpret_cast<const __half2*>(&biased),
+                                    *reinterpret_cast<const __half2*>(&bias));
     return *reinterpret_cast<const unsigned*>(&result);
 }
 
 __device__ __forceinline__ void mma_integer_weights(float& c0, float& c1, float& c2, float& c3,
                                                     unsigned a0, unsigned a1, unsigned a2,
                                                     unsigned a3, unsigned b0, unsigned b1) {
-    mma_f16(c0, c1, c2, c3, a0, a1, a2, a3, bf16x2_to_f16x2_operand(b0), bf16x2_to_f16x2_operand(b1));
+    mma_f16(c0, c1, c2, c3, a0, a1, a2, a3, bf16x2_to_f16x2_operand(b0),
+            bf16x2_to_f16x2_operand(b1));
 }
 #else
 __device__ __forceinline__ unsigned integer_pair_operand(int q0, int q1) {

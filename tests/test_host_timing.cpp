@@ -71,18 +71,19 @@ int main() {
         .control_units                   = 31,
     };
     const ninfer::GenerationEngineTiming public_timing = request.public_snapshot();
-    failures += check(nearly_equal(public_timing.queue_wait_seconds, 1.0e-9) &&
-                          nearly_equal(public_timing.engine_boundary_exposed_seconds, 2.0e-9) &&
-                          nearly_equal(public_timing.program_submit_exposed_seconds, 3.0e-9) &&
-                          nearly_equal(public_timing.program_post_exposed_seconds, 5.0e-9) &&
-                          nearly_equal(public_timing.engine_commit_output_exposed_seconds, 7.0e-9) &&
-                          nearly_equal(public_timing.engine_maintenance_exposed_seconds, 11.0e-9) &&
-                          nearly_equal(public_timing.device_wait_exposed_seconds, 13.0e-9) &&
-                          nearly_equal(public_timing.decode_host_exposed_seconds, 17.0e-9) &&
-                          nearly_equal(public_timing.decode_device_wait_exposed_seconds, 19.0e-9) &&
-                          public_timing.prefill_units == 23 && public_timing.decode_rounds == 29 &&
-                          public_timing.control_units == 31,
-                      "request timing publication changed integer observations");
+    failures +=
+        check(nearly_equal(public_timing.queue_wait_seconds, 1.0e-9) &&
+                  nearly_equal(public_timing.engine_boundary_exposed_seconds, 2.0e-9) &&
+                  nearly_equal(public_timing.program_submit_exposed_seconds, 3.0e-9) &&
+                  nearly_equal(public_timing.program_post_exposed_seconds, 5.0e-9) &&
+                  nearly_equal(public_timing.engine_commit_output_exposed_seconds, 7.0e-9) &&
+                  nearly_equal(public_timing.engine_maintenance_exposed_seconds, 11.0e-9) &&
+                  nearly_equal(public_timing.device_wait_exposed_seconds, 13.0e-9) &&
+                  nearly_equal(public_timing.decode_host_exposed_seconds, 17.0e-9) &&
+                  nearly_equal(public_timing.decode_device_wait_exposed_seconds, 19.0e-9) &&
+                  public_timing.prefill_units == 23 && public_timing.decode_rounds == 29 &&
+                  public_timing.control_units == 31,
+              "request timing publication changed integer observations");
 
     ninfer::runtime::RequestHostTiming batch_row_a;
     ninfer::runtime::RequestHostTiming batch_row_b;

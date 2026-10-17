@@ -31,12 +31,12 @@ namespace {
 HANDLE as_handle(std::intptr_t value) noexcept { return reinterpret_cast<HANDLE>(value); }
 
 // Overlapped handles allow concurrent positional reads on one InputFile without a shared file
-// pointer. Full sharing matches POSIX: an open artifact can still be rewritten or replaced. A failed
-// open yields INVALID_HANDLE_VALUE, which is -1 like a failed POSIX open.
+// pointer. Full sharing matches POSIX: an open artifact can still be rewritten or replaced. A
+// failed open yields INVALID_HANDLE_VALUE, which is -1 like a failed POSIX open.
 std::intptr_t open_handle(const std::filesystem::path& path, DWORD flags) {
-    const HANDLE handle =
-        ::CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                      nullptr, OPEN_EXISTING, FILE_FLAG_OVERLAPPED | flags, nullptr);
+    const HANDLE handle = ::CreateFileW(
+        path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+        OPEN_EXISTING, FILE_FLAG_OVERLAPPED | flags, nullptr);
     return reinterpret_cast<std::intptr_t>(handle);
 }
 

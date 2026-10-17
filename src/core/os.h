@@ -76,7 +76,8 @@ namespace ninfer::os {
 }
 
 // Process-wide console setup for the executables. On Windows: UTF-8 console code pages, ANSI escape
-// processing on stdout/stderr, and untranslated "\n" on both streams (as on Linux). No-op elsewhere.
+// processing on stdout/stderr, and untranslated "\n" on both streams (as on Linux). No-op
+// elsewhere.
 inline void init_console() noexcept {
 #if defined(_WIN32)
     ::SetConsoleOutputCP(CP_UTF8);

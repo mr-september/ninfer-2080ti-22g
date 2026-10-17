@@ -1,8 +1,8 @@
 #pragma once
 
 // Defaults of the shipped executables (ninfer, ninfer-serve, ninfer-perplexity). They select the
-// best-tested configuration for the GPU the binary is built for. Each one is an ordinary flag, so an
-// ablation names the option it changes; the README lists the full-argument equivalent.
+// best-tested configuration for the GPU the binary is built for. Each one is an ordinary flag, so
+// an ablation names the option it changes; the README lists the full-argument equivalent.
 
 #include "ninfer/types.h"
 
