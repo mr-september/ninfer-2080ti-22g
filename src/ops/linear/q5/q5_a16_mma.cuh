@@ -105,6 +105,46 @@ void q5_a16_mma_kernel(
         }
     };
 
+#if defined(NINFER_SM75)
+    // Turing has no cp.async, so staging is a global load followed by a shared store. The next
+    // activation tile is loaded into registers before the current tile's MMAs and stored after
+    // them, so its global-memory latency overlaps the MMAs instead of stalling in front of the next
+    // tile (and a thread's loads are issued together). Single-buffered activations only.
+    constexpr bool kRegPrefetch = BS == 1 && BS != S;
+    constexpr int kActItems     = (BN * (BK / 8) + Schedule::kThreads - 1) / Schedule::kThreads;
+    int4 act_regs[kActItems];
+    auto load_activation_regs = [&](int k_tile) {
+        const int k0 = k_tile * BK;
+#pragma unroll
+        for (int i = 0; i < kActItems; ++i) {
+            const int item = tid + i * Schedule::kThreads;
+            int4 v         = make_int4(0, 0, 0, 0);
+            if (item < BN * (BK / 8)) {
+                const int local_col = item / (BK / 8);
+                const int k8        = item - local_col * (BK / 8);
+                const int kk        = k0 + k8 * 8;
+                const int col       = col0 + local_col;
+                if (kFull || (col < cols && kk + 8 <= k)) {
+                    v = load_vec<int4>(&x[static_cast<std::int64_t>(col) * k + kk]);
+                }
+            }
+            act_regs[i] = v;
+        }
+    };
+    auto store_activation_regs = [&](int stage) {
+#pragma unroll
+        for (int i = 0; i < kActItems; ++i) {
+            const int item = tid + i * Schedule::kThreads;
+            if (item < BN * (BK / 8)) {
+                const int local_col = item / (BK / 8);
+                const int k8        = item - local_col * (BK / 8);
+                auto* dst = &Bs[stage][local_col * BK + q5_mma_swizzle_k64(local_col, k8 * 8)];
+                store_vec(dst, bf16x8_to_f16x8_operand(act_regs[i]));
+            }
+        }
+    };
+#endif
+
     auto stage_quant = [&](int stage, int k_tile) {
         const int group0 = (k_tile * BK) / Q5RowSplitStorage::kGroupK;
 #pragma unroll 1
@@ -268,6 +308,12 @@ void q5_a16_mma_kernel(
             cp_commit();
         }
 
+#if defined(NINFER_SM75)
+        if constexpr (kRegPrefetch) {
+            if (k_tile + 1 < k_tiles) { load_activation_regs(k_tile + 1); }
+        }
+#endif
+
         auto load_fragments = [&](int k_step, unsigned(&a_frag)[MT][4], unsigned(&b_frag)[NT][2]) {
 #pragma unroll
             for (int mi = 0; mi < MT; ++mi) {
@@ -331,7 +377,14 @@ void q5_a16_mma_kernel(
             cp_commit();
         } else {
             const int next_tile = k_tile + 1;
-            if (next_tile < k_tiles) { stage_activation(0, next_tile); }
+#if defined(NINFER_SM75)
+            if constexpr (kRegPrefetch) {
+                if (next_tile < k_tiles) { store_activation_regs(0); }
+            } else
+#endif
+            {
+                if (next_tile < k_tiles) { stage_activation(0, next_tile); }
+            }
             cp_commit();
         }
     }

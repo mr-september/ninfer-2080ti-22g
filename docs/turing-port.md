@@ -210,3 +210,30 @@ Measured interleaved in one session (`ninfer_bench`, INT8 KV, `--spec mtp --draf
 | acceptance | 0.231 | 0.231 |
 
 The decode step at MTP depth 5 (T=6) is consistently 4.4% slower, so the roadmap's gate ("`bench-mtp` with `--draft-tokens 5` not worse") fails and the change was reverted. A likely cause is that Turing's emulated `cp.async` is an ordinary load followed by a store: converting in between lengthens that dependent chain once per staged vector, while for the 16-row blocks used at these token counts the per-MMA conversions it removes were not more numerous than the staged conversions it adds. The other kernels named in the roadmap (Q4, Q6, Q8, grouped Q8, `linear_topk`) were not changed.
+
+## Register-prefetch pipelining of the prefill GEMMs (roadmap P5)
+
+Prefill is almost entirely three dequantizing GEMM kernels. Nsight Systems on a 4096-token prefill (INT8 KV, MTP off, kernel time 98% of the total): `q5_a16_mma_kernel` (MLP down and output projections through `linear_add`, 37.8%), `q4_linear_swiglu_mma_split_half_pair_kernel` (MLP gate/up, 37.0%) and `rowsplit_grouped_mma_kernel` (GDN and attention input projections, 18.6%).
+
+Turing has no `cp.async`, so these kernels' staging is a load from global memory followed by a store to shared memory, issued one item at a time after the MMAs of the previous tile: each k-tile waited out several serialized global-memory latencies. The change (Turing only, `q5_a16_mma.cuh`, single-buffered-activation schedules such as `MmaR64T128A1`, which is what `linear_add` and the plain-linear prefill routes use): the next activation tile is loaded into registers (all of a thread's loads issued together) before the current tile's MMAs and stored to shared memory after them. Other targets keep the asynchronous copy.
+
+Kernel level, `ninfer_turing_route_sweep` (cold graph replay) on the `MmaR64T128A1` launcher, before, batched loads only, and with prefetch across the MMAs:
+
+| Shape, T | before | batched loads | prefetch across MMAs (kept) |
+|---|---|---|---|
+| Q5 n5120 k17408, T=512 | 5026 us (18.2 TFLOPS) | 3463 us (-31%) | 3166 us (-37%, 28.8 TFLOPS) |
+| Q5 n5120 k17408, T=1024 | 8413 us (21.7) | 5816 us (-31%) | 5542 us (-34%, 32.9) |
+| Q5 n5120 k6144, T=1024 (old production route `r128_t64_s1_a1`: 2823 us) | 2900 us | 2065 us | 1903 us (-33% against the old production route) |
+| Q5 n7168 k5120, T=1024 (old production route: 3347 us) | 3438 us | 2431 us | 2279 us (-32% against the old production route) |
+
+After the change this launcher is the fastest Q5 route at every T from 512 up in those sweeps, ahead of the `r128_t64_s1_a1` route that the plain-linear selector uses above 1536 tokens.
+
+End to end, interleaved in one session (`ninfer_bench`, INT8 KV, MTP off; pp512: 3 repetitions after 1 warmup, pp8192: 4 after 2, pp65536: 1 after 1), two rounds of before then after:
+
+| Prompt | before (tok/s) | after (tok/s) | change |
+|---|---|---|---|
+| 512, round 1 / 2 | 497.76 / 494.44 | 580.92 / 575.64 | +16.7% / +16.4% |
+| 8192, round 1 / 2 | 523.27 / 519.91 | 579.16 / 577.37 | +10.7% / +11.1% |
+| 65536, round 1 / 2 | 435.36 / 432.50 | 471.06 / 470.62 | +8.2% / +8.8% |
+
+Checks: `ninfer_linear_q5_a16_test` and `ninfer_linear_add_q5_a16_test` pass; greedy text of `long_decode_aime26_01.json` (341-token prompt, which runs through the changed route) is byte-identical before and after (only the load order changed). This is the Q5 family only (37.8% of prefill); the roadmap's whole-item gate (8k prefill +15%) needs the Q4 SwiGLU and grouped-projection kernels as well.
