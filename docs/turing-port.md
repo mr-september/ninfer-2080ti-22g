@@ -275,7 +275,7 @@ pp512 is the same within noise (about 613 to 615 tok/s for both). Planned device
 
 ## Test status on this machine (native Windows, sm_75)
 
-`ctest --preset windows-dev` after the roadmap's Phase 0 to 2 changes: 126 of 131 tests pass, 13 skipped for lack of the local real-model prerequisites are counted as passing/skipped by CTest. The five failures:
+`ctest --preset windows-dev` after the roadmap's Phase 0 to 2 changes: 131 tests, 5 fail, 13 real-model tests report "Skipped" (they need artifacts or environment variables that are not set up), the rest pass. The five failures:
 
 - `ninfer_chat_templates_test`, `ninfer_json_schema_oracle_test`, `ninfer_qwen3_5_tool_schema_oracle_test`: the Python oracles pipe UTF-8 text to a child process through the Windows ANSI code page (`UnicodeEncodeError: 'charmap' codec can't encode characters`). They pass with `PYTHONUTF8=1` in the environment.
 - `ninfer_device_sync_empty_test` ("invalid sync setting did not fail before CUDA initialization") and `ninfer_gdn_gating_proj_test` (`qwen3_6_27b T=4097 g: reduction criterion failed at index 122 actual=-2.20374 reference=-2.20374`): both fail identically at the fork's commit before this roadmap (`a97bbc8d`, built in a separate worktree), so neither comes from the Phase 0 to 2 changes. They are not investigated here.
