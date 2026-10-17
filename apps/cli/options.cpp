@@ -269,8 +269,8 @@ Options parse_options(int argc, char** argv) {
         throw std::invalid_argument("--thinking-budget cannot be combined with --no-thinking");
     }
     if (options.greedy) { options.sampling.temperature = 0.0F; }
-    options.chat_template_path = product::resolve_chat_template(
-        std::move(options.chat_template_path), options.artifact_chat_template);
+    product::validate_chat_template_selection(options.chat_template_path,
+                                              options.artifact_chat_template);
     return options;
 }
 

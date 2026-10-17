@@ -288,7 +288,8 @@ int main(int argc, char** argv) {
 
         ninfer::EngineOptions engine_options;
         engine_options.artifact_path      = cli.artifact_path;
-        engine_options.chat_template_path = cli.chat_template_path;
+        ninfer::product::select_chat_template(engine_options, cli.chat_template_path,
+                                      cli.artifact_chat_template);
         engine_options.device             = cli.device;
         engine_options.max_context        = cli.max_context;
         engine_options.kv_capacity        = cli.kv_capacity;

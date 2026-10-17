@@ -2,6 +2,7 @@
 #include "product/defaults.h"
 
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <iostream>
 #include <stdexcept>
@@ -50,13 +51,34 @@ int main() {
                   defaults.speculative.proposal_head ==
                       ninfer::product::default_speculative().proposal_head,
               "speculation does not follow the product defaults");
-    failures += check(defaults.chat_template_path == NINFER_DEFAULT_CHAT_TEMPLATE &&
-                          std::filesystem::exists(defaults.chat_template_path),
-                      "the vendored Sharp template is not the CLI default");
-    failures += check(parse({"ninfer", "model.ninfer", "--prompt", "hello", "--chat-template",
-                             "x.jinja"})
-                              .chat_template_path == "x.jinja",
-                      "--chat-template did not override the default template");
+    failures += check(defaults.chat_template_path.empty() && !defaults.artifact_chat_template,
+                      "the embedded Sharp template is not the CLI default");
+    {
+        ninfer::EngineOptions engine;
+        ninfer::product::select_chat_template(engine, defaults.chat_template_path,
+                                              defaults.artifact_chat_template);
+        failures += check(engine.chat_template_path.empty() &&
+                              engine.chat_template_source ==
+                                  ninfer::product::default_chat_template_source() &&
+                              engine.chat_template_source.find("template_version") !=
+                                  std::string::npos,
+                          "the default engine template is not the embedded source");
+    }
+    failures += check(rejects([] {
+                          (void)parse({"ninfer", "model.ninfer", "--prompt", "hello",
+                                       "--chat-template", "does-not-exist.jinja"});
+                      }),
+                      "--chat-template accepted a file that does not exist");
+    {
+        const auto template_file =
+            std::filesystem::temp_directory_path() / "ninfer-cli-options-template.jinja";
+        std::ofstream(template_file) << "{{ messages }}";
+        failures += check(parse({"ninfer", "model.ninfer", "--prompt", "hello", "--chat-template",
+                                 template_file.string()})
+                                  .chat_template_path == template_file,
+                          "--chat-template did not override the default template");
+        std::filesystem::remove(template_file);
+    }
     failures += check(parse({"ninfer", "model.ninfer", "--prompt", "hello",
                              "--artifact-chat-template"})
                           .chat_template_path.empty(),

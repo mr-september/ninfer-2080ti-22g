@@ -408,8 +408,8 @@ ServeOptions parse_serve_options(int argc, char** argv) {
         throw std::invalid_argument("--prefill-chunk must be a positive multiple of 128");
     }
     product::finalize_speculative_cli_options(options.speculative, draft_tokens_explicit);
-    options.chat_template_path = product::resolve_chat_template(
-        std::move(options.chat_template_path), options.artifact_chat_template);
+    product::validate_chat_template_selection(options.chat_template_path,
+                                              options.artifact_chat_template);
     if (default_max_tokens_explicit) {
         if (options.default_max_tokens <= 0) {
             throw std::invalid_argument("--default-max-tokens must be positive");

@@ -92,7 +92,7 @@ Decode is at parity. Prefill is about 6% lower natively on a short prompt and ab
 
 ## Default chat template
 
-The former `--chat-style sharp-v22.1` option is now the vendored Sharp v22.5.0 Jinja template `tools/chat_templates/qwen3_8_sharp_v22_5.jinja`, which `ninfer` and `ninfer-serve` use by default. `--artifact-chat-template` selects the artifact's own template and `--chat-template FILE` another file:
+The former `--chat-style sharp-v22.1` option is now the vendored Sharp v22.5.0 Jinja template `tools/chat_templates/qwen3_8_sharp_v22_5.jinja`, which is embedded in `ninfer` and `ninfer-serve` at build time and used by default. `--artifact-chat-template` selects the artifact's own template and `--chat-template FILE` another file:
 
 ```bash
 ./build/apps/ninfer model.ninfer --artifact-chat-template --prompt "..."

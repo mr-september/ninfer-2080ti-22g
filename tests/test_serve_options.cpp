@@ -48,8 +48,8 @@ int main() {
         } catch (const std::invalid_argument&) { rejected = true; }
         failures += check(rejected, "serve accepted an invalid --vision-max-item-tokens");
     }
-    failures += check(defaults.chat_template_path == NINFER_DEFAULT_CHAT_TEMPLATE,
-                      "the vendored Sharp template is not the server default");
+    failures += check(defaults.chat_template_path.empty() && !defaults.artifact_chat_template,
+                      "the embedded Sharp template is not the server default");
     failures += check(parse({"ninfer-serve", "model.ninfer", "--artifact-chat-template"})
                           .chat_template_path.empty(),
                       "--artifact-chat-template did not select the artifact template");

@@ -162,7 +162,11 @@ struct ContextCostOptions {
 
 struct EngineOptions {
     std::filesystem::path artifact_path;
+    // Prompt template, in order of precedence: the file at chat_template_path, then
+    // chat_template_source (named chat_template_source_name in diagnostics), then the artifact's.
     std::filesystem::path chat_template_path;
+    std::string chat_template_source;
+    std::string chat_template_source_name;
     std::size_t grammar_cache_bytes    = 256ULL * 1024 * 1024;
     EnginePurpose purpose              = EnginePurpose::Generation;
     int device                         = 0;

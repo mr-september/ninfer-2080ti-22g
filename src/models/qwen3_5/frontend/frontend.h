@@ -19,6 +19,8 @@ namespace ninfer::models::qwen3_5 {
 
 struct FrontendOptions {
     std::filesystem::path chat_template_path;
+    std::string chat_template_source;
+    std::string chat_template_source_name;
     std::size_t grammar_cache_bytes        = 256ULL * 1024 * 1024;
     Architecture architecture              = Architecture::Qwen3_5;
     bool vision_enabled                    = true;

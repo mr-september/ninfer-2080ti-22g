@@ -31,7 +31,7 @@ Answer content is streamed to stdout. Human-readable startup milestones and runt
   > answer.txt 2> run.log
 ```
 
-By default prompts are rendered with the vendored [Sharp v22.5.0 template](../tools/chat_templates/qwen3_8_sharp_v22_5.jinja), resolved from the source tree at build time (it adds about 150 prompt tokens to the system block and steers answers to be terse). `--chat-template FILE` uses a different local Jinja file, and `--artifact-chat-template` uses the template stored in the artifact; the two cannot be combined. Changes to a template file take effect after restarting NInfer:
+By default prompts are rendered with the vendored [Sharp v22.5.0 template](../tools/chat_templates/qwen3_8_sharp_v22_5.jinja), embedded in the executables at build time, so they run without the source tree (it adds about 150 prompt tokens to the system block and steers answers to be terse). `--chat-template FILE` uses a different local Jinja file, and `--artifact-chat-template` uses the template stored in the artifact; the two cannot be combined. Changes to a template file take effect after restarting NInfer:
 
 ```bash
 ./build/apps/ninfer models/qwen3_8_27b.ninfer \

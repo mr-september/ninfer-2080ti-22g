@@ -51,7 +51,16 @@ else()
 endif()
 
 # The shipped executables render prompts with this vendored template unless --artifact-chat-template.
-add_compile_definitions(NINFER_DEFAULT_CHAT_TEMPLATE="${CMAKE_CURRENT_SOURCE_DIR}/tools/chat_templates/qwen3_8_sharp_v22_5.jinja")
+# It is embedded in the binaries as a byte array so they run without the source tree.
+set(NINFER_DEFAULT_CHAT_TEMPLATE_FILE
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/chat_templates/qwen3_8_sharp_v22_5.jinja")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${NINFER_DEFAULT_CHAT_TEMPLATE_FILE}")
+file(READ "${NINFER_DEFAULT_CHAT_TEMPLATE_FILE}" ninfer_chat_template_hex HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1," ninfer_chat_template_bytes
+       "${ninfer_chat_template_hex}")
+file(CONFIGURE OUTPUT "${CMAKE_BINARY_DIR}/generated/product/default_chat_template.inc"
+     CONTENT "${ninfer_chat_template_bytes}\n" NEWLINE_STYLE UNIX)
+include_directories("${CMAKE_BINARY_DIR}/generated")
 
 # Tests also exercise product input, logging and protocol adapters.
 set(NINFER_BUILD_PRODUCT_SUPPORT OFF)
