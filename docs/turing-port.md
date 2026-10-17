@@ -237,3 +237,13 @@ End to end, interleaved in one session (`ninfer_bench`, INT8 KV, MTP off; pp512:
 | 65536, round 1 / 2 | 435.36 / 432.50 | 471.06 / 470.62 | +8.2% / +8.8% |
 
 Checks: `ninfer_linear_q5_a16_test` and `ninfer_linear_add_q5_a16_test` pass; greedy text of `long_decode_aime26_01.json` (341-token prompt, which runs through the changed route) is byte-identical before and after (only the load order changed). This is the Q5 family only (37.8% of prefill); the roadmap's whole-item gate (8k prefill +15%) needs the Q4 SwiGLU and grouped-projection kernels as well.
+
+**Same change in the folded Q4 gate/up SwiGLU kernel** (`q4_linear_swiglu_gemm_mma.cuh`, the single-stage `TuringPrefillCfg`): the next tile's activation vectors, code vectors and scale words are loaded into registers before the MMAs and stored after them. Interleaved in one session against the build with only the Q5 change (same method as above, two rounds, before then after; greedy text identical, `ninfer_linear_swiglu_q4_a16_test` passes):
+
+| Prompt | before (tok/s) | after (tok/s) | change |
+|---|---|---|---|
+| 512, round 1 / 2 | 583.06 / 575.69 | 603.89 / 599.44 | +3.6% / +4.1% |
+| 8192, round 1 / 2 | 586.15 / 578.78 | 599.09 / 597.29 | +2.2% / +3.2% |
+| 65536, round 1 / 2 | 473.64 / 471.31 | 483.52 / 483.32 | +2.1% / +2.5% |
+
+This kernel (37% of prefill) gains less than the Q5 one because it does more ALU work per loaded byte and already had two resident CTAs overlapping its loads.
