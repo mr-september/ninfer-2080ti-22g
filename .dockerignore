@@ -31,3 +31,5 @@ models
 *.qus
 *.safetensors
 *.sqlite
+dist
+.vcpkg
