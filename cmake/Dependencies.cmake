@@ -1,5 +1,14 @@
 find_package(CUDAToolkit REQUIRED)
 find_package(Threads REQUIRED)
+# One CUDA runtime. Windows links it statically (the CUDA language already adds cudart_static, and
+# the shared import library would define the same symbols a second time and make the executables
+# depend on cudart64_12.dll); other platforms keep CUDA::cudart.
+add_library(ninfer::cudart INTERFACE IMPORTED GLOBAL)
+if(WIN32)
+  target_link_libraries(ninfer::cudart INTERFACE CUDA::cudart_static)
+else()
+  target_link_libraries(ninfer::cudart INTERFACE CUDA::cudart)
+endif()
 # Operating-system link requirements shared by the product and serving libraries.
 add_library(ninfer::platform INTERFACE IMPORTED GLOBAL)
 if(WIN32)

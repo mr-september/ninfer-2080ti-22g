@@ -65,3 +65,4 @@ profiles/
 
 # Local vcpkg clone made by scripts/build.ps1 when no vcpkg is installed
 .vcpkg/
+dist/

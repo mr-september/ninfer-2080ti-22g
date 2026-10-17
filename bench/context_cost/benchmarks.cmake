@@ -12,4 +12,4 @@ target_include_directories(ninfer_context_cost_bench PRIVATE
 target_compile_definitions(ninfer_context_cost_bench PRIVATE
   NINFER_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 target_link_libraries(ninfer_context_cost_bench PRIVATE
-  ninfer_engine ninfer_core CUDA::cudart ninfer::json)
+  ninfer_engine ninfer_core ninfer::cudart ninfer::json)

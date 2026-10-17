@@ -16,4 +16,4 @@ add_library(ninfer_core STATIC
 )
 ninfer_internal_includes(ninfer_core)
 ninfer_cuda_archive(ninfer_core)
-target_link_libraries(ninfer_core PUBLIC CUDA::cudart CUDA::nvtx3 Threads::Threads)
+target_link_libraries(ninfer_core PUBLIC ninfer::cudart CUDA::nvtx3 Threads::Threads)

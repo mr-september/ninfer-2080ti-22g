@@ -115,6 +115,8 @@ Page-locked memory has to be free RAM: the server pins 3.15 GiB by default (the 
 
 A cold build of the three executables took 10.6 minutes on native Windows with 16 logical cores (measured with FFmpeg already in vcpkg's binary cache; compiling FFmpeg itself the first time adds to that and was not timed), dominated by the Q8 split-K kernels. Tests and benchmarks are off by default (`BUILD_TESTING`, `NINFER_BUILD_BENCHMARKS`; see [build organization](docs/maintainer/build-system.md)). There is no install target; run from the build tree.
 
+`scripts\package.ps1` packs the built executables, their DLLs and `serve.ps1` into `dist\ninfer-windows.zip`; cudart is linked statically, so the machine that runs the zip needs only the NVIDIA driver.
+
 With Docker and the NVIDIA container toolkit (Linux or WSL2), the [Dockerfile](Dockerfile) builds the server for Turing and serves `qwen3_8_27b.ninfer` from a mounted models folder:
 
 ```bash
