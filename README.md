@@ -115,6 +115,13 @@ Page-locked memory has to be free RAM: the server pins about 3 GiB by default (t
 
 A cold build compiles the Q8 split-K kernels and takes tens of minutes on either platform, plus the one-time FFmpeg build on Windows. Tests and benchmarks are off by default (`BUILD_TESTING`, `NINFER_BUILD_BENCHMARKS`; see [build organization](docs/maintainer/build-system.md)). There is no install target; run from the build tree.
 
+With Docker and the NVIDIA container toolkit (Linux or WSL2), the [Dockerfile](Dockerfile) builds the server for Turing and serves `qwen3_8_27b.ninfer` from a mounted models folder:
+
+```bash
+docker build -t ninfer .
+docker run --gpus all -v /path/to/models:/models -p 8080:8080 ninfer
+```
+
 ## Models, formats and converting your own weights
 
 An artifact is a `.ninfer` v3 container: the model configuration, the encoded weights, logical bindings and the tokenizer and chat-template resources. This fork changes none of the format; files converted before or after its kernel changes are interchangeable with upstream's. The weight formats this GPU runs are:

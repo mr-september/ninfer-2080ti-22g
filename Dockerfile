@@ -1,5 +1,11 @@
 # syntax=docker/dockerfile:1
 
+# Build:  docker build -t ninfer .
+# Run:    docker run --gpus all -v /path/to/models:/models -p 8080:8080 ninfer
+# The models folder must contain qwen3_8_27b.ninfer; for another artifact or flags, name the command:
+#         docker run --gpus all -v /path/to/models:/models -p 8080:8080 ninfer \
+#             ninfer-serve /models/other.ninfer --host 0.0.0.0 --max-context 32768
+
 FROM nvidia/cuda:13.1.2-devel-ubuntu24.04 AS build
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -45,4 +51,4 @@ WORKDIR /workspace
 EXPOSE 8080
 STOPSIGNAL SIGTERM
 
-CMD ["ninfer-serve", "--help"]
+CMD ["ninfer-serve", "/models/qwen3_8_27b.ninfer", "--host", "0.0.0.0"]
