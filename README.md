@@ -87,7 +87,14 @@ The default is a 64k-token context with MTP. That needs most of the 22 GB (the e
 
 ## Build
 
-Pick the environment you want to run in. The two paths side by side (the sources are the same):
+On native Windows, install the NVIDIA driver, CUDA 12.8+ and Visual Studio 2022 (or Build Tools) with "Desktop development with C++", then run two commands from a PowerShell prompt in the clone:
+
+```powershell
+scripts\build.ps1    # configures with vcpkg.json and builds (about an hour the first time)
+scripts\serve.ps1    # downloads the default model if needed and serves http://127.0.0.1:8080/v1
+```
+
+`serve.ps1` takes `-Model PATH`, `-Port N` and `-ServerArgs '--max-context','32768'`. The two paths side by side, with the steps those scripts perform (the sources are the same):
 
 | | Linux / WSL2 | Windows native |
 |---|---|---|
