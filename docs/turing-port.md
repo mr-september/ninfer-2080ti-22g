@@ -112,3 +112,16 @@ Qwen3.8-27B `groupwise-int`, INT8 KV, greedy, long warmups (the GPU clock ramps)
 | prefill GEMM, Q8 5120x6144, T=512/2048 | 18.1 / 19.1 TFLOPS |
 
 Single-prompt greedy comparisons are noisy for MTP (near-tie flips change the acceptance rate); compare decode with MTP off. The 35B-A3B and DFlash routes build and pass the op tests but were not run end to end here (no local artifact).
+
+## Roadmap baseline (2026-10-17, commit `4bedd2e5`)
+
+Reference numbers for the performance items in `docs/plans/fork-roadmap.md`, measured with the product `ninfer_bench` (Windows, MSVC 19.44, CUDA 12.9, driver 610.88, RTX 2080 Ti 22 GB, Qwen3.8-27B `groupwise-int`, INT8 KV, CUDA Graph decode, the repository's token-id corpus). The desktop was running (about 2.6 GiB of VRAM held by other programs, 0% GPU utilization, idle SM clock 1350 MHz before each run); each run starts with the warmup repetitions shown.
+
+| Run | Command (after `--weights M`) | Result (mean, sample sd over repetitions) |
+|---|---|---|
+| `bench-short` | `-p 512 -n 256 -r 3 --warmup 1 --kv-dtype int8 --max-ctx 16384` | pp512 494.88 tok/s (sd 0.39); tg256 26.45 tok/s (sd 0.04) |
+| `bench-long` | `-p 8192,65536 -n 32 -r 2 --warmup 1 --kv-dtype int8 --max-ctx 70000` | pp65536 394.51 tok/s (sd 0.08); tg32 26.20 tok/s (sd 0.00); pp8192: see below |
+| pp8192 rerun | `-p 8192 -n 32 -r 4 --warmup 2 --kv-dtype int8 --max-ctx 70000` | pp8192 513.73 tok/s (sd 0.18); tg32 26.35 tok/s (sd 0.07) |
+| `bench-mtp` | `bench-short` plus `--spec mtp --draft-tokens 3 --lm-head-draft` | pp512 492.88 tok/s (sd 0.18); tg256 29.76 tok/s (sd 0.04), acceptance 0.371 |
+
+Exception: in the `bench-long` run the two measured pp8192 repetitions were 26.0 and 512.8 tok/s. The first was a transient of unknown cause (not reproduced in the rerun, where all four repetitions were within 0.4 tok/s), so the rerun is the pp8192 baseline and `bench-long` needs at least two warmups to be trusted at 8k. The benchmark corpus is random token ids, so MTP acceptance (0.371) and the MTP decode figure are far below the 38-44 tok/s seen on real text and are only comparable with each other.
