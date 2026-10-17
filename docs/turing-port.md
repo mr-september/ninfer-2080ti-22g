@@ -139,3 +139,13 @@ Measured on Qwen3.8-27B `groupwise-int`, INT8 KV, 2026-10-17:
 | short chat prompt, 64 greedy tokens | 304.0 | 0 | 0 |
 
 Every maximum is below 16384, so there is at least 4x headroom to the threshold the roadmap set (and more than 100x to the FP16 limit), nothing was clamped, and no pre-scaling is added. This covers these corpora and prompts; the SwiGLU output feeding the Q5 down projection, the site the roadmap singled out, is included in the global maximum. Decode at 1 to 4 tokens uses FP32 SIMT, so the two paths agree on these inputs. The ppl-quick result of the probe build (overall 4.794356) equals the production build's.
+
+## Route sweep tool (roadmap P1)
+
+`ninfer_turing_route_sweep` (`bench/ops/turing_route_sweep.cu`, built only for sm_75 with `NINFER_BUILD_BENCHMARKS=ON`) forces every Q4/Q5/Q6/Q8 launcher of one shape, drops the ones that throw or whose output differs from the production route's by more than 5% of the output RMS, times the rest with cold-cache CUDA Graph replay, and prints the ranking per token count plus a `TokenRoute` table to paste into the shape selector. The candidate list comes from the `q*_launch.h` headers at configure time. It includes private `ops/linear` headers, so it is a fork-only developer tool and not part of any product or CI target.
+
+```bash
+./build-windows/bench/ninfer_turing_route_sweep --qtype q5 --n 5120 --k 17408 --t 1,2,3,4,1024 --top 8
+```
+
+First result (Q5 `n5120_k17408`, the MLP down projection, T=1024, three runs within 0.2%): the production route `launch_q5_a16_mma_r64_t128_a1` takes 8.41 ms (21.7 TFLOPS); `launch_q5_a16_mma_r128_t64_s1_a1` takes 8.04 ms (22.7 TFLOPS), 4.6% faster. Of the 32 Q5 launchers, 22 were legal at that shape and 10 were rejected.
