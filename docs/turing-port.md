@@ -149,3 +149,31 @@ Every maximum is below 16384, so there is at least 4x headroom to the threshold 
 ```
 
 First result (Q5 `n5120_k17408`, the MLP down projection, T=1024, three runs within 0.2%): the production route `launch_q5_a16_mma_r64_t128_a1` takes 8.41 ms (21.7 TFLOPS); `launch_q5_a16_mma_r128_t64_s1_a1` takes 8.04 ms (22.7 TFLOPS), 4.6% faster. Of the 32 Q5 launchers, 22 were legal at that shape and 10 were rejected.
+
+## Decode kernel breakdown and the first P2 change (roadmap P2)
+
+One decode step is 37.6 ms (Nsight Systems, CUDA Graph nodes traced, MTP off, 103 steps): kernel time equals step time. The card's sustained read ceiling, measured with `tools/hbm_bandwidth_probe.cu` built for sm_75, is 584.2 GB/s (94.8% of the 616 GB/s peak). Per step before the change:
+
+| Kernel (op) | share | per call | bytes read | rate | of 584 GB/s |
+|---|---|---|---|---|---|
+| Q4 gate/up GEMV (`linear_swiglu`, 34816x5120) | 31.2% | 183 us | 94.7 MB | 517 GB/s | 88% |
+| Q5 direct SIMT, K=17408 (MLP down, `linear_add`) | 22.0% | 130 us | 58.5 MB | 451 GB/s | 77% |
+| Q5 staged GEMV, value+z rows (GDN input, T=1) | 15.4% | 124 us | 41.3 MB | 332 GB/s | 57% |
+| Q5 direct SIMT, K=6144 (output projections, `linear_add`) | 8.2% | 48 us | 20.6 MB | 428 GB/s | 73% |
+| Q8 output head (plain `linear`) | 6.4% | 2425 us | 1351 MB | 557 GB/s | 95% |
+
+The MLP down and output projections run through `linear_add`, which has its own route tables (`src/ops/linear_add/q5/q5_linear_add_plan.cpp`); the plain-linear shape files under `src/ops/linear/*/shapes/` serve only the output head and the vision tower on the text path, so tuning them does not change decode.
+
+**Change.** On Turing the GDN input projection's T=1 Q5 launch (`launch_q5_t1` in `q4_q5_gdn_input_conv_snapshot.cu`) now uses the direct SIMT kernel that the T>=2 path already used, instead of the staged shared-memory GEMV. Turing has no `cp.async`, so the staged GEMV cannot overlap its loads. That kernel went from 124.4 us to 92.5 us (446 GB/s, 76%).
+
+Measured interleaved in one session (the GPU ran about 3% slower than in the morning baseline, so only same-session pairs are compared), `ninfer_bench`, INT8 KV, `-n 256 -r 3 --warmup 1`:
+
+| Run | before (tok/s) | after (tok/s) |
+|---|---|---|
+| MTP off, round 1 / 2 / 3 | 24.92 (sd 1.03), 26.01, 25.84 | 26.68, 26.68, 26.49 |
+| MTP off, medians | 25.84 | 26.68 (+3.3%) |
+| MTP 3 draft tokens, round 1 / 2 | 29.61, 29.46 | 29.65, 29.59 (acceptance 0.371 both) |
+
+Paired by round the MTP-off gain is +7.1% (the first baseline run was noisy), +2.6% and +2.5%. `greedy-identity` holds: `long_decode_aime26_01.json`, `--greedy --max-new 256 --spec none`, identical output text before and after (and identical across two baseline runs, so decoding is deterministic).
+
+Remaining decode headroom, by the table above: the K=17408 and K=6144 `linear_add` Q5 kernels (77% and 73%), then the Q4 GEMV (88%).
