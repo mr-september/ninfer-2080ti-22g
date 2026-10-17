@@ -257,3 +257,18 @@ This kernel (37% of prefill) gains less than the Q5 one because it does more ALU
 | 65536, round 1 / 2 | 487.14 / 483.58 | 491.71 / 491.05 | +0.9% / +1.5% |
 
 **P5 total.** Each step was measured against the build before it, in its own session; the sessions drift by a few percent, so the steps are not additive on paper. Whole-item numbers in the first session's terms (before any P5 change: pp512 497.8 / 494.4, pp8192 523.3 / 519.9, pp65536 435.4 / 432.5): after all three kernel families, a later session measured pp8192 612.40 and 609.18 against a same-session predecessor, so the 8k prefill is about 17% above the pre-P5 build (523.3 to 612.4 and 519.9 to 609.2: +17.0% and +17.2%), which meets the roadmap gate (8k prefill +15%). Remaining kernels in the roadmap's list (Q4 and Q6 and Q8 plain MMA, `linear_pair`, the attention and GDN gating projections) were not changed: none of them is more than a few percent of prefill time.
+
+## Output head Q6 against Q8, re-measured (roadmap P6)
+
+The earlier conclusion that a Q6 head saves memory but not time (23.5 against 23.8 tok/s) sat inside the session noise. Re-measured with five interleaved rounds, the Q8 artifact (`qwen3_8_27b.ninfer`) against a copy with `text/output_head` re-encoded to `q6_g64_fp16` (`python -m tools.artifact.requantize_tensor ... --object text/output_head --format q6_g64_fp16`, 17,853,160,360 bytes, 341 MiB smaller; about 17 minutes on the CPU here), same binary, `-p 512 -n 256 -r 3 --warmup 1 --kv-dtype int8 --max-ctx 16384`, MTP off:
+
+| Round | Q8 head tg256 (tok/s) | Q6 head tg256 (tok/s) |
+|---|---|---|
+| 1 | 27.08 | 26.93 |
+| 2 | 27.11 | 26.88 |
+| 3 | 27.05 | 26.96 |
+| 4 | 27.06 | 26.99 |
+| 5 | 27.07 | 26.97 |
+| median | 27.07 | 26.96 (-0.4%) |
+
+pp512 is the same within noise (about 613 to 615 tok/s for both). Planned device memory is 358 MB lower with the Q6 head (16.105 against 16.463 GB). Every Q6 run is slower than every Q8 run: the Q6 head saves memory and costs about 0.4% of decode speed, so the Q8 head stays the recommended artifact. The Q8 head read is 1.35 GB at about 95% of the card's sustained bandwidth, so a smaller head has little time to gain, and the Q6 kernel's extra decode work shows.
