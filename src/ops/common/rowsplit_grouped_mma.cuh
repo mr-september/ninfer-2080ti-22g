@@ -4,6 +4,7 @@
 // set, route plan, workspace, and fixed instantiations.
 
 #include "ops/common/math.h"
+#include "ops/common/operand16.cuh"
 #include "ops/common/rowsplit_mma.cuh"
 #include "ops/linear/q4/q4_rowsplit_storage.cuh"
 #include "ops/linear/q5/q5_rowsplit_storage.cuh"
@@ -238,6 +239,89 @@ __global__ __launch_bounds__(Cfg::THREADS, Cfg::MIN_BLOCKS) void rowsplit_groupe
         stage_load_quant(stage, kt);
     };
 
+#if defined(NINFER_SM75)
+    // Turing has no cp.async, so a stage is a global load followed by a shared store. With a single
+    // stage the next tile is loaded into registers before the current tile's MMAs and stored after
+    // them, which overlaps its global-memory latency with the MMAs and issues a thread's loads
+    // together instead of serially after the tile.
+    constexpr bool kRegPrefetch = S == 1;
+    static_assert(!kRegPrefetch || (SB == 4 && Cfg::SCALE_PAIR_LOAD && BM * 2 <= Cfg::THREADS),
+                  "register prefetch assumes pair scale loads and one code vector per thread");
+    constexpr int kActItems = (BN * (BK / 8) + Cfg::THREADS - 1) / Cfg::THREADS;
+    int4 act_regs[kActItems];
+    int4 code_reg           = make_int4(0, 0, 0, 0);
+    std::uint64_t high_reg  = 0;
+    std::uint32_t scale_reg = 0;
+    // Whether this tile's rows carry a high-bit plane (Q5 rows).
+    const bool has_high = Codec == RowSplitGroupedMmaCodec::Q5 ||
+                          (Codec == RowSplitGroupedMmaCodec::Mixed && job.q5);
+    auto prefetch_to_regs = [&](int kt) {
+        const int k0 = kt * BK;
+#pragma unroll
+        for (int i = 0; i < kActItems; ++i) {
+            const int c = tid + i * Cfg::THREADS;
+            int4 v      = make_int4(0, 0, 0, 0);
+            if (c < BN * (BK / 8)) {
+                const int tl  = c / (BK / 8);
+                const int kl  = (c - tl * (BK / 8)) * 8;
+                const int col = t0 + tl;
+                const int kk  = k0 + kl;
+                if (FullTiles || (col < t && kk + 8 <= k)) {
+                    v = load_vec<int4>(&x[static_cast<std::int64_t>(col) * k + kk]);
+                }
+            }
+            act_regs[i] = v;
+        }
+        const int g = (kt * BK) >> 6;
+        if (tid < BM * 2) {
+            const int row  = tid >> 1;
+            const int half = tid & 1;
+            code_reg       = make_int4(0, 0, 0, 0);
+            if (FullTiles || m0 + row < job.n) {
+                const std::int64_t gi = static_cast<std::int64_t>(m0 + row) * kg + g;
+                code_reg              = load_vec<int4>(&job.codes[gi * 32 + half * 16]);
+            }
+        }
+        if (tid < BM) {
+            high_reg  = 0;
+            scale_reg = 0;
+            if (FullTiles || m0 + tid < job.n) {
+                const std::int64_t base = static_cast<std::int64_t>(m0 + tid) * kg;
+                if (has_high) { high_reg = load_vec<std::uint64_t>(&job.high[(base + g) * 8]); }
+                const int aligned_g = g & ~1;
+                if (aligned_g + 1 < kg) {
+                    scale_reg = load_vec<std::uint32_t>(&job.scales[(base + aligned_g) * 2]);
+                } else {
+                    scale_reg = load_vec<std::uint16_t>(&job.scales[(base + g) * 2]);
+                }
+            }
+        }
+    };
+    auto store_from_regs = [&](int stage) {
+#pragma unroll
+        for (int i = 0; i < kActItems; ++i) {
+            const int c = tid + i * Cfg::THREADS;
+            if (c < BN * (BK / 8)) {
+                const int tl = c / (BK / 8);
+                const int kl = (c - tl * (BK / 8)) * 8;
+                store_vec(&Bs[stage][tl * BK + gemm_swz64(tl, kl)],
+                          bf16x8_to_f16x8_operand(act_regs[i]));
+            }
+        }
+        if (tid < BM * 2) {
+            store_vec(&Cr[stage][(tid >> 1) * 32 + (tid & 1) * 16], code_reg);
+        }
+        if (tid < BM) {
+            if constexpr (Codec != RowSplitGroupedMmaCodec::Q4) {
+                if (has_high) {
+                    *reinterpret_cast<std::uint64_t*>(&Hr[stage][tid * 8]) = high_reg;
+                }
+            }
+            *reinterpret_cast<std::uint32_t*>(&Sr[stage][tid * SB]) = scale_reg;
+        }
+    };
+#endif
+
     auto dequant_to_As = [&](int stage, int kt) {
         const int scale_off = ((kt * BK >> 6) & 1) * 2;
         for (int row = warp; row < BM; row += Cfg::WARPS) {
@@ -291,6 +375,12 @@ __global__ __launch_bounds__(Cfg::THREADS, Cfg::MIN_BLOCKS) void rowsplit_groupe
         dequant_to_As(stage, it);
         __syncthreads();
 
+#if defined(NINFER_SM75)
+        if constexpr (kRegPrefetch) {
+            if (it + 1 < NKT) { prefetch_to_regs(it + 1); }
+        }
+#endif
+
         unsigned af[MT][4];
         unsigned bf[NT][2];
 #pragma unroll
@@ -319,7 +409,14 @@ __global__ __launch_bounds__(Cfg::THREADS, Cfg::MIN_BLOCKS) void rowsplit_groupe
         }
         __syncthreads();
         const int next = it + S;
-        if (next < NKT) { stage_load(stage, next); }
+#if defined(NINFER_SM75)
+        if constexpr (kRegPrefetch) {
+            if (next < NKT) { store_from_regs(stage); }
+        } else
+#endif
+        {
+            if (next < NKT) { stage_load(stage, next); }
+        }
         ninfer::ops::cp_commit();
     }
 

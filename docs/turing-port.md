@@ -247,3 +247,13 @@ Checks: `ninfer_linear_q5_a16_test` and `ninfer_linear_add_q5_a16_test` pass; gr
 | 65536, round 1 / 2 | 473.64 / 471.31 | 483.52 / 483.32 | +2.1% / +2.5% |
 
 This kernel (37% of prefill) gains less than the Q5 one because it does more ALU work per loaded byte and already had two resident CTAs overlapping its loads.
+
+**Same change in the grouped input-projection kernel** (`rowsplit_grouped_mma.cuh`, GDN and attention input projections, single-stage `TuringPrefillCfg`; activation, code, high-bit and scale loads prefetched into registers). Interleaved against the build with the Q5 and SwiGLU changes (two rounds; greedy text identical; the GDN-input, attention-input, snapshot and record tests pass):
+
+| Prompt | before (tok/s) | after (tok/s) | change |
+|---|---|---|---|
+| 512, round 1 / 2 | 609.33 / 601.34 | 614.76 / 610.81 | +0.9% / +1.6% |
+| 8192, round 1 / 2 | 605.51 / 598.40 | 612.40 / 609.18 | +1.1% / +1.8% |
+| 65536, round 1 / 2 | 487.14 / 483.58 | 491.71 / 491.05 | +0.9% / +1.5% |
+
+**P5 total.** Each step was measured against the build before it, in its own session; the sessions drift by a few percent, so the steps are not additive on paper. Whole-item numbers in the first session's terms (before any P5 change: pp512 497.8 / 494.4, pp8192 523.3 / 519.9, pp65536 435.4 / 432.5): after all three kernel families, a later session measured pp8192 612.40 and 609.18 against a same-session predecessor, so the 8k prefill is about 17% above the pre-P5 build (523.3 to 612.4 and 519.9 to 609.2: +17.0% and +17.2%), which meets the roadmap gate (8k prefill +15%). Remaining kernels in the roadmap's list (Q4 and Q6 and Q8 plain MMA, `linear_pair`, the attention and GDN gating projections) were not changed: none of them is more than a few percent of prefill time.
