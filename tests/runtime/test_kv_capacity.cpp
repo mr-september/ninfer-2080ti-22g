@@ -1,5 +1,7 @@
 #include "runtime/engine/kv_capacity.h"
 
+#include "ninfer/device_memory_error.h"
+
 #include <iostream>
 #include <stdexcept>
 
@@ -50,6 +52,14 @@ int main() {
     } catch (const std::invalid_argument&) { insufficient_rejected = true; }
     failures += check(insufficient_rejected,
                       "automatic KV capacity accepted less than the minimum reservation");
+
+    bool shortfall_typed = false;
+    try {
+        (void)ninfer::runtime::resolve_kv_capacity(ninfer::KvCapacityPolicy::explicit_capacity(129),
+                                                   curve, 1127);
+    } catch (const ninfer::DeviceMemoryError&) { shortfall_typed = true; }
+    failures += check(shortfall_typed,
+                      "an explicit reservation that does not fit did not throw DeviceMemoryError");
 
     if (failures == 0) { std::cout << "ok\n"; }
     return failures == 0 ? 0 : 1;

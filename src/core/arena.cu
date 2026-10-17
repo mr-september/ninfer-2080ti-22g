@@ -1,5 +1,7 @@
 #include "core/arena.h"
 
+#include "ninfer/device_memory_error.h"
+
 #include <cuda_runtime.h>
 
 #include <cstdio>
@@ -58,6 +60,9 @@ DeviceBuffer::DeviceBuffer(std::size_t size_bytes) : bytes(size_bytes) {
 
     void* ptr             = nullptr;
     const cudaError_t err = cudaMalloc(&ptr, bytes);
+    if (err == cudaErrorMemoryAllocation) {
+        throw ninfer::DeviceMemoryError(cuda_error_message("cudaMalloc failed", err));
+    }
     if (err != cudaSuccess) {
         throw std::runtime_error(cuda_error_message("cudaMalloc failed", err));
     }
@@ -145,6 +150,9 @@ DeviceArena::DeviceArena(std::size_t capacity_bytes) {
 
     void* ptr             = nullptr;
     const cudaError_t err = cudaMalloc(&ptr, capacity_bytes);
+    if (err == cudaErrorMemoryAllocation) {
+        throw ninfer::DeviceMemoryError(cuda_error_message("cudaMalloc failed", err));
+    }
     if (err != cudaSuccess) {
         throw std::runtime_error(cuda_error_message("cudaMalloc failed", err));
     }

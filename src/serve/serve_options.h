@@ -31,6 +31,8 @@ struct ServeOptions {
     std::optional<std::string> model_id_override; // unset => artifact metadata.name
     std::string request_log_jsonl;                // empty => structured request logging disabled
     std::uint32_t max_context          = product::kDefaultServeMaxContext;
+    bool max_context_explicit          = false; // --max-context was given; never lowered to fit
+    bool kv_capacity_explicit          = false; // --kv-capacity was given
     KvCapacityPolicy kv_capacity =
         KvCapacityPolicy::explicit_capacity(product::kDefaultServeMaxContext);
     std::uint32_t max_concurrency      = 1;

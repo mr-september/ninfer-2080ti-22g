@@ -1,6 +1,7 @@
 #include <charconv>
 #include "serve/generation_service.h"
 
+#include "product/context_fit.h"
 #include "product/media_acquire/acquire.h"
 #include "serve/translate.h"
 
@@ -325,7 +326,13 @@ GenerationService::GenerationService(ServeOptions options, StartupObserver start
     engine_options.media_live_bytes         = options_.media_live_bytes;
     engine_options.media_preprocess_threads = options_.media_preprocess_threads;
     engine_options.startup_observer         = std::move(startup_observer);
-    engine_           = std::make_unique<ninfer::Engine>(std::move(engine_options));
+    engine_ = product::start_fitting_context(
+        options_.max_context, options_.kv_capacity, options_.max_context_explicit,
+        options_.kv_capacity_explicit, [&] {
+            engine_options.max_context = options_.max_context;
+            engine_options.kv_capacity = options_.kv_capacity;
+            return std::make_unique<ninfer::Engine>(engine_options);
+        });
     request_capacity_ = std::make_shared<RequestCapacity>(
         static_cast<std::size_t>(options_.max_concurrency) + options_.max_pending_requests);
 }

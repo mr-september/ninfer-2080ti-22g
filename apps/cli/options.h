@@ -28,6 +28,8 @@ struct Options {
 
     std::uint32_t max_new        = 128;
     std::uint32_t max_context    = product::kDefaultCliMaxContext;
+    bool max_context_explicit    = false; // --max-context was given; never lowered to fit
+    bool kv_capacity_explicit    = false; // --kv-capacity was given
     KvCapacityPolicy kv_capacity =
         KvCapacityPolicy::explicit_capacity(product::kDefaultCliMaxContext);
     std::uint32_t prefill_chunk  = 1024;

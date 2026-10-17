@@ -83,7 +83,7 @@ and the server default is
 | no CUDA Graph decode | `--no-cuda-graph` |
 | another GPU | `--device N` ([multi-GPU notes](docs/multi-gpu.md)) |
 
-The default is a 64k-token context with MTP. That needs most of the 22 GB (the embedding table lives in host memory to make room), and the limit with MTP is about 97k tokens (110k without it). The card is also a desktop GPU: other programs that hold VRAM reduce what is available, and if startup reports out of memory, pass `--max-context 32768` or `--kv-capacity auto`.
+The default is a 64k-token context with MTP. That needs most of the 22 GB (the embedding table lives in host memory to make room), and the limit with MTP is about 97k tokens (110k without it). The card is also a desktop GPU: other programs that hold VRAM reduce what is available, and when the default context does not fit in the free VRAM, startup retries at 32768 and then 16384 tokens and logs `max-context reduced to N to fit free VRAM`. An explicit `--max-context` is never lowered; if it does not fit, startup fails, and `--kv-capacity auto` sizes the KV pool to what is free.
 
 ## Build
 

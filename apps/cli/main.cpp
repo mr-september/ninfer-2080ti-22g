@@ -1,5 +1,6 @@
 #include "core/os.h"
 #include "options.h"
+#include "product/context_fit.h"
 #include "product/logging/logging.h"
 #include "product/logging/pretty_format.h"
 #include "product/logging/startup_log.h"
@@ -14,6 +15,7 @@
 #include <iterator>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -306,7 +308,15 @@ int main(int argc, char** argv) {
         engine_options.context_cache.host_capacity_bytes = 0;
         engine_options.startup_observer                  = startup_log.observer();
 
-        ninfer::Engine engine(std::move(engine_options));
+        const std::uint32_t requested_context = engine_options.max_context;
+        const auto engine_owner               = ninfer::product::start_fitting_context(
+            engine_options.max_context, engine_options.kv_capacity, cli.max_context_explicit,
+            cli.kv_capacity_explicit, [&] { return std::make_unique<ninfer::Engine>(engine_options); });
+        ninfer::Engine& engine = *engine_owner;
+        if (engine_options.max_context != requested_context) {
+            std::cerr << "max-context reduced to " << engine_options.max_context
+                      << " to fit free VRAM (pass --max-context to choose one)\n";
+        }
         startup_log.engine_ready(engine.load_summary());
         engine.reset_memory_peaks();
 

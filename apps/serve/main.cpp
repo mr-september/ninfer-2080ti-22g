@@ -64,6 +64,9 @@ int main(int argc, char** argv) {
 
         ninfer::serve::GenerationService service(options, startup_log.observer());
         startup_log.engine_ready(service.load_summary());
+        if (service.options().max_context != options.max_context) {
+            operational_log.context_reduced(options.max_context, service.options().max_context);
+        }
         operational_log.engine_capacity(service);
 
         using Clock                            = std::chrono::steady_clock;

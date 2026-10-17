@@ -520,6 +520,8 @@ void HttpServer::attach(GenerationService& service) {
     // memory_summary waits for the completed worker boundary, including warmup publication.
     const ninfer::MemorySummary memory  = service.memory_summary();
     const ninfer::RuntimeStats baseline = service.runtime_stats();
+    // The service may have lowered the default context to fit free device memory.
+    options_.max_context                = service.options().max_context;
     public_model_id_                    = resolve_public_model_id(options_, load.model_name);
     service_                            = &service;
     metrics_.configure(public_model_id_, service.engine_options(), memory, baseline);

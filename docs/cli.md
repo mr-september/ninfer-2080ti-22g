@@ -192,7 +192,7 @@ The table lists executable defaults. The examples above select FP8 KV and MTP3 e
 
 | Option | Meaning | Default |
 |---|---|---:|
-| `--max-context N` | per-sequence logical context ceiling | `65536` |
+| `--max-context N` | per-sequence logical context ceiling; when omitted and the default does not fit in free VRAM, startup retries at `32768`, then `16384`, and says so; an explicit value is never lowered | `65536` |
 | `--kv-capacity N\|auto` | explicit shared Main Text KV capacity, or maximize it from remaining GPU memory; omitted means `--max-context` | `65536` |
 | `--prefill-chunk N` | positive text-prefill chunk, in multiples of 128 | `1024` |
 | `--max-new N` | requested output-token limit | `128` |

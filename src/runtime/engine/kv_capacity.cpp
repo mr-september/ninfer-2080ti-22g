@@ -1,5 +1,7 @@
 #include "runtime/engine/kv_capacity.h"
 
+#include "ninfer/device_memory_error.h"
+
 #include <algorithm>
 #include <limits>
 #include <stdexcept>
@@ -120,10 +122,10 @@ KvCapacityResolution resolve_kv_capacity(const KvCapacityPolicy& policy,
 
     const std::size_t reservation = curve.reservation_bytes(pages);
     if (reservation > capacity_budget) {
-        throw std::invalid_argument("requested Engine runtime reservation requires " +
-                                    std::to_string(reservation) + " bytes, but only " +
-                                    std::to_string(capacity_budget) +
-                                    " bytes are available for runtime capacity");
+        throw DeviceMemoryError("requested Engine runtime reservation requires " +
+                                std::to_string(reservation) + " bytes, but only " +
+                                std::to_string(capacity_budget) +
+                                " bytes are available for runtime capacity");
     }
 
     return KvCapacityResolution{
