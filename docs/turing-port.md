@@ -181,3 +181,18 @@ Remaining decode headroom, by the table above: the K=17408 and K=6144 `linear_ad
 **Q5 `linear_add` direct-kernel schedule sweep (P2 step 4, no change made).** `Q5A16DirectSimtSchedule<1, T, W, G, MinBlocks, K, exact>` in `q5_linear_add_gemm_simt.cu` (W warps per row, G groups per warp tile, K tile per iteration W*G*64) was swept with `ninfer_q5_linear_add_bench` (graph replay, warmup 200, repeat 200) over (W,G,MinBlocks) = (2,8,16) current, (2,4,16), (4,4,10), (4,8,8), (2,12,16), (2,8,8). For K=17408 the current schedule is best or tied at every T (T=1 about 115 us, 510 GB/s in isolation); the only gain is (4,4,10) at T=1, 2.5%, and it is far worse at T>=2 (T=3: 305 us against 184 us). For K=6144 all variants are within the run-to-run spread (the T=1 median alternates between about 43 us and 49 us across identical runs). Larger W, G or MinBlocks values and W=1 are slower. No schedule change is justified. (An earlier sweep with short warmups was discarded: its dev-shell invocations accumulated PATH until builds failed silently.)
 
 **Decode is power-capped.** While decoding, the card sits at its 250 W cap (`clocks_throttle_reasons.active` = software power cap, 0x4): measured over 75 busy samples, SM clock 1455-1635 MHz (mean 1511), power 237-252 W (mean 246), memory clock fixed at 7000 MHz, temperature at most 44 C. Short micro-benchmarks draw less power and run faster, which is why the in-situ kernels run slower than the same kernels in isolation (the K=17408 `linear_add` kernel is about 115 us alone and 130-135 us inside decode). Gains from kernels that issue fewer ALU instructions per weight byte may therefore be larger in decode than in isolation, but load-width or occupancy changes alone are not expected to close the gap.
+
+## INT8-KV attention tile 64x32 (roadmap P3)
+
+`Int8KvTiledInstance` (`src/ops/softmax_attention/dense/causal_cache/int8/instances.h`) on Turing changes from `<32, 32, 128>` to `<64, 32, 128>`. The 64x32 tile stages 55,296 bytes of shared memory (54 KiB, under the 64 KiB limit; 64x64 would need 92 KiB), uses 16 warps per CTA instead of 8, and reuses each Q tile over twice as many query rows.
+
+Measured interleaved in one session (`ninfer_bench`, INT8 KV, MTP off, `--max-ctx 70000`; 8k: 4 repetitions after 2 warmups, 64k: 2 repetitions after 1 warmup; two rounds of before then after):
+
+| Prompt | before (tok/s) | after (tok/s) | change |
+|---|---|---|---|
+| 8192, round 1 | 507.17 (sd 1.10) | 513.44 (sd 2.38) | +1.2% |
+| 8192, round 2 | 496.74 (sd 15.68; one repetition at 473.4) | 517.46 (sd 1.37) | +4.2% (+2.4% against the other three repetitions) |
+| 65536, round 1 | 390.74 (sd 0.33) | 427.04 (sd 2.76) | +9.3% |
+| 65536, round 2 | 389.47 (sd 0.57) | 424.13 (sd 1.46) | +8.9% |
+
+Checks: the attention, KV-cache and sliding-window tests pass (`ninfer_softmax_attention_test`, `ninfer_kv_cache_test`, `ninfer_kv_cache_append_test`, `ninfer_sliding_window_attention_test`, `ninfer_causal_conv1d_silu_test`). `ppl-quick` (INT8 KV, 4096 context) with the new tile against the baseline 4.794356: overall 4.794641 (+0.006%); Chinese 6.750531 against 6.746396 (+0.061%), long-form English 7.179776 against 7.178846 (+0.013%), English reference 6.458972 against 6.461225 (-0.035%), code 1.673260 against 1.673525 (-0.016%). The tile shape changes the order in which key blocks are merged, so bit-identical output is not expected; the overall change is within the 0.05% limit and the Chinese domain alone is slightly above it, with the other domains moving the other way.

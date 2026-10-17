@@ -23,8 +23,9 @@ struct Int8KvGroupedInstance {
 };
 
 #if defined(NINFER_SM75)
-// 64x64 stages 92 KiB; 32x32 stages 44 KiB, within a Turing CTA.
-using Int8KvTiledInstance = Int8KvTiledMmaSchedule<32, 32, 128>;
+// 64x64 stages 92 KiB, too large for a Turing CTA; 64x32 stages 54 KiB and doubles the warps per
+// CTA (and the reuse of each Q tile) over 32x32, which stages 44 KiB.
+using Int8KvTiledInstance = Int8KvTiledMmaSchedule<64, 32, 128>;
 #else
 using Int8KvTiledInstance = Int8KvTiledMmaSchedule<64, 64, 128>;
 #endif
