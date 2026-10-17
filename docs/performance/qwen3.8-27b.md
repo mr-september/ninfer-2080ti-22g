@@ -2,13 +2,24 @@
 
 [Performance index](../performance.md) · [Measurement and publication rules](methodology.md)
 
-On this page: [run records](#scope-and-run-records), [context profile](#no-speculation-context-profile), [single-request decode](#single-request-speculative-decode), [corpus makespan](#corpus-makespan), [decode saturation](#decode-saturation), [completion outcomes](#completion-outcomes), [reproduction](#reproduction-and-reports).
+On this page: [run records](#scope-and-run-records), [context profile](#no-speculation-context-profile),
+[single-request decode](#single-request-speculative-decode), [corpus makespan](#corpus-makespan),
+[decode saturation](#decode-saturation), [completion outcomes](#completion-outcomes),
+[reproduction](#reproduction-and-reports).
 
 ## Scope and run records
 
-Measured on September 28–29, 2026 (Asia/Shanghai), using one RTX 5090, NVIDIA driver 617.14, CUDA 13.4 compile/runtime/driver API, and NInfer revision `7f6aafedb5f20200def820cfe51ab81c09c20eeb`. The serving binary was fixed for the entire campaign. All runs use FP8 E4M3 row-256 KV, a 1,024-token prefill chunk, CUDA Graphs, disabled prefix reuse, and the [common stochastic sampling profile](methodology.md#common-serving-profile). MTP3 and DFlash2 K=7 use the optimized proposal head. Startup and warmup are outside measurement.
+Measured on September 28–29, 2026 (Asia/Shanghai), using one RTX 5090, NVIDIA driver 617.14,
+CUDA 13.4 compile/runtime/driver API, and NInfer revision
+`7f6aafedb5f20200def820cfe51ab81c09c20eeb`. The serving binary was fixed for the entire campaign.
+All runs use FP8 E4M3 row-256 KV, a 1,024-token prefill chunk, CUDA Graphs, disabled prefix reuse,
+and the [common stochastic sampling profile](methodology.md#common-serving-profile).
+MTP3 and DFlash2 K=7 use the optimized proposal head. Startup and warmup are outside measurement.
 
-The artifacts are `out/qwen3_8_27b.ninfer` (`groupwise-int`) and `out/qwen3_8_27b_nvfp4.ninfer` (`nvfp4`), including their selected speculative companion weights. All 20 configurations and 820 formal requests completed without request, CUDA, or allocation errors. The tables contain this campaign's measurements only.
+The artifacts are `out/qwen3_8_27b.ninfer` (`groupwise-int`) and
+`out/qwen3_8_27b_nvfp4.ninfer` (`nvfp4`), including their selected speculative companion weights.
+All 20 configurations and 820 formal requests completed without request, CUDA, or allocation errors.
+The tables contain this campaign's measurements only.
 
 | Run | Weights ID | Measurement | Context ceiling | C | Actual KV capacity (tokens, in C order) |
 |---|---|---|---|---|---|
@@ -21,7 +32,8 @@ The artifacts are `out/qwen3_8_27b.ninfer` (`groupwise-int`) and `out/qwen3_8_27
 | ND | `nvfp4` | DFlash2 K=7 corpus | 131,072 | 1 | 131,072 |
 | NS | `nvfp4` | MTP3 saturation | 16,384 | 1, 2, 4, 8 | 16,384; 32,768; 65,536; 131,072 |
 
-MTP0 reserves its KV capacity explicitly; corpus and saturation points use `--kv-capacity auto`. The workspace arena is 243.3 MiB in every configuration. Resident weight arenas depend on the selected backend:
+MTP0 reserves its KV capacity explicitly; corpus and saturation points use `--kv-capacity auto`.
+The workspace arena is 243.3 MiB in every configuration. Resident weight arenas depend on the selected backend:
 
 | Backend | groupwise-int weights (GiB) | nvfp4 weights (GiB) |
 |---|---|---|
@@ -53,7 +65,12 @@ G0/N0 use the [single-request method](methodology.md#single-request-phases): fiv
 
 ## Single-request speculative decode
 
-These phase statistics come directly from the C=1 corpus points, G3/N3 and GD/ND. Each reasoning fixture has five samples and a 65,536-token output budget; each other category pools three fixtures × five seeds with a 4,096-token budget. Values are arithmetic mean ± sample standard deviation of per-request rates and ratios. Category deviation also includes differences between fixtures. Actual output lengths vary; [completion outcomes](#completion-outcomes) apply to all the means below. In particular, all C=1 AIME 15 samples reach the output limit.
+These phase statistics come directly from the C=1 corpus points, G3/N3 and GD/ND.
+Each reasoning fixture has five samples and a 65,536-token output budget; each other category
+pools three fixtures × five seeds with a 4,096-token budget. Values are arithmetic mean ± sample
+standard deviation of per-request rates and ratios. Category deviation also includes differences
+between fixtures. Actual output lengths vary; [completion outcomes](#completion-outcomes) apply
+to all the means below. In particular, all C=1 AIME 15 samples reach the output limit.
 
 ### groupwise-int
 
@@ -129,7 +146,10 @@ These phase statistics come directly from the C=1 corpus points, G3/N3 and GD/ND
 
 ## Corpus makespan
 
-Each point is one uninterrupted run of the same 75-request corpus, using shuffle seed `20260811` and ordered HTTP sends. Makespan includes prefill, decode, admission waits, transitions, and drain. Corpus rates divide token totals by full makespan; acceptance is the ratio of summed accepted and drafted tokens. Average batch covers the entire run. Stochastic continuations differ between points.
+Each point is one uninterrupted run of the same 75-request corpus, using shuffle seed `20260811`
+and ordered HTTP sends. Makespan includes prefill, decode, admission waits, transitions, and drain.
+Corpus rates divide token totals by full makespan; acceptance is the ratio of summed accepted and
+drafted tokens. Average batch covers the entire run. Stochastic continuations differ between points.
 
 ### MTP3 groupwise-int
 
@@ -149,7 +169,11 @@ Each point is one uninterrupted run of the same 75-request corpus, using shuffle
 | 4 | 75 | 15,460 | 722,202 | 1,640.17 | 0.0457 | 9.4 | 440.3 | 3.13 | 58.5% |
 | 8 | 75 | 15,460 | 708,589 | 1,443.37 | 0.0520 | 10.7 | 490.9 | 3.52 | 59.5% |
 
-At C=8, the full-corpus average batch is 4.31 for groupwise-int and 3.52 for NVFP4. Their shared KV capacities are 318,592 and 225,024 tokens; the sampled maximum waiting counts are four and five requests. NVFP4 C=4 also records one waiting request. These are measured admission limits, and the full makespans retain their effect. No spill, owner degradation/eviction, or search-exhaustion event was recorded.
+At C=8, the full-corpus average batch is 4.31 for groupwise-int and 3.52 for NVFP4.
+Their shared KV capacities are 318,592 and 225,024 tokens; the sampled maximum waiting counts
+are four and five requests. NVFP4 C=4 also records one waiting request. These are measured admission
+limits, and the full makespans retain their effect. No spill, owner degradation/eviction, or
+search-exhaustion event was recorded.
 
 ### DFlash2 K=7
 
@@ -162,7 +186,10 @@ Each DFlash2 point computes 15,460 prefill tokens, has average decode batch 1.00
 
 ## Decode saturation
 
-GS/NS use the [sustained-wave method](methodology.md#decode-saturation): one wave at each C, `long_decode_aime26_15`, a 335-token prompt, thinking enabled, and an 8,192-token output budget per request. All 30 requests reach that budget. Steady throughput selects complete full-batch intervals; acceptance covers the entire wave, and wave makespan includes ramp-up and drain.
+GS/NS use the [sustained-wave method](methodology.md#decode-saturation): one wave at each C,
+`long_decode_aime26_15`, a 335-token prompt, thinking enabled, and an 8,192-token output budget
+per request. All 30 requests reach that budget. Steady throughput selects complete full-batch
+intervals; acceptance covers the entire wave, and wave makespan includes ramp-up and drain.
 
 ### groupwise-int
 
@@ -184,7 +211,9 @@ GS/NS use the [sustained-wave method](methodology.md#decode-saturation): one wav
 
 ## Completion outcomes
 
-Token accounting and termination reasons were checked for every formal request. All 40 MTP0 requests terminate at a stop token. The table below gives stop-token / output-limit counts for the C=1 speculative corpus; every sample remains in the published statistics.
+Token accounting and termination reasons were checked for every formal request. All 40 MTP0
+requests terminate at a stop token. The table below gives stop-token / output-limit counts for
+the C=1 speculative corpus; every sample remains in the published statistics.
 
 | Workload | Samples per profile | Groupwise MTP3 | NVFP4 MTP3 | Groupwise DFlash2 | NVFP4 DFlash2 |
 |---|---|---|---|---|---|
@@ -197,13 +226,20 @@ Token accounting and termination reasons were checked for every formal request. 
 | Structured | 15 | 1 / 14 | 0 / 15 | 3 / 12 | 1 / 14 |
 | **Total** | **75** | 36 / 39 | 40 / 35 | 37 / 38 | 42 / 33 |
 
-Across MTP3 C=1/2/4/8, groupwise-int stop/limit counts are 36/39, 35/40, 36/39, and 37/38; NVFP4 counts are 40/35, 41/34, 40/35, and 42/33. Output-limit samples measure generation through the configured budget and do not establish completed reasoning or task success.
+Across MTP3 C=1/2/4/8, groupwise-int stop/limit counts are 36/39, 35/40, 36/39, and 37/38;
+NVFP4 counts are 40/35, 41/34, 40/35, and 42/33. Output-limit samples measure generation through
+the configured budget and do not establish completed reasoning or task success.
 
-Screening the complete C=1 responses for obvious large verbatim repetitions found no candidates. Concurrent C>1 runs retain token and termination records, but no complete-response repetition audit was performed. Answer accuracy, prompt compliance, and perplexity were not measured in this campaign.
+Screening the complete C=1 responses for obvious large verbatim repetitions found no candidates.
+Concurrent C>1 runs retain token and termination records, but no complete-response repetition audit
+was performed. Answer accuracy, prompt compliance, and perplexity were not measured in this campaign.
 
 ## Reproduction and reports
 
-Reports are local under `profiles/bench/qwen3_8_27b_fp8kv_20260928/`. `campaign.json` records the build, artifact identities, commands, and execution status. `run.jsonl`, `points/*.json`, `server/*.jsonl`, and the existing summaries retain the measured evidence; C=1 corpus responses and phase summaries are in `corpus/<point>/`.
+Reports are local under `profiles/bench/qwen3_8_27b_fp8kv_20260928/`.
+`campaign.json` records the build, artifact identities, commands, and execution status.
+`run.jsonl`, `points/*.json`, `server/*.jsonl`, and the existing summaries retain the measured evidence;
+C=1 corpus responses and phase summaries are in `corpus/<point>/`.
 
 | Runs | Report directories relative to campaign root |
 |---|---|

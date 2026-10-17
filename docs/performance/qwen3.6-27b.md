@@ -2,11 +2,16 @@
 
 [Performance index](../performance.md) · [Measurement and publication rules](methodology.md)
 
-On this page: [run records](#scope-and-run-records), [context profile](#no-speculation-context-profile), [single-request decode](#single-request-speculative-decode), [decode saturation](#decode-saturation), [comparisons](#comparisons-and-limitations), [reproduction](#reproduction-and-reports).
+On this page: [run records](#scope-and-run-records), [context profile](#no-speculation-context-profile),
+[single-request decode](#single-request-speculative-decode), [decode saturation](#decode-saturation),
+[comparisons](#comparisons-and-limitations), [reproduction](#reproduction-and-reports).
 
 ## Scope and run records
 
-All runs use the [common RTX 5090 serving profile](methodology.md#common-serving-profile). The tables below specify differences; all runs use stochastic sampling. Dates identify historical campaign labels. Run IDs are local to this page and link to the reproduction command, artifact path, and local report directory.
+All runs use the [common RTX 5090 serving profile](methodology.md#common-serving-profile).
+The tables below specify differences; all runs use stochastic sampling. Dates identify historical
+campaign labels. Run IDs are local to this page and link to the reproduction command, artifact
+path, and local report directory.
 
 | Run | Campaign date | Weights ID | Measurement | Context ceiling | C | CUDA driver API | KV capacity (tokens) |
 |---|---|---|---|---:|---|---|---|
@@ -26,7 +31,10 @@ All runs use the [common RTX 5090 serving profile](methodology.md#common-serving
 | [GS](#gs) | `26da9df7c1b3d3c04ea7bbd730271aa01d00742a` |
 | [NS](#ns) | `26da9df7c1b3d3c04ea7bbd730271aa01d00742a` |
 
-Both registered weight profiles have MTP0 and MTP3 phase results and C=1, 2, 4, 8 saturation results. N3 phase statistics come from the C=1 point of a corpus-makespan run; full makespan results are not published here. EvalScope accuracy is recorded in the [groupwise-int model card](../../model-cards/Qwen3.6-27B-NInfer/README.md#evaluation) and [NVFP4 model card](../../model-cards/Qwen3.6-27B-nvfp4-NInfer/README.md#evaluation).
+Both registered weight profiles have MTP0 and MTP3 phase results and C=1, 2, 4, 8 saturation
+results. N3 phase statistics come from the C=1 point of a corpus-makespan run; full makespan results
+are not published here. EvalScope accuracy is recorded in the [groupwise-int model card](../../model-cards/Qwen3.6-27B-NInfer/README.md#evaluation)
+and [NVFP4 model card](../../model-cards/Qwen3.6-27B-nvfp4-NInfer/README.md#evaluation).
 
 ## No-speculation context profile
 
@@ -56,7 +64,9 @@ Run [N0](#n0).
 
 ## Single-request speculative decode
 
-Five samples per reasoning fixture; category rows pool three fixtures × five seeds. Values are mean ± sample standard deviation of per-request phase rates and speculative ratios. Output budgets are 65,536 tokens for reasoning and 4,096 for other scenarios.
+Five samples per reasoning fixture; category rows pool three fixtures × five seeds. Values are
+mean ± sample standard deviation of per-request phase rates and speculative ratios. Output budgets
+are 65,536 tokens for reasoning and 4,096 for other scenarios.
 
 ### groupwise-int
 
@@ -102,7 +112,8 @@ Run [N3](#n3), MTP3.
 
 ## Decode saturation
 
-Runs [GS](#gs), [NS](#ns) use the [sustained-wave method](methodology.md#decode-saturation): 293 prompt tokens per request, an 8,192-token output budget, and one wave per C.
+Runs [GS](#gs), [NS](#ns) use the [sustained-wave method](methodology.md#decode-saturation):
+293 prompt tokens per request, an 8,192-token output budget, and one wave per C.
 
 | Weights ID | C | Steady (s) | Avg batch | Steady decode (tok/s) | MTP acceptance (wave) | Speedup vs. C1 | Wave makespan (s) |
 |---|---:|---:|---:|---:|---:|---:|---:|
@@ -115,11 +126,16 @@ Runs [GS](#gs), [NS](#ns) use the [sustained-wave method](methodology.md#decode-
 | `nvfp4` | 4 | 44.01 | 4.00 | 699.7 | 69.3% | 3.46× | 47.92 |
 | `nvfp4` | 8 | 55.01 | 8.00 | 1,146.9 | 68.6% | 5.67× | 58.57 |
 
-All 30 requests reached their output limit without a request, CUDA, or out-of-memory failure, producing 245,760 completion tokens. At C=8, available device memory after startup was 2.66 GiB for groupwise-int and 2.18 GiB for NVFP4. These are sustained-generation stress results.
+All 30 requests reached their output limit without a request, CUDA, or out-of-memory failure,
+producing 245,760 completion tokens. At C=8, available device memory after startup was 2.66 GiB
+for groupwise-int and 2.18 GiB for NVFP4. These are sustained-generation stress results.
 
 ## Comparisons and limitations
 
-The weight profiles use the same fixtures, seeds, sampling, and output budgets, but revisions, driver API versions, and MTP3 context ceilings differ as recorded above. Quantization can change sampled continuations. These are historical fixed-workload results, not an isolated quantization comparison. MTP0 and MTP3 use different workloads; no per-scenario speculative speedup is reported.
+The weight profiles use the same fixtures, seeds, sampling, and output budgets, but revisions,
+driver API versions, and MTP3 context ceilings differ as recorded above. Quantization can change
+sampled continuations. These are historical fixed-workload results, not an isolated quantization
+comparison. MTP0 and MTP3 use different workloads; no per-scenario speculative speedup is reported.
 
 ## Reproduction and reports
 
@@ -210,4 +226,5 @@ Historical reports: `profiles/bench/concurrent_decode_27b_nvfp4_mtp3_20260811/`.
   --output profiles/bench/concurrent_decode_27b_nvfp4_mtp3_20260811
 ```
 
-[Runner usage](../../tools/bench/README.md#serving-corpus-benchmark) describes the report files. Older corpus runs may retain only point reports and server logs.
+[Runner usage](../../tools/bench/README.md#serving-corpus-benchmark) describes the report files.
+Older corpus runs may retain only point reports and server logs.

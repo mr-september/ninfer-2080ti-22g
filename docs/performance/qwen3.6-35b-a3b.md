@@ -2,11 +2,15 @@
 
 [Performance index](../performance.md) · [Methodology](methodology.md)
 
-On this page: [configuration](#configuration-and-runs), [context profile](#no-speculation-context-profile), [single-request decode](#single-request-speculative-decode), [corpus makespan](#corpus-makespan), [decode saturation](#decode-saturation), [termination](#termination-and-anomalies), [reproduction](#reproduction-and-reports).
+On this page: [configuration](#configuration-and-runs), [context profile](#no-speculation-context-profile),
+[single-request decode](#single-request-speculative-decode), [corpus makespan](#corpus-makespan),
+[decode saturation](#decode-saturation), [termination](#termination-and-anomalies),
+[reproduction](#reproduction-and-reports).
 
 ## Configuration and runs
 
-Measured on 2026-09-07 at revision `487f89773f07cb18a2fb841fe0971ec9634d409b`. All 11 measurement points and 485 formal requests completed without request, CUDA, or out-of-memory failures.
+Measured on 2026-09-07 at revision `487f89773f07cb18a2fb841fe0971ec9634d409b`. All 11 measurement
+points and 485 formal requests completed without request, CUDA, or out-of-memory failures.
 
 | Setting | Value |
 |---|---|
@@ -24,7 +28,9 @@ Measured on 2026-09-07 at revision `487f89773f07cb18a2fb841fe0971ec9634d409b`. A
 | Greedy sampling | Exact argmax |
 | Speculative proposal head | Optimized (`--lm-head-draft`) |
 
-The build and artifact remain fixed across all points. Each point starts a fresh server; model loading and startup warmup complete before measurement. Three short startup checks are outside the formal request count. Run IDs link to their commands and local report directories.
+The build and artifact remain fixed across all points. Each point starts a fresh server; model
+loading and startup warmup complete before measurement. Three short startup checks are outside
+the formal request count. Run IDs link to their commands and local report directories.
 
 | Run | Workload | Backend / sampling | C | Requests |
 |---|---|---|---|---:|
@@ -50,7 +56,10 @@ The build and artifact remain fixed across all points. Each point starts a fresh
 
 ## No-speculation context profile
 
-Run [P0](#p0) uses four Long NIAH fixtures with five seeds each, thinking disabled, and a 128-token output budget. Each request stops naturally after 17 completion tokens. Inputs are submitted serially through the corpus runner's C=1 path with shuffle seed `20260811`. Values are arithmetic mean ± sample standard deviation of per-request phase metrics.
+Run [P0](#p0) uses four Long NIAH fixtures with five seeds each, thinking disabled, and a
+128-token output budget. Each request stops naturally after 17 completion tokens. Inputs are
+submitted serially through the corpus runner's C=1 path with shuffle seed `20260811`.
+Values are arithmetic mean ± sample standard deviation of per-request phase metrics.
 
 | Prompt tokens | Samples | Prefill phase (tok/s) | Server TTFT (ms) | Decode phase (tok/s) |
 |---|---|---|---|---|
@@ -61,9 +70,14 @@ Run [P0](#p0) uses four Long NIAH fixtures with five seeds each, thinking disabl
 
 ## Single-request speculative decode
 
-The C=1 points of [M3](#m3), [DS](#ds), and [DG](#dg) each supply 75 requests: three long-reasoning fixtures and twelve scenario fixtures, with five fixed seeds per fixture. Reasoning enables thinking and uses a 65,536-token output budget. Code, Story, Translation, and Structured each contain three fixtures, disable thinking, and use a 4,096-token output budget.
+The C=1 points of [M3](#m3), [DS](#ds), and [DG](#dg) each supply 75 requests: three long-reasoning
+fixtures and twelve scenario fixtures, with five fixed seeds per fixture. Reasoning enables
+thinking and uses a 65,536-token output budget. Code, Story, Translation, and Structured each
+contain three fixtures, disable thinking, and use a 4,096-token output budget.
 
-Tables use arithmetic mean ± sample standard deviation of per-request decode-phase rates and speculative ratios. Category rows pool 15 samples. Completion lengths are actual generated tokens. These C=1 runs also supply the corpus-makespan results below.
+Tables use arithmetic mean ± sample standard deviation of per-request decode-phase rates and
+speculative ratios. Category rows pool 15 samples. Completion lengths are actual generated tokens.
+These C=1 runs also supply the corpus-makespan results below.
 
 ### MTP3 stochastic
 
@@ -130,7 +144,11 @@ Run [DG](#dg).
 
 ## Corpus makespan
 
-Each point runs the same 75-request corpus with shuffle seed `20260811` and a fixed HTTP send order. Exactly C persistent clients submit their next request after reading their current response. Makespan spans client release through the last complete response, including prefill, request admission, workload transitions, and drain. Corpus decode throughput uses that full interval; average batch covers the whole run. Acceptance is the ratio of summed accepted and drafted tokens.
+Each point runs the same 75-request corpus with shuffle seed `20260811` and a fixed HTTP send
+order. Exactly C persistent clients submit their next request after reading their current response.
+Makespan spans client release through the last complete response, including prefill, request
+admission, workload transitions, and drain. Corpus decode throughput uses that full interval;
+average batch covers the whole run. Acceptance is the ratio of summed accepted and drafted tokens.
 
 ### MTP3
 
@@ -141,7 +159,8 @@ Each point runs the same 75-request corpus with shuffle seed `20260811` and a fi
 | 4 | 75 | 14,830 | 807,280 | 737.87 | 0.1016 | 1,094.1 | 3.45 | 71.7% |
 | 8 | 75 | 14,830 | 861,416 | 679.61 | 0.1104 | 1,267.5 | 6.48 | 73.3% |
 
-The stop-token / output-limit counts at C=1, 2, 4, 8 are 37/38, 34/41, 34/41, and 32/43. Stochastic continuations and token totals can vary with concurrency.
+The stop-token / output-limit counts at C=1, 2, 4, 8 are 37/38, 34/41, 34/41, and 32/43.
+Stochastic continuations and token totals can vary with concurrency.
 
 ### DFlash K=7, C=1
 
@@ -154,7 +173,11 @@ Each DFlash run computed 14,830 prefill tokens and had average decode batch 1.00
 
 ## Decode saturation
 
-Run [S3](#s3) uses `long_decode_aime26_15`, a 293-token rendered prompt, thinking enabled, and an 8,192-token output budget per request. Each C point is one sustained wave. Steady throughput uses only complete one-second intervals satisfying the [full-batch criteria](methodology.md#decode-saturation). Prefill, ramp-up, and drain are excluded from steady throughput and included in wave makespan. Acceptance covers the complete wave.
+Run [S3](#s3) uses `long_decode_aime26_15`, a 293-token rendered prompt, thinking enabled, and
+an 8,192-token output budget per request. Each C point is one sustained wave. Steady throughput
+uses only complete one-second intervals satisfying the [full-batch criteria](methodology.md#decode-saturation).
+Prefill, ramp-up, and drain are excluded from steady throughput and included in wave makespan.
+Acceptance covers the complete wave.
 
 | C | Requests | Steady (s) | Avg batch | Steady decode (tok/s) | MTP acceptance (wave) | Wave makespan (s) |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -167,9 +190,13 @@ All 15 requests reach the output limit, producing 122,880 completion tokens.
 
 ## Termination and anomalies
 
-Checks cover execution failures, token-accounting consistency, termination reasons, and obvious repetition. No obvious short-cycle repetition was found in the 225 complete C=1 speculative responses. C>1 retains request usage, termination reasons, and server logs; response-text screening covers C=1. This performance measurement does not score answer accuracy or prompt compliance.
+Checks cover execution failures, token-accounting consistency, termination reasons, and obvious
+repetition. No obvious short-cycle repetition was found in the 225 complete C=1 speculative
+responses. C>1 retains request usage, termination reasons, and server logs; response-text screening
+covers C=1. This performance measurement does not score answer accuracy or prompt compliance.
 
-The following entries are stop-token / output-limit counts. Each reasoning row has five samples per profile; each category has fifteen. All output-limit samples remain in the reported statistics.
+The following entries are stop-token / output-limit counts. Each reasoning row has five samples
+per profile; each category has fifteen. All output-limit samples remain in the reported statistics.
 
 | Workload | MTP3 stop / limit | DFlash stochastic stop / limit | DFlash greedy stop / limit |
 |---|---|---|---|
@@ -184,7 +211,9 @@ The following entries are stop-token / output-limit counts. Each reasoning row h
 
 ## Reproduction and reports
 
-Run from the repository root using Python 3.11 and the explicit artifact above. Campaign reports: `profiles/bench/qwen3_6_35b_a3b_retest_20260907_130244/`. Select an unused `NINFER_PERF_OUTPUT` directory for a new run.
+Run from the repository root using Python 3.11 and the explicit artifact above.
+Campaign reports: `profiles/bench/qwen3_6_35b_a3b_retest_20260907_130244/`.
+Select an unused `NINFER_PERF_OUTPUT` directory for a new run.
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -264,4 +293,7 @@ Report subdirectory: `mtp3_saturation/`.
   --output "$NINFER_PERF_OUTPUT/mtp3_saturation"
 ```
 
-Each group contains `summary.json`, `summary.csv`, `summary.md`, `points/`, and `server/`. C=1 `corpus/` directories retain complete responses and per-fixture phase summaries. The campaign `manifest.json` records the revision, artifact identity, and commands; `anomalies.json` records termination and repetition screening. See [runner usage](../../tools/bench/README.md#concurrent-serving-benchmark).
+Each group contains `summary.json`, `summary.csv`, `summary.md`, `points/`, and `server/`.
+C=1 `corpus/` directories retain complete responses and per-fixture phase summaries. The campaign
+`manifest.json` records the revision, artifact identity, and commands; `anomalies.json` records
+termination and repetition screening. See [runner usage](../../tools/bench/README.md#concurrent-serving-benchmark).

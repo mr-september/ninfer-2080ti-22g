@@ -1,10 +1,15 @@
 # NInfer tools
 
-`tools/` contains artifact conversion and inspection, benchmark orchestration, and serving smoke checks. To download and run an existing artifact, start with the [project README](../README.md). To build your own weights, use the [weight conversion guide](../docs/weight-conversion.md).
+`tools/` contains artifact conversion and inspection, benchmark orchestration, and serving smoke
+checks. To download and run an existing artifact, start with the [project README](../README.md).
+To build your own weights, use the [weight conversion guide](../docs/weight-conversion.md).
 
-Run commands from the repository root with a Python environment containing the dependencies for the selected tool. The maintained environment uses Python 3.11.
+Run commands from the repository root with a Python environment containing the dependencies
+for the selected tool. The maintained environment uses Python 3.11.
 
-The artifact, conversion and upgrade tools run on Linux and native Windows. Offset I/O and page-cache hints are in `artifact/file_io.py`; on Windows they use seek-and-read under a lock and skip the cache hints.
+The artifact, conversion and upgrade tools run on Linux and native Windows. Offset I/O and
+page-cache hints are in `artifact/file_io.py`; on Windows they use seek-and-read under a lock and
+skip the cache hints.
 
 Python tools are independent of CMake; there is no `NINFER_BUILD_TOOLS` option.
 
@@ -23,7 +28,8 @@ Python tools are independent of CMake; there is no `NINFER_BUILD_TOOLS` option.
 
 ## Standalone HBM probe
 
-This maintainer probe has an explicit standalone CUDA build, independent of the CMake benchmark targets. Build it with the project's CUDA toolkit and run it from the repository root:
+This maintainer probe has an explicit standalone CUDA build, independent of the CMake benchmark
+targets. Build it with the project's CUDA toolkit and run it from the repository root:
 
 ```bash
 mkdir -p build
@@ -34,7 +40,9 @@ nvcc -O3 -std=c++17 -arch=sm_120a tools/hbm_bandwidth_probe.cu \
 
 ## Artifact workflow
 
-The common converter reads selected local sources and writes a `.ninfer` artifact plus its `.conversion.json` report. These examples include the optional weights used by the official artifacts. The input paths are placeholders for local checkpoint checkouts:
+The common converter reads selected local sources and writes a `.ninfer` artifact plus its
+`.conversion.json` report. These examples include the optional weights used by the official
+artifacts. The input paths are placeholders for local checkpoint checkouts:
 
 ```bash
 python3 -m tools.convert \
@@ -67,20 +75,26 @@ Inspect a result:
 python3 -m tools.artifact.inspect out/qwen3_6_27b.ninfer --objects
 ```
 
-Recipes, mixed sources, custom methods, resources and sharding are described in the [conversion guide](../docs/weight-conversion.md). Numeric formats, layouts and framing are defined by the references linked from the [documentation map](../docs/README.md).
+Recipes, mixed sources, custom methods, resources and sharding are described in the
+[conversion guide](../docs/weight-conversion.md). Numeric formats, layouts and framing are defined
+by the references linked from the [documentation map](../docs/README.md).
 
 ## Benchmark orchestration
 
-`tools/bench/run_ninfer_bench_matrix.py` builds and runs the public-Engine benchmark matrix and writes ignored local reports below `profiles/bench/`:
+`tools/bench/run_ninfer_bench_matrix.py` builds and runs the public-Engine benchmark matrix and
+writes ignored local reports below `profiles/bench/`:
 
 ```bash
 python3 tools/bench/run_ninfer_bench_matrix.py --preset core --dry-run
 python3 tools/bench/run_ninfer_bench_matrix.py --preset core
 ```
 
-See [`tools/bench/README.md`](bench/README.md) and [`bench/README.md`](../bench/README.md) for the orchestrator and executable contracts.
+See [`tools/bench/README.md`](bench/README.md) and [`bench/README.md`](../bench/README.md) for the
+orchestrator and executable contracts.
 
-For request-arrival latency, use the managed Qwen3.8-27B NVFP4/FP8 TTFT campaign. Its measurement runner remains an external-only HTTP client; the separate controller owns Serve lifecycle and artifacts. See [`tools/bench/ttft/README.md`](bench/ttft/README.md).
+For request-arrival latency, use the managed Qwen3.8-27B NVFP4/FP8 TTFT campaign. Its measurement
+runner remains an external-only HTTP client; the separate controller owns Serve lifecycle and
+artifacts. See [`tools/bench/ttft/README.md`](bench/ttft/README.md).
 
 ## Serving smoke
 
@@ -92,9 +106,11 @@ python3 -m tools.smoke.serve_contract \
   --model qwen3.6-27b
 ```
 
-The client exercises OpenAI, Anthropic, streaming, usage, multimodal, and tool-call response surfaces against the resident process.
+The client exercises OpenAI, Anthropic, streaming, usage, multimodal, and tool-call response
+surfaces against the resident process.
 
-For typed rewrite-checkpoint and thinking-history behavior, the managed smoke script launches a real server and consumes the repository fixture:
+For typed rewrite-checkpoint and thinking-history behavior, the managed smoke script launches a
+real server and consumes the repository fixture:
 
 ```bash
 python3 tools/smoke/serve_thinking_preservation.py \
