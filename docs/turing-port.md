@@ -196,3 +196,17 @@ Measured interleaved in one session (`ninfer_bench`, INT8 KV, MTP off, `--max-ct
 | 65536, round 2 | 389.47 (sd 0.57) | 424.13 (sd 1.46) | +8.9% |
 
 Checks: the attention, KV-cache and sliding-window tests pass (`ninfer_softmax_attention_test`, `ninfer_kv_cache_test`, `ninfer_kv_cache_append_test`, `ninfer_sliding_window_attention_test`, `ninfer_causal_conv1d_silu_test`). `ppl-quick` (INT8 KV, 4096 context) with the new tile against the baseline 4.794356: overall 4.794641 (+0.006%); Chinese 6.750531 against 6.746396 (+0.061%), long-form English 7.179776 against 7.178846 (+0.013%), English reference 6.458972 against 6.461225 (-0.035%), code 1.673260 against 1.673525 (-0.016%). The tile shape changes the order in which key blocks are merged, so bit-identical output is not expected; the overall change is within the 0.05% limit and the Chinese domain alone is slightly above it, with the other domains moving the other way.
+
+## Converting sliced-K activations once (roadmap P4): tried, regressed, not kept
+
+The sliced-K kernels (T of about 5 to 160) stage BF16 activations raw and convert each B fragment to FP16 inside every MMA (`mma_integer_weights`), once per row tile. The change tried for Q5 (`q5_a16_sliced_k_mma.cuh`): stage the activations with `stage_activation_operand_zfill`, which converts BF16 to FP16 once while writing shared memory, and call `mma_operands` (FP16 MMA on Turing) in the loop. The Q5 linear, `linear_add`, `linear_pair`, `attn_input_proj` and GDN-input op tests all passed with it.
+
+Measured interleaved in one session (`ninfer_bench`, INT8 KV, `--spec mtp --draft-tokens 5 --lm-head-draft`, `-p 512 -n 256 -r 3 --warmup 1`, three rounds of before then after):
+
+| | before | after |
+|---|---|---|
+| pp512 (tok/s) | 497.0, 496.8, 496.6 | 494.7, 494.6, 497.0 |
+| MTP-5 tg256 (tok/s) | 22.17, 22.18, 22.19 | 21.21, 21.22, 21.07 (-4.4%) |
+| acceptance | 0.231 | 0.231 |
+
+The decode step at MTP depth 5 (T=6) is consistently 4.4% slower, so the roadmap's gate ("`bench-mtp` with `--draft-tokens 5` not worse") fails and the change was reverted. A likely cause is that Turing's emulated `cp.async` is an ordinary load followed by a store: converting in between lengthens that dependent chain once per staged vector, while for the 16-row blocks used at these token counts the per-MMA conversions it removes were not more numerous than the staged conversions it adds. The other kernels named in the roadmap (Q4, Q6, Q8, grouped Q8, `linear_topk`) were not changed.
