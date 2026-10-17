@@ -2,18 +2,17 @@
 
 `build/apps/ninfer` runs one request against one v3 `.ninfer` artifact. Build NInfer and download an artifact using the [project README](../README.md) before following this guide.
 
-The examples use Qwen3.8-27B NVFP4 with FP8 KV storage.
+The examples use the Qwen3.8-27B `groupwise-int` artifact with this build's INT8 KV storage, which is the default on Turing, so no `--kv-dtype` flag is needed.
 
-> **Turing fork.** The commands in this page are upstream's RTX 5090 forms (NVFP4 weights, FP8 KV). On a GeForce RTX 2080 Ti use the `groupwise-int` artifact and the defaults of this build: INT8 KV, 65,536-token context, MTP with three draft tokens and the optimized proposal head when the artifact has one. Drop `--kv-dtype fp8`, or write `--kv-dtype int8`; see the [README](../README.md#defaults).
+> **Turing fork.** Upstream's forms of these commands target an RTX 5090 (NVFP4 weights, `--kv-dtype fp8`); FP8 and NVFP4 are not available on a GeForce RTX 2080 Ti. The defaults of this build are INT8 KV, a 65,536-token context, and MTP with three draft tokens and the optimized proposal head when the artifact has one; see the [README](../README.md#defaults).
 
 ## Text input
 
 ```bash
-./build/apps/ninfer models/qwen3_8_27b_nvfp4.ninfer \
+./build/apps/ninfer models/qwen3_8_27b.ninfer \
   --prompt "Summarize the difference between prefill and decode." \
   --max-context 32768 \
   --max-new 8192 \
-  --kv-dtype fp8 \
   --spec mtp --draft-tokens 3 \
   --lm-head-draft
 ```
@@ -23,11 +22,10 @@ Exactly one of `--prompt` and `--messages` is required. The CLI normally omits `
 Answer content is streamed to stdout. Human-readable startup milestones and runtime errors are written to stderr without service timestamps. Reasoning and the CLI result report (timings, throughput, GPU memory, token IDs when requested, and speculative-decoding statistics) also use stderr as unprefixed product output, so stdout can be redirected independently. On a terminal, weight materialization is one transient progress line followed by a compact Engine-ready summary. Redirected stderr contains persistent readable progress for long loads and no carriage returns or ANSI escapes. `--log-level debug` exposes every startup phase. Option and local prompt/message input failures remain direct command diagnostics:
 
 ```bash
-./build/apps/ninfer models/qwen3_8_27b_nvfp4.ninfer \
+./build/apps/ninfer models/qwen3_8_27b.ninfer \
   --prompt "Return one sentence." \
   --max-context 4096 \
   --max-new 64 \
-  --kv-dtype fp8 \
   > answer.txt 2> run.log
 ```
 
@@ -45,18 +43,18 @@ The Sharp template takes `{"terse": false}` through `chat_template_kwargs` (serv
 
 ```bash
 printf 'root ::= "yes" | "no"\n' > answer.gbnf
-./build/apps/ninfer models/qwen3_8_27b_nvfp4.ninfer \
+./build/apps/ninfer models/qwen3_8_27b.ninfer \
   --prompt "Is 17 prime?" --no-thinking --grammar-file answer.gbnf --max-new 64
 ```
 
 `--choice TEXT` selects a literal candidate; repeat the flag to supply the candidate set. `--regex PATTERN` constrains the complete answer to a regular expression:
 
 ```bash
-./build/apps/ninfer models/qwen3_8_27b_nvfp4.ninfer \
+./build/apps/ninfer models/qwen3_8_27b.ninfer \
   --prompt "Classify this review: the service was excellent." --no-thinking \
   --choice positive --choice neutral --choice negative
 
-./build/apps/ninfer models/qwen3_8_27b_nvfp4.ninfer \
+./build/apps/ninfer models/qwen3_8_27b.ninfer \
   --prompt "Return ticket TASK-0042." --no-thinking --regex '(BUG|TASK)-[0-9]{4}'
 ```
 
@@ -66,7 +64,7 @@ Candidates preserve exact text; `--choice ''` explicitly permits empty content. 
 
 ```bash
 printf '%s\n' '{"type":"object","properties":{"answer":{"type":"integer"}},"required":["answer"],"additionalProperties":false}' > answer.schema.json
-./build/apps/ninfer models/qwen3_8_27b_nvfp4.ninfer \
+./build/apps/ninfer models/qwen3_8_27b.ninfer \
   --prompt "Return the answer to 6 times 7 as JSON." --no-thinking \
   --json-schema-file answer.schema.json --max-new 64
 ```
@@ -82,12 +80,11 @@ Omitted thinking and effort options use the selected template's defaults. `--no-
 For example, this allows at most 512 model-origin thinking tokens while retaining enough total output capacity for the inserted suffix and the answer:
 
 ```bash
-./build/apps/ninfer models/qwen3_8_27b_nvfp4.ninfer \
+./build/apps/ninfer models/qwen3_8_27b.ninfer \
   --prompt "Explain speculative decoding, then give a concise conclusion." \
   --max-context 4096 \
   --max-new 1024 \
   --thinking-budget 512 \
-  --kv-dtype fp8 \
   --spec mtp --draft-tokens 3 \
   --lm-head-draft
 ```
@@ -134,11 +131,10 @@ The complete `.ninfer` inventory is still validated. These choices are not lazy 
 Run message files from the repository root when they contain repository-relative media paths:
 
 ```bash
-./build/apps/ninfer models/qwen3_8_27b_nvfp4.ninfer \
+./build/apps/ninfer models/qwen3_8_27b.ninfer \
   --messages examples/cli/messages/image_chart.json \
   --max-context 8192 \
   --max-new 128 \
-  --kv-dtype fp8 \
   --vision \
   --spec mtp --draft-tokens 3 \
   --lm-head-draft
@@ -167,7 +163,6 @@ Speculative decoding is disabled by default. Select MTP with one to five draft p
   --prompt "Write a short explanation of speculative decoding." \
   --max-context 16384 \
   --max-new 512 \
-  --kv-dtype fp8 \
   --spec mtp --draft-tokens 3 \
   --lm-head-draft
 ```
@@ -178,7 +173,6 @@ For DFlash:
 ./build/apps/ninfer models/qwen3_6_35b_a3b.ninfer \
   --prompt "Write a short explanation of speculative decoding." \
   --max-context 16384 --max-new 512 \
-  --kv-dtype fp8 \
   --spec dflash --draft-tokens 7 --lm-head-draft
 ```
 
@@ -240,7 +234,7 @@ Run `./build/apps/ninfer --help` for the exact option contract.
 `NINFER_CUDA_SYNC` selects the CUDA device synchronization schedule at startup for both the CLI and HTTP server. When unset, it defaults to `spin`, prioritizing low synchronization latency at the cost of CPU usage while waiting for the GPU. Use `blocking` to let the waiting thread sleep; the decode performance cost depends on the host. `yield` yields the CPU while waiting, and `auto` uses CUDA's scheduling heuristic, not an automatic performance benchmark.
 
 ```bash
-NINFER_CUDA_SYNC=blocking ./build/apps/ninfer models/qwen3_8_27b_nvfp4.ninfer --prompt "Hello"
+NINFER_CUDA_SYNC=blocking ./build/apps/ninfer models/qwen3_8_27b.ninfer --prompt "Hello"
 ```
 
 The Engine-ready log reports the selected mode. Empty or unrecognized values, or failure to apply the schedule, fail startup. This controls device scheduling (including stream synchronization); it does not override individual CUDA event creation flags.

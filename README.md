@@ -78,7 +78,7 @@ and the server default is
 | a shorter or longer context | `--max-context N` (the KV pool follows it) |
 | the largest KV pool that fits | `--kv-capacity auto` |
 | image and video input | `--vision` |
-| more retained-prefix memory in RAM | `--host-context-mib N` (default 2 GiB plus eight state images) |
+| more retained-prefix memory in RAM | `--host-context-mib N` (default 2 GiB plus eight state images, 3.15 GiB) |
 | the artifact's own chat template instead of Sharp v22.5.0 | `--artifact-chat-template` |
 | no CUDA Graph decode | `--no-cuda-graph` |
 | another GPU | `--device N` ([multi-GPU notes](docs/multi-gpu.md)) |
@@ -90,7 +90,7 @@ The default is a 64k-token context with MTP. That needs most of the 22 GB (the e
 On native Windows, install the NVIDIA driver, CUDA 12.8+ and Visual Studio 2022 (or Build Tools) with "Desktop development with C++", then run two commands from a PowerShell prompt in the clone:
 
 ```powershell
-scripts\build.ps1    # configures with vcpkg.json and builds (about an hour the first time)
+scripts\build.ps1    # configures with vcpkg.json and builds (about 11 minutes, plus the first-time FFmpeg build)
 scripts\serve.ps1    # downloads the default model if needed and serves http://127.0.0.1:8080/v1
 ```
 
@@ -111,9 +111,9 @@ scripts\serve.ps1    # downloads the default model if needed and serves http://1
 
 The `zlib` and `dav1d` features in `vcpkg.json` provide the PNG and AV1 decoders; without `zlib` image prompts fail with "media codec is not supported". Linux/WSL2 is the original, longer-tested path; native Windows avoids carving memory and disk out for a WSL VM.
 
-Page-locked memory has to be free RAM: the server pins about 3 GiB by default (the 2 GiB host-context budget plus state images), the embedding table another 1.3 GiB. `ninfer-serve` halves the default host-context budget when the available RAM looks too small for it and logs `host context reduced to N to fit free RAM`; the startup log also shows how much was pinned and warns if the embedding had to move to the GPU. An explicit `--host-context-mib` is never changed; if it cannot be pinned, startup fails with a message naming the flag. If startup still reports `cudaMallocHost ... out of memory`, close memory-hungry programs or lower `--host-context-mib`.
+Page-locked memory has to be free RAM: the server pins 3.15 GiB by default (the 2 GiB host-context budget plus eight state images) and the embedding table another 1.26 GiB, 4.4 GiB in all (the startup log prints both). `ninfer-serve` halves the default host-context budget when the available RAM looks too small for it and logs `host context reduced to N to fit free RAM`; the startup log also shows how much was pinned and warns if the embedding had to move to the GPU. An explicit `--host-context-mib` is never changed; if it cannot be pinned, startup fails with a message naming the flag. If startup still reports `cudaMallocHost ... out of memory`, close memory-hungry programs or lower `--host-context-mib`.
 
-A cold build compiles the Q8 split-K kernels and takes tens of minutes on either platform, plus the one-time FFmpeg build on Windows. Tests and benchmarks are off by default (`BUILD_TESTING`, `NINFER_BUILD_BENCHMARKS`; see [build organization](docs/maintainer/build-system.md)). There is no install target; run from the build tree.
+A cold build of the three executables took 10.6 minutes on native Windows with 16 logical cores (measured with FFmpeg already in vcpkg's binary cache; compiling FFmpeg itself the first time adds to that and was not timed), dominated by the Q8 split-K kernels. Tests and benchmarks are off by default (`BUILD_TESTING`, `NINFER_BUILD_BENCHMARKS`; see [build organization](docs/maintainer/build-system.md)). There is no install target; run from the build tree.
 
 With Docker and the NVIDIA container toolkit (Linux or WSL2), the [Dockerfile](Dockerfile) builds the server for Turing and serves `qwen3_8_27b.ninfer` from a mounted models folder:
 

@@ -59,11 +59,11 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTUR
 cmake --build build -j
 ```
 
-CUDA 12.8+ is enough (no 13.x-only features are used). The Q8 split-K translation units are slow to compile for sm_75 (minutes each); expect a cold build of an hour on 16 cores. `ninja -t deps | grep '#deps 0,'` finds objects whose header dependencies were lost by an interrupted build; delete those objects, otherwise header edits silently do not rebuild them.
+CUDA 12.8+ is enough (no 13.x-only features are used). The Q8 split-K translation units are slow to compile for sm_75 (minutes each); a cold build of the release preset took 10.6 minutes on 16 logical cores (native Windows, warm vcpkg cache). `ninja -t deps | grep '#deps 0,'` finds objects whose header dependencies were lost by an interrupted build; delete those objects, otherwise header edits silently do not rebuild them.
 
 ## Native Windows build
 
-The same sources build with MSVC 14.4 and `nvcc` 12.9 (`cmake --preset windows`; see the [README](../README.md#native-windows) for prerequisites). Linux/WSL2 builds are unchanged; nothing selects between them at runtime, the environment you build in is the mode. What differs:
+The same sources build with MSVC 14.4 and `nvcc` 12.9 (`cmake --preset windows`; see the [README](../README.md#build) for prerequisites). Linux/WSL2 builds are unchanged; nothing selects between them at runtime, the environment you build in is the mode. What differs:
 
 | Area | Handling |
 |---|---|
@@ -100,13 +100,13 @@ The former `--chat-style sharp-v22.1` option is now the vendored Sharp v22.5.0 J
 
 ## Measured on one RTX 2080 Ti 22 GB
 
-Qwen3.8-27B `groupwise-int`, INT8 KV, greedy, ~125-token prompts, long warmups (the GPU clock ramps).
+Qwen3.8-27B `groupwise-int`, INT8 KV, greedy, long warmups (the GPU clock ramps).
 
 | Metric | Result |
 |---|---|
-| decode, no MTP | ~29 tok/s |
-| decode, MTP3 | ~44 tok/s |
-| prefill (end to end) | 225-240 tok/s |
+| decode, no MTP | 24-29 tok/s |
+| decode, MTP3 | 38-44 tok/s |
+| prefill (end to end), 122 / 8k / 64k-token prompts | 247 / 479 / 372 tok/s |
 | prefill GEMM, Q4 34816x5120, T=512/2048 | 12.4 / 12.6 TFLOPS |
 | prefill GEMM, Q5 5120x6144, T=512/2048 | 11.2 / 11.5 TFLOPS |
 | prefill GEMM, Q8 5120x6144, T=512/2048 | 18.1 / 19.1 TFLOPS |
