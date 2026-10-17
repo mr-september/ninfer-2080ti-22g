@@ -283,3 +283,21 @@ pp512 is the same within noise (about 613 to 615 tok/s for both). Planned device
 ## Fusing small decode projections (roadmap P7): measured ceiling, not pursued
 
 Per decode step (Nsight Systems, CUDA Graph nodes traced, MTP off, 103 steps, after the P2 change): 711 kernel launches and 37.23 ms of kernel time. The kernels whose average duration is under 20 us (norms, RoPE, GDN gating and its small recurrent update, SiLU-mul, the causal-convolution and attention-merge helpers: 18 kinds) account for 390 launches and 2.00 ms per step, 5.4% of kernel time. None of them is a projection: the projections are all among the 321 launches that take 20 us or more (35.2 ms), and the small ones the roadmap names are already fused (`attn_input_proj` carries Q, gate, K and V; `gdn_input_proj` carries the Q4 query/key and Q5 value/z sides; the gating projection is fused with the GDN norm). The gap between the kernel time and the step time (37.2 ms against 1/26.4 s = 37.9 ms) is about 0.7 ms, so the missing PDL costs under 2% of a step. Even a fusion that removed every small kernel would be bounded by about 7%, and a realistic one (folding norms and gating into their neighbours) by 1 to 2%, at the cost of new kernels whose numerics must be requalified. Since the item is optional and its ceiling is that small next to the changes already made, it was not implemented.
+
+## Roadmap Phase 2 result (2026-10-18)
+
+`ninfer_bench`, INT8 KV, CUDA Graph decode, native Windows, RTX 2080 Ti, Qwen3.8-27B `groupwise-int`. The comparison is the build after the P2 decode change (but before P3 and P5) against the current build, interleaved in one session, two rounds each:
+
+| Metric | before P3-P5 (round 1 / 2) | current (round 1 / 2) | change |
+|---|---|---|---|
+| pp512, tok/s | 498.3 / 498.5 | 613.9 / 613.1 | +23.2% / +23.0% |
+| pp8192, tok/s | 516.4 / 516.2 | 611.9 / 612.0 | +18.5% / +18.6% |
+| pp65536, tok/s | 397.0 / 396.9 | 492.8 / 493.1 | +24.1% / +24.2% |
+| tg256, MTP off, tok/s | 27.08 / 26.99 | 27.02 / 27.07 | unchanged (no decode kernel changed after P2) |
+| tg256, MTP 3 draft tokens, tok/s | 29.96 / 29.91 | 29.97 / 29.95 | unchanged (acceptance 0.371 both) |
+
+`ppl-quick` (INT8 KV, 4096 context): overall 4.794641 on the current build, identical in every digit to the build after P3; the P5 kernels change only the order of loads. The scoring rate of that run went from 247.5 to 305.9 tok/s.
+
+Against the first measurements of the roadmap's morning baseline (different session, so the session-to-session drift of a few percent applies): pp512 494.9, pp8192 513.7 (rerun), pp65536 394.5, tg256 26.45, MTP-3 tg256 29.76 tok/s, i.e. prefill about 19 to 25% faster, decode about 2% faster (the interleaved P2 measurement of the decode change was +3.3%) and MTP decode within 1%.
+
+What each roadmap item contributed: P2 (GDN T=1 Q5 launch) +3.3% decode; P3 (64x32 attention tile) +9% at 64k and +1 to 4% at 8k; P4 (convert activations once) tried and reverted, -4.4% at MTP depth 5; P5 (register prefetch in the Q5, Q4 SwiGLU and grouped input-projection kernels) +17% at 8k and +16% at 512 on its own; P6 (Q6 head) not recommended, -0.4% decode; P7 (fusing small kernels) not pursued, ceiling 1 to 2%. C1 (FP16 range) closed with no change needed.

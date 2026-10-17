@@ -179,6 +179,8 @@ Qwen3.8-27B `groupwise-int`, INT8 KV, greedy, single request, native Windows (WS
 | decode, MTP3 with the proposal head (default) | 38-44 tok/s |
 | longest context that starts | 64k+ with MTP (about 97k); about 110k without |
 
+After the latest Turing kernel work (register-prefetched prefill GEMMs, a larger attention tile and a faster GDN projection at decode) the same build measures, with `ninfer_bench` on the repository token corpus and INT8 KV, about 614 tok/s at 512 prompt tokens, 612 at 8k and 493 at 64k (before: 498, 516, 397 in the same session) and about 27 tok/s decode without MTP (before: 26.4); the table above predates that work and is kept for the CLI prompts it was measured with. See [docs/turing-port.md](docs/turing-port.md) for the measurements.
+
 Prefill is about 1.9x faster on long prompts than before this fork's Turing tile tuning (8k: 253 to 479, 64k: about 205 to 372 tok/s) and 1.2x on a short one (122 tokens: 201 to 247). These are Turing numbers; the RTX 5090 tables in [docs/performance.md](docs/performance.md) are upstream's and do not apply here. Details and caveats are in [docs/turing-port.md](docs/turing-port.md).
 
 ## Capabilities and limits
