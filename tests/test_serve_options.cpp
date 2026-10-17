@@ -67,11 +67,13 @@ int main() {
                       "default KV capacity does not follow max context");
     failures += check(!defaults.context_cache.host_capacity_bytes.has_value(),
                       "default Host context capacity was resolved before Engine startup");
-    failures += check(defaults.speculative.backend == ninfer::SpeculativeBackend::Mtp &&
-                          defaults.speculative.draft_tokens == ninfer::product::kDefaultDraftTokens &&
-                          defaults.speculative.proposal_head == ninfer::ProposalHead::Auto,
-                      "MTP with the automatic proposal head is not the default");
-    failures += check(defaults.max_context == ninfer::product::kDefaultMaxContext &&
+    failures += check(defaults.speculative.backend == ninfer::product::default_speculative().backend &&
+                          defaults.speculative.draft_tokens ==
+                              ninfer::product::default_speculative().draft_tokens &&
+                          defaults.speculative.proposal_head ==
+                              ninfer::product::default_speculative().proposal_head,
+                      "speculation does not follow the product defaults");
+    failures += check(defaults.max_context == ninfer::product::kDefaultServeMaxContext &&
                           defaults.kv_cache == ninfer::product::default_kv_cache(),
                       "default context or KV representation does not follow the product defaults");
     const ServeOptions no_speculation =

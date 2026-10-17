@@ -165,10 +165,8 @@ std::string serve_usage_text(const char* argv0) {
            std::to_string(kDefaultKvCapacityHeadroomBytes / (1024ULL * 1024ULL)) +
            " MiB of sizing headroom\n"
            "       --no-prefix-reuse disables cross-request history; request pause/replay "
-           "resources remain available\n"
-           "       defaults: --max-context 32768 (KV capacity the same), --kv-dtype int8 on Turing "
-           "builds, --spec mtp --draft-tokens 3 with the optimized proposal head when the artifact "
-           "has one (--spec none and --no-lm-head-draft switch them off)\n"
+           "resources remain available\n" +
+           product::defaults_help(product::kDefaultServeMaxContext, "       ") +
            "       context defaults: device-state=max-concurrency; Host budget is resolved from " +
            std::to_string(kDefaultHostKvBytes >> 20) + " MiB plus eight native StateImages\n"
            "       --device-state-slots is extra capacity beyond active lanes; "

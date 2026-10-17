@@ -39,14 +39,16 @@ int main() {
     failures += check(choice.choices == std::vector<std::string>{"", "a|b", "你好"},
                       "choice flags changed literal text or order");
     const auto defaults = parse({"ninfer", "model.ninfer", "--prompt", "hello"});
-    failures += check(defaults.max_context == ninfer::product::kDefaultMaxContext &&
+    failures += check(defaults.max_context == ninfer::product::kDefaultCliMaxContext &&
                           defaults.kv_capacity.explicit_tokens == defaults.max_context &&
                           defaults.kv_cache == ninfer::product::default_kv_cache(),
                       "CLI defaults do not follow the product defaults");
-    failures += check(defaults.speculative.backend == ninfer::SpeculativeBackend::Mtp &&
-                          defaults.speculative.draft_tokens == ninfer::product::kDefaultDraftTokens &&
-                          defaults.speculative.proposal_head == ninfer::ProposalHead::Auto,
-                      "MTP with the automatic proposal head is not the CLI default");
+    failures += check(defaults.speculative.backend == ninfer::product::default_speculative().backend &&
+                          defaults.speculative.draft_tokens ==
+                              ninfer::product::default_speculative().draft_tokens &&
+                          defaults.speculative.proposal_head ==
+                              ninfer::product::default_speculative().proposal_head,
+                      "speculation does not follow the product defaults");
     failures += check(defaults.chat_template_path == NINFER_DEFAULT_CHAT_TEMPLATE &&
                           std::filesystem::exists(defaults.chat_template_path),
                       "the vendored Sharp template is not the CLI default");

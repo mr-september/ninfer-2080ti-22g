@@ -49,7 +49,7 @@ struct Options {
     std::uint32_t context               = 4096;
     std::uint32_t stride                = 2048;
     int device                          = 0;
-    ninfer::KvCacheStorage kv           = ninfer::product::default_kv_cache();
+    ninfer::KvCacheStorage kv           = ninfer::product::default_perplexity_kv_cache();
     bool quick                          = false;
     ninfer::product::LogLevel log_level = ninfer::product::LogLevel::Info;
 };

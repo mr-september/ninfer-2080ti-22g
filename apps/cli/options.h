@@ -27,8 +27,8 @@ struct Options {
     std::filesystem::path messages_path;
 
     std::uint32_t max_new        = 128;
-    std::uint32_t max_context    = product::kDefaultMaxContext;
-    KvCapacityPolicy kv_capacity = KvCapacityPolicy::explicit_capacity(product::kDefaultMaxContext);
+    std::uint32_t max_context    = product::kDefaultCliMaxContext;
+    KvCapacityPolicy kv_capacity = KvCapacityPolicy::explicit_capacity(product::kDefaultCliMaxContext);
     std::uint32_t prefill_chunk  = 1024;
     int device                   = 0;
 

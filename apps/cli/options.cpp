@@ -99,10 +99,8 @@ std::string usage_text(const char* argv0) {
            "       [--vision-max-item-tokens N]\n"
            "       [--no-cuda-graph]\n"
            "       [--log-level trace|debug|info|warning|error|critical|off]\n"
-           "\n"
-           "Defaults: --max-context 65536 (KV capacity the same), --kv-dtype int8 on Turing builds,\n"
-           "--spec mtp --draft-tokens 3 with the optimized proposal head when the artifact has one\n"
-           "(--spec none and --no-lm-head-draft switch them off).\n"
+           "\n" +
+           ninfer::product::defaults_help(ninfer::product::kDefaultCliMaxContext, "") +
            "Streams answer content to stdout and reasoning plus diagnostics to stderr.\n"
            "Structured message content accepts text, image/image_url, and video/video_url parts;\n"
            "media sources may be local paths, HTTP(S) URLs, or base64 data URIs.\n"
