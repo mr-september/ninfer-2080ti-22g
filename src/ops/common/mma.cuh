@@ -2,6 +2,7 @@
 
 #include "core/arch_traits.cuh"
 #include "ops/common/memory.cuh"
+#include "ops/common/range_probe.h"
 
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
@@ -125,6 +126,9 @@ __device__ __forceinline__ void mma_bf16_simt(float& c0, float& c1, float& c2, f
 // the FP16 range saturate to +-65504 instead of becoming infinity; values below 2^-14 lose
 // subnormal precision, which is far below BF16's own rounding step.
 __device__ __forceinline__ unsigned bf16x2_to_f16x2_operand(unsigned packed) {
+#if defined(NINFER_SM75_RANGE_PROBE)
+    range_probe_record(__uint_as_float(packed << 16), __uint_as_float(packed & 0xffff0000U));
+#endif
     const float lo = fminf(fmaxf(__uint_as_float(packed << 16), -65504.0f), 65504.0f);
     const float hi = fminf(fmaxf(__uint_as_float(packed & 0xffff0000U), -65504.0f), 65504.0f);
     const __half2 h = __floats2half2_rn(lo, hi);

@@ -59,6 +59,16 @@ else()
   add_compile_definitions(NINFER_SM120A=1)
 endif()
 
+# Debug build: record the largest magnitude entering Turing's BF16 -> FP16 conversion (see
+# src/ops/common/range_probe.h). Off in every production build.
+option(NINFER_SM75_RANGE_PROBE "Record the FP16 operand range on Turing (debug)" OFF)
+if(NINFER_SM75_RANGE_PROBE)
+  if(NOT CMAKE_CUDA_ARCHITECTURES STREQUAL "75")
+    message(FATAL_ERROR "NINFER_SM75_RANGE_PROBE applies only to CMAKE_CUDA_ARCHITECTURES=75")
+  endif()
+  add_compile_definitions(NINFER_SM75_RANGE_PROBE=1)
+endif()
+
 # The shipped executables render prompts with this vendored template unless --artifact-chat-template.
 # It is embedded in the binaries as a byte array so they run without the source tree.
 set(NINFER_DEFAULT_CHAT_TEMPLATE_FILE

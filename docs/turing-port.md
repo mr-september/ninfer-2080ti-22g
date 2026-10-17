@@ -125,3 +125,17 @@ Reference numbers for the performance items in `docs/plans/fork-roadmap.md`, mea
 | `bench-mtp` | `bench-short` plus `--spec mtp --draft-tokens 3 --lm-head-draft` | pp512 492.88 tok/s (sd 0.18); tg256 29.76 tok/s (sd 0.04), acceptance 0.371 |
 
 Exception: in the `bench-long` run the two measured pp8192 repetitions were 26.0 and 512.8 tok/s. The first was a transient of unknown cause (not reproduced in the rerun, where all four repetitions were within 0.4 tok/s), so the rerun is the pp8192 baseline and `bench-long` needs at least two warmups to be trusted at 8k. The benchmark corpus is random token ids, so MTP acceptance (0.371) and the MTP decode figure are far below the 38-44 tok/s seen on real text and are only comparable with each other.
+
+## FP16 activation range (roadmap C1)
+
+On Turing every BF16 operand is converted to FP16 before the tensor core, and values beyond +-65504 saturate. The debug build option `NINFER_SM75_RANGE_PROBE` (`cmake --preset windows -B build-probe -DNINFER_SM75_RANGE_PROBE=ON`, sm_75 only) records the largest magnitude that reaches that conversion in any kernel, and how many elements exceed 16384, 32768 and 65504; `ninfer`, `ninfer-perplexity` and the benchmarks print one `range probe | ...` line when the Engine shuts down. It is a global maximum over all call sites and kernels, which bounds every individual site.
+
+Measured on Qwen3.8-27B `groupwise-int`, INT8 KV, 2026-10-17:
+
+| Workload | max abs value | elements > 16384 | clamped (> 65504) |
+|---|---|---|---|
+| `ppl-quick` (261,223 tokens: English reference, English long-form, Chinese, code; 4096 context) | 516.0 | 0 | 0 |
+| one 65,536-token window of long-form English (`--text pg19/00.txt --context 65536`) | 438.0 | 0 | 0 |
+| short chat prompt, 64 greedy tokens | 304.0 | 0 | 0 |
+
+Every maximum is below 16384, so there is at least 4x headroom to the threshold the roadmap set (and more than 100x to the FP16 limit), nothing was clamped, and no pre-scaling is added. This covers these corpora and prompts; the SwiGLU output feeding the Q5 down projection, the site the roadmap singled out, is included in the global maximum. Decode at 1 to 4 tokens uses FP32 SIMT, so the two paths agree on these inputs. The ppl-quick result of the probe build (overall 4.794356) equals the production build's.

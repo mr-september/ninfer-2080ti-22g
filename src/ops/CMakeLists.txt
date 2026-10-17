@@ -12,6 +12,12 @@ ninfer_internal_includes(ninfer_nvfp4_non_rdc)
 ninfer_cuda_non_rdc_archive(ninfer_nvfp4_non_rdc)
 target_link_libraries(ninfer_nvfp4_non_rdc PRIVATE ninfer_core ninfer::cudart CUDA::cuda_driver)
 
+# Debug build: NINFER_SM75_RANGE_PROBE (defined in the top-level CMakeLists.txt) records the
+# largest magnitude entering Turing's BF16 -> FP16 conversion; see common/range_probe.h.
+if(NINFER_SM75_RANGE_PROBE)
+  target_sources(ninfer_ops PRIVATE "${CMAKE_CURRENT_LIST_DIR}/common/range_probe.cu")
+endif()
+
 include(basic_sources.cmake)
 include("${CMAKE_CURRENT_LIST_DIR}/attn_input_proj/sources.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/candidate_selector/sources.cmake")
