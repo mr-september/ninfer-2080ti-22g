@@ -13,6 +13,15 @@ if(NOT (CMAKE_CUDA_ARCHITECTURES STREQUAL "75" OR
     "'${CMAKE_CUDA_ARCHITECTURES}'")
 endif()
 
+# The Windows preset takes its dependencies from vcpkg (vcpkg.json). The "x64 Native Tools" prompt of
+# Visual Studio 2022 sets VCPKG_ROOT; without it the toolchain path is empty and configure fails with
+# an unrelated "/scripts/buildsystems/vcpkg.cmake" error.
+if(CMAKE_HOST_WIN32 AND NOT DEFINED ENV{VCPKG_ROOT} AND NOT EXISTS "${CMAKE_TOOLCHAIN_FILE}")
+  message(FATAL_ERROR
+    "VCPKG_ROOT is not set. Configure from the \"x64 Native Tools Command Prompt for VS 2022\" "
+    "(it sets VCPKG_ROOT), or set VCPKG_ROOT to a vcpkg checkout.")
+endif()
+
 project(ninfer LANGUAGES C CXX CUDA)
 
 # --- Global settings ---------------------------------------------------------

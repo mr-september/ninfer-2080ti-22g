@@ -1,0 +1,15 @@
+{
+  "name": "ninfer-2080ti-22g",
+  "dependencies": [
+    {
+      "name": "ffmpeg",
+      "default-features": false,
+      "features": ["avcodec", "avformat", "swscale", "zlib", "dav1d"]
+    },
+    {
+      "name": "curl",
+      "features": ["ssl"]
+    }
+  ],
+  "builtin-baseline": "e456309491fd875487bf02b8a0dca76c1b1b00cc"
+}

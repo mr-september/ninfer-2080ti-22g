@@ -92,17 +92,17 @@ Pick the environment you want to run in. The two paths side by side (the sources
 | | Linux / WSL2 | Windows native |
 |---|---|---|
 | **Shell** | any bash | **"x64 Native Tools Command Prompt for VS 2022"** (plain PowerShell or cmd cannot find the compiler) |
-| **Needs** | 64-bit Linux, CUDA 12.8+, CMake 3.28+, Ninja, a C++20 compiler, `pkg-config`, FFmpeg dev libraries (`libavformat`, `libavcodec`, `libavutil`, `libswscale`), `libcurl >= 7.85` | Windows 10/11 x64, NVIDIA driver, CUDA 12.8+ (validated with 12.9), Visual Studio 2022 or Build Tools with "Desktop development with C++" (MSVC v143 + a Windows SDK), CMake 3.28+, Ninja, [vcpkg](https://github.com/microsoft/vcpkg) |
-| **1. Libraries (once)** | Debian/Ubuntu: `sudo apt install pkg-config libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libcurl4-openssl-dev` | `cd /d C:\path\to\vcpkg`<br>`vcpkg install "ffmpeg[core,avcodec,avformat,swscale,zlib,dav1d]:x64-windows" "curl[ssl]:x64-windows"`<br>FFmpeg compiles from source, about 20 minutes |
+| **Needs** | 64-bit Linux, CUDA 12.8+, CMake 3.28+, Ninja, a C++20 compiler, `pkg-config`, FFmpeg dev libraries (`libavformat`, `libavcodec`, `libavutil`, `libswscale`), `libcurl >= 7.85` | Windows 10/11 x64, NVIDIA driver, CUDA 12.8+ (validated with 12.9), Visual Studio 2022 or Build Tools with "Desktop development with C++" (MSVC v143 + a Windows SDK), CMake 3.28+ and Ninja (both ship with the VS workload), vcpkg (the copy bundled with VS 2022 17.6+ works) |
+| **1. Libraries (once)** | Debian/Ubuntu: `sudo apt install pkg-config libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libcurl4-openssl-dev` | nothing to run: [`vcpkg.json`](vcpkg.json) lists FFmpeg and curl, and step 4 installs them into the build folder (FFmpeg compiles from source, about 20 minutes the first time) |
 | **2. Get the source** | `git clone https://github.com/mr-september/ninfer-2080ti-22g.git`<br>`cd ninfer-2080ti-22g` | the same clone; then `cd /d C:\path\to\ninfer-2080ti-22g` |
-| **3. Point at the libraries** | not needed (found through `pkg-config`) | `set VCPKG_ROOT=C:\path\to\vcpkg` (the vcpkg from step 1) |
+| **3. Point at the libraries** | not needed (found through `pkg-config`) | nothing in the "x64 Native Tools" prompt, which sets `VCPKG_ROOT`; otherwise `set VCPKG_ROOT=C:\path\to\vcpkg` |
 | **4. Configure** | `cmake --preset release -DCMAKE_CUDA_ARCHITECTURES=75` | `cmake --preset windows` |
 | **5. Build** | `cmake --build build -j` | `cmake --build build-windows -j` |
 | **Binaries** | `build/apps/ninfer`, `ninfer-serve`, `ninfer-perplexity` | `build-windows\apps\ninfer.exe`, `ninfer-serve.exe`, `ninfer-perplexity.exe` (the FFmpeg and curl DLLs are copied next to them) |
 | **Tests and benchmarks** | `cmake --preset dev` | `cmake --preset windows-dev` |
 | **Keep the model on** | a Linux filesystem if you can | an NTFS drive (reading it through `\\wsl$` is slow) |
 
-`zlib` in the vcpkg line provides the PNG decoder and `dav1d` the AV1 decoder; without `zlib` image prompts fail with "media codec is not supported". Linux/WSL2 is the original, longer-tested path; native Windows avoids carving memory and disk out for a WSL VM.
+The `zlib` and `dav1d` features in `vcpkg.json` provide the PNG and AV1 decoders; without `zlib` image prompts fail with "media codec is not supported". Linux/WSL2 is the original, longer-tested path; native Windows avoids carving memory and disk out for a WSL VM.
 
 Page-locked memory has to be free RAM: the server pins about 3 GiB by default (the 2 GiB host-context budget plus state images), the embedding table another 1.3 GiB. If startup reports `cudaMallocHost ... out of memory`, close memory-hungry programs or lower `--host-context-mib`.
 
