@@ -111,7 +111,7 @@ scripts\serve.ps1    # downloads the default model if needed and serves http://1
 
 The `zlib` and `dav1d` features in `vcpkg.json` provide the PNG and AV1 decoders; without `zlib` image prompts fail with "media codec is not supported". Linux/WSL2 is the original, longer-tested path; native Windows avoids carving memory and disk out for a WSL VM.
 
-Page-locked memory has to be free RAM: the server pins about 3 GiB by default (the 2 GiB host-context budget plus state images), the embedding table another 1.3 GiB. If startup reports `cudaMallocHost ... out of memory`, close memory-hungry programs or lower `--host-context-mib`.
+Page-locked memory has to be free RAM: the server pins about 3 GiB by default (the 2 GiB host-context budget plus state images), the embedding table another 1.3 GiB. `ninfer-serve` halves the default host-context budget when the available RAM looks too small for it and logs `host context reduced to N to fit free RAM`; the startup log also shows how much was pinned and warns if the embedding had to move to the GPU. An explicit `--host-context-mib` is never changed; if it cannot be pinned, startup fails with a message naming the flag. If startup still reports `cudaMallocHost ... out of memory`, close memory-hungry programs or lower `--host-context-mib`.
 
 A cold build compiles the Q8 split-K kernels and takes tens of minutes on either platform, plus the one-time FFmpeg build on Windows. Tests and benchmarks are off by default (`BUILD_TESTING`, `NINFER_BUILD_BENCHMARKS`; see [build organization](docs/maintainer/build-system.md)). There is no install target; run from the build tree.
 

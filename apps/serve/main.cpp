@@ -67,6 +67,11 @@ int main(int argc, char** argv) {
         if (service.options().max_context != options.max_context) {
             operational_log.context_reduced(options.max_context, service.options().max_context);
         }
+        if (service.host_context_default_bytes() != 0) {
+            operational_log.host_context_reduced(
+                service.host_context_default_bytes(),
+                *service.engine_options().context_cache.host_capacity_bytes);
+        }
         operational_log.engine_capacity(service);
 
         using Clock                            = std::chrono::steady_clock;

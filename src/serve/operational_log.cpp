@@ -441,6 +441,14 @@ void OperationalLog::context_reduced(std::uint32_t requested, std::uint32_t fitt
                   fitted, requested);
 }
 
+void OperationalLog::host_context_reduced(std::size_t default_bytes,
+                                          std::size_t fitted_bytes) const {
+    logger_->warn("host context reduced to {} to fit free RAM (default about {}; pass "
+                  "--host-context-mib to choose one)",
+                  product::format_pretty_bytes(fitted_bytes),
+                  product::format_pretty_bytes(default_bytes));
+}
+
 void OperationalLog::engine_capacity(const GenerationService& service) const {
     const ninfer::MemorySummary memory            = service.memory_summary();
     const ninfer::EngineOptions& engine           = service.engine_options();

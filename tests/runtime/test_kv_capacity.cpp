@@ -1,6 +1,6 @@
 #include "runtime/engine/kv_capacity.h"
 
-#include "ninfer/device_memory_error.h"
+#include "ninfer/memory_errors.h"
 
 #include <iostream>
 #include <stdexcept>

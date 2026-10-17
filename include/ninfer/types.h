@@ -1136,6 +1136,11 @@ struct LoadSummary {
     std::uint64_t peak_staging_bytes   = 0;
     std::size_t device_object_count    = 0;
     std::size_t host_object_count      = 0;
+    // Weights read in place from page-locked host memory (the token embedding on Turing), and the
+    // parameters that wanted it but fell back to device memory when pinning failed.
+    std::size_t pinned_object_count    = 0;
+    std::uint64_t pinned_host_bytes    = 0;
+    std::size_t pinned_fallback_count  = 0;
     ContextCostSummary context_cost;
 };
 

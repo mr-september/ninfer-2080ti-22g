@@ -38,6 +38,7 @@ struct MaterializationPlan {
     std::uint64_t device_capacity_bytes = 0;
     std::uint64_t prior_read_bytes      = 0;
     std::uint64_t owned_value_bytes     = 0;
+    std::size_t pinned_fallback_count   = 0; // PinnedHost parameters that fell back to the device
     std::vector<DevicePlacement> device_objects;
     std::vector<HostPlacement> host_objects;
     // Page-locked host storage that kernels read in place. The buffers are acquired when the
@@ -58,6 +59,7 @@ struct MaterializationStats {
     std::size_t device_object_count     = 0;
     std::size_t host_object_count       = 0;
     std::size_t pinned_object_count     = 0;
+    std::size_t pinned_fallback_count   = 0;
     double upload_seconds               = 0;
 };
 

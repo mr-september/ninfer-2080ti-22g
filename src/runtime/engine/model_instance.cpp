@@ -189,6 +189,9 @@ ConstructedModel construct_model(EngineOptions& options, DeviceContext& device) 
     summary.peak_staging_bytes   = stats.peak_staging_bytes;
     summary.device_object_count  = stats.device_object_count;
     summary.host_object_count    = stats.host_object_count;
+    summary.pinned_object_count  = stats.pinned_object_count;
+    summary.pinned_host_bytes    = stats.pinned_host_bytes;
+    summary.pinned_fallback_count = stats.pinned_fallback_count;
     summary.context_cost         = std::move(context_cost.summary);
     return {std::move(instance), std::move(summary), std::move(context_cost.model)};
 }

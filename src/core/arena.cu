@@ -1,6 +1,6 @@
 #include "core/arena.h"
 
-#include "ninfer/device_memory_error.h"
+#include "ninfer/memory_errors.h"
 
 #include <cuda_runtime.h>
 
@@ -254,6 +254,12 @@ PinnedHostBuffer::PinnedHostBuffer(std::size_t size_bytes) {
 
     void* ptr             = nullptr;
     const cudaError_t err = cudaMallocHost(&ptr, size_bytes);
+    // A large page-locked request that the OS cannot satisfy fails with cudaErrorMemoryAllocation, or
+    // on some Windows drivers with cudaErrorAlreadyMapped; both mean "cannot pin this much now".
+    if (err == cudaErrorMemoryAllocation || err == cudaErrorAlreadyMapped) {
+        throw ninfer::HostMemoryError(cuda_error_message("cudaMallocHost failed", err),
+                                      size_bytes);
+    }
     if (err != cudaSuccess) {
         throw std::runtime_error(cuda_error_message("cudaMallocHost failed", err));
     }

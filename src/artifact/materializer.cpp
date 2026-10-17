@@ -154,6 +154,7 @@ MaterializedArtifact materialize(const Reader& reader, MaterializationPlan&& pla
     out.stats_.device_object_count   = plan.device_objects.size();
     out.stats_.host_object_count     = plan.host_objects.size();
     out.stats_.pinned_object_count   = plan.pinned_objects.size();
+    out.stats_.pinned_fallback_count = plan.pinned_fallback_count;
     if (plan.device_capacity_bytes > std::numeric_limits<std::size_t>::max()) {
         throw ArtifactError("device backing exceeds size_t");
     }

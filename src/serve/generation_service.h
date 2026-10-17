@@ -119,6 +119,12 @@ public:
 
     [[nodiscard]] const ServeOptions& options() const noexcept { return options_; }
 
+    // Nonzero when the default Host context did not fit in the available RAM and a smaller budget
+    // was requested: the default's estimated size. Engine options report the budget actually used.
+    [[nodiscard]] std::size_t host_context_default_bytes() const noexcept {
+        return host_context_default_bytes_;
+    }
+
     // Engine owns the once-normalized startup configuration. Serving diagnostics must use this
     // value instead of reinterpreting optional defaults from ServeOptions.
     [[nodiscard]] const ninfer::EngineOptions& engine_options() const { return engine_->options(); }
@@ -173,6 +179,7 @@ private:
     acquire_request_lifetime(DeadlinePolicy deadline_policy) const;
 
     ServeOptions options_;
+    std::size_t host_context_default_bytes_ = 0;
     std::unique_ptr<ninfer::Engine> engine_;
     std::shared_ptr<RequestCapacity> request_capacity_;
 };

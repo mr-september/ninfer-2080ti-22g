@@ -68,6 +68,7 @@ private:
     const Reader& reader_;
     std::vector<Demand> demands_;
     std::uint64_t read_bytes_        = 0;
+    std::size_t pinned_fallbacks_    = 0; // PinnedHost parameters placed on the device instead
     std::uint64_t owned_value_bytes_ = 0;
 };
 

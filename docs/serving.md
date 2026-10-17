@@ -569,7 +569,7 @@ The table lists executable defaults. The startup example selects a long-context 
 | `--no-cuda-graph` | disable CUDA Graph decode | graphs on |
 | `--no-prefix-reuse` | disable compatible-prefix caching | prefix reuse on |
 | `--device-state-slots N` | extra Device StateImages beyond `max-concurrency` | `max-concurrency` |
-| `--host-context-mib N` | shared pinned Host budget for StateImages, KV and pause snapshots, including in-flight destinations | `2048 MiB + 8 native StateImages` (Turing builds; `8192 MiB` otherwise) |
+| `--host-context-mib N` | shared pinned Host budget for StateImages, KV and pause snapshots, including in-flight destinations | `2048 MiB + 8 native StateImages` (Turing builds; `8192 MiB` otherwise); on Turing builds the default is halved, down to `256 MiB`, when the available RAM is too small for it, and the reduction is logged; an explicit value is never changed |
 | `--no-thinking` | disable thinking by default | thinking on |
 | `--preserve-thinking` | preserve closed-turn assistant reasoning by default | off |
 | `--cors` | permissive browser CORS headers | off |

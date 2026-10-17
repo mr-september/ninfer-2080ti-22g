@@ -73,6 +73,7 @@ ParameterReference Binder::binding(std::string name, const Binding& binding, Sha
                 demands_.at(handle.index).pinned_buffer.reset();
             }
             effective = Residency::Device;
+            ++pinned_fallbacks_;
         }
     }
     for (const auto& part : binding.parts) {
@@ -197,6 +198,7 @@ MaterializationPlan Binder::finish() && {
     plan.object_count      = demands_.size();
     plan.prior_read_bytes  = read_bytes_;
     plan.owned_value_bytes = owned_value_bytes_;
+    plan.pinned_fallback_count = pinned_fallbacks_;
     for (std::size_t i = 0; i < demands_.size(); ++i) {
         auto& demand = demands_[i];
         if (demand.device) {

@@ -94,4 +94,23 @@ inline void init_console() noexcept {
 #endif
 }
 
+// Physical memory the OS can hand out now, in bytes; 0 when it cannot be determined.
+[[nodiscard]] inline std::uint64_t available_physical_bytes() noexcept {
+#if defined(_WIN32)
+    MEMORYSTATUSEX status{};
+    status.dwLength = sizeof(status);
+    return ::GlobalMemoryStatusEx(&status) != 0 ? status.ullAvailPhys : 0;
+#else
+    std::FILE* file = std::fopen("/proc/meminfo", "r");
+    if (file == nullptr) { return 0; }
+    char line[256];
+    unsigned long long kib = 0;
+    while (std::fgets(line, sizeof(line), file) != nullptr) {
+        if (std::sscanf(line, "MemAvailable: %llu kB", &kib) == 1) { break; }
+    }
+    std::fclose(file);
+    return static_cast<std::uint64_t>(kib) * 1024ULL;
+#endif
+}
+
 } // namespace ninfer::os
