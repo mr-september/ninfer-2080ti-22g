@@ -28,5 +28,5 @@ target_sources(ninfer_ops_non_rdc PRIVATE
   "${CMAKE_CURRENT_LIST_DIR}/nvfp4/projection_a4_tma.cu"
 )
 
-include("${CMAKE_CURRENT_LIST_DIR}/${NINFER_TARGET}/sources.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/q8/${NINFER_TARGET}/sources.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/${NINFER_SOURCE_TARGET}/sources.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/q8/${NINFER_SOURCE_TARGET}/sources.cmake")

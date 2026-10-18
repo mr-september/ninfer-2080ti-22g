@@ -63,3 +63,7 @@ profiles/
 
 # Claude Code personal/local settings (may contain API tokens)
 .claude/settings.local.json
+
+# Local vcpkg clone made by scripts/build.ps1 when no vcpkg is installed
+.vcpkg/
+dist/

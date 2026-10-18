@@ -6,4 +6,4 @@ target_sources(ninfer_ops PRIVATE
   "${CMAKE_CURRENT_LIST_DIR}/shapes/n48_k2560.cu"
 )
 
-include("${CMAKE_CURRENT_LIST_DIR}/${NINFER_TARGET}/sources.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/${NINFER_SOURCE_TARGET}/sources.cmake")

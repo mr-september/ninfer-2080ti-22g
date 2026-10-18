@@ -8,4 +8,4 @@ target_sources(ninfer_ops PRIVATE
   "${CMAKE_CURRENT_LIST_DIR}/projection.cpp"
 )
 
-include("${CMAKE_CURRENT_LIST_DIR}/${NINFER_TARGET}/sources.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/${NINFER_SOURCE_TARGET}/sources.cmake")

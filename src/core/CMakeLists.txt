@@ -1,4 +1,4 @@
-add_library(ninfer_cpu SHARED
+add_library(ninfer_cpu ${NINFER_LIBRARY_TYPE}
   cpu/system.cpp
   cpu/task_pool.cpp
 )
@@ -6,12 +6,19 @@ ninfer_internal_includes(ninfer_cpu)
 target_link_libraries(ninfer_cpu PRIVATE PkgConfig::HWLOC Threads::Threads)
 
 if(NINFER_TARGET STREQUAL "rtx5090")
-  add_library(ninfer_cpu_executor SHARED cpu/executor.cpp cpu/x86.cpp)
+  add_library(ninfer_cpu_executor ${NINFER_LIBRARY_TYPE} cpu/executor.cpp cpu/x86.cpp)
   ninfer_internal_includes(ninfer_cpu_executor)
   target_link_libraries(ninfer_cpu_executor PUBLIC ninfer_cpu)
 endif()
 
-add_library(ninfer_core SHARED
+# Linux reads weights through io_uring; native Windows through an I/O completion port.
+if(WIN32)
+  set(NINFER_CORE_IO_SOURCES io/direct_read.cpp io/windows/file.cpp io/windows/read_queue.cpp)
+else()
+  set(NINFER_CORE_IO_SOURCES io/direct_read.cpp io/file.cpp io/read_queue.cpp)
+endif()
+
+add_library(ninfer_core ${NINFER_LIBRARY_TYPE}
   arena.cpp
   buffer.cpp
   buffer.cu
@@ -22,8 +29,7 @@ add_library(ninfer_core SHARED
   device_memory.cpp
   dtype.cpp
   nf4.cpp
-  io/file.cpp
-  io/read_queue.cpp
+  ${NINFER_CORE_IO_SOURCES}
   gdn_replay_records.cpp
   cyclic_kv_cache.cpp
   host_context_arena.cpp
@@ -41,4 +47,6 @@ add_library(ninfer_core SHARED
 ninfer_internal_includes(ninfer_core)
 ninfer_cuda_library(ninfer_core)
 target_link_libraries(ninfer_core PUBLIC ninfer_cpu CUDA::cudart CUDA::nvtx3 Threads::Threads)
-target_link_libraries(ninfer_core PRIVATE PkgConfig::URING)
+if(NOT WIN32)
+  target_link_libraries(ninfer_core PRIVATE PkgConfig::URING)
+endif()

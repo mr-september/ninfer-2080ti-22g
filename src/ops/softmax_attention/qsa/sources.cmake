@@ -9,9 +9,9 @@ target_sources(ninfer_ops PRIVATE
 )
 
 target_sources(ninfer_ops PRIVATE
-  "${CMAKE_CURRENT_LIST_DIR}/indexer/${NINFER_TARGET}/plan.cpp"
-  "${CMAKE_CURRENT_LIST_DIR}/sparse_gqa/${NINFER_TARGET}/plan.cpp"
-  "${CMAKE_CURRENT_LIST_DIR}/sparse_gqa/${NINFER_TARGET}/launch.cu"
+  "${CMAKE_CURRENT_LIST_DIR}/indexer/${NINFER_SOURCE_TARGET}/plan.cpp"
+  "${CMAKE_CURRENT_LIST_DIR}/sparse_gqa/${NINFER_SOURCE_TARGET}/plan.cpp"
+  "${CMAKE_CURRENT_LIST_DIR}/sparse_gqa/${NINFER_SOURCE_TARGET}/launch.cu"
 )
 
 if(NINFER_TARGET STREQUAL "dgx_spark")
@@ -19,5 +19,5 @@ if(NINFER_TARGET STREQUAL "dgx_spark")
     "${CMAKE_CURRENT_LIST_DIR}/indexer/dgx_spark/launch.cu")
 else()
   target_sources(ninfer_ops PRIVATE
-    "${CMAKE_CURRENT_LIST_DIR}/indexer/${NINFER_TARGET}/launch.cu")
+    "${CMAKE_CURRENT_LIST_DIR}/indexer/${NINFER_SOURCE_TARGET}/launch.cu")
 endif()

@@ -1,5 +1,6 @@
-set(NINFER_TARGET rtx5090 CACHE STRING "NInfer execution target")
-set_property(CACHE NINFER_TARGET PROPERTY STRINGS rtx5090 dgx_spark)
+# This fork targets Turing by default; rtx5090 and dgx_spark keep upstream's behavior.
+set(NINFER_TARGET turing CACHE STRING "NInfer execution target")
+set_property(CACHE NINFER_TARGET PROPERTY STRINGS turing rtx5090 dgx_spark)
 
 if(DEFINED NINFER_CONFIGURED_TARGET AND
    NOT NINFER_CONFIGURED_TARGET STREQUAL NINFER_TARGET)
@@ -8,9 +9,21 @@ if(DEFINED NINFER_CONFIGURED_TARGET AND
     "use a separate directory for ${NINFER_TARGET}")
 endif()
 
+# Source directories are keyed by NINFER_SOURCE_TARGET. Turing builds the portable kernels that the
+# rtx5090 directories list (the Blackwell-only ones are filtered out in src/ops/CMakeLists.txt) and
+# keeps NINFER_TARGET for behavior that must differ (no CPU expert executor, no expert offload).
+set(NINFER_SOURCE_TARGET ${NINFER_TARGET})
+set(NINFER_TARGET_TURING 0)
 set(NINFER_TARGET_RTX5090 0)
 set(NINFER_TARGET_SPARK 0)
-if(NINFER_TARGET STREQUAL "rtx5090")
+set(NINFER_SYSTEMS "Linux")
+if(NINFER_TARGET STREQUAL "turing")
+  set(NINFER_TARGET_TURING 1)
+  set(NINFER_SOURCE_TARGET rtx5090)
+  set(NINFER_CUDA_ARCHITECTURE 75)
+  set(NINFER_PROCESSOR_PATTERN "^(x86_64|amd64|AMD64)$")
+  set(NINFER_SYSTEMS "Linux;Windows")
+elseif(NINFER_TARGET STREQUAL "rtx5090")
   set(NINFER_TARGET_RTX5090 1)
   set(NINFER_CUDA_ARCHITECTURE 120a)
   set(NINFER_PROCESSOR_PATTERN "^(x86_64|amd64|AMD64)$")
@@ -39,7 +52,7 @@ ninfer_validate_cuda_architecture()
 function(ninfer_validate_platform)
   # The toolchain file can change CUDA architectures during project() initialization.
   ninfer_validate_cuda_architecture()
-  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" OR
+  if(NOT CMAKE_SYSTEM_NAME IN_LIST NINFER_SYSTEMS OR
      NOT CMAKE_SYSTEM_PROCESSOR MATCHES "${NINFER_PROCESSOR_PATTERN}")
     message(FATAL_ERROR
       "${NINFER_TARGET} does not support ${CMAKE_SYSTEM_NAME}/${CMAKE_SYSTEM_PROCESSOR}")
