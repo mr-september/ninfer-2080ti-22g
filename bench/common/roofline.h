@@ -34,6 +34,15 @@ inline constexpr Roofline kRoofline{
     .mxfp8_f32_tflops   = 838.0,
     .nvfp4_f32_tflops   = 1676.0,
 };
+#elif NINFER_TARGET_TURING
+// RTX 2080 Ti (TU102, 22 GB): nominal GDDR6 bandwidth, and the sustained read rate measured
+// with the dependent-free streaming kernel (docs/turing-port.md). Tensor-core rates are not
+// established for this target.
+inline constexpr Roofline kRoofline{
+    .target             = "turing",
+    .memory_gbs         = 616.0,
+    .sustained_read_gbs = 584.0,
+};
 #elif NINFER_TARGET_SPARK
 // Register-resident MMA and streaming-read calibration on GB10, 2026-10-09.
 inline constexpr Roofline kRoofline{
