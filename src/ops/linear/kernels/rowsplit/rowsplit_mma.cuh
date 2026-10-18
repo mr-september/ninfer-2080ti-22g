@@ -37,13 +37,19 @@ struct GemmCfg {
                                           STAGES_ * (BM_ * GROUPS_PER_BK * (32 + 16 + SCALE_BYTES));
 
     static_assert(BK_ % 64 == 0, "GemmCfg: BK must be a multiple of 64");
-    static_assert(STAGES_ >= 2, "GemmCfg: cp.async pipeline requires at least two stages");
+    static_assert(STAGES_ >= 1, "GemmCfg: at least one stage");
     static_assert(BM_ % WM_ == 0 && BN_ % WN_ == 0,
                   "GemmCfg: block tile must divide into warp tiles");
     static_assert(WM_ % 16 == 0 && WN_ % 8 == 0, "GemmCfg: warp tile must use m16n8 multiples");
     static_assert(WARPS >= 1 && THREADS <= 1024, "GemmCfg: invalid thread count");
     static_assert(smem_est_bytes <= 48 * 1024, "GemmCfg: staged shared exceeds 48 KiB");
 };
+
+// Turing prefill tile of the folded SwiGLU and the grouped input projections: 64 weight rows by 128
+// tokens, eight warps, one stage, two resident CTAs per SM. cp.async does not exist there, so a
+// second stage would only cost shared memory; one stage fits two CTAs, and one tile's MMA overlaps
+// the other's decode and loads (about 2x the two-stage tile, which fits one CTA per SM).
+using TuringPrefillCfg = GemmCfg<64, 128, 64, 64, 16, 1, 2, false, true, true>;
 
 template <int Bytes, class Cfg>
 __device__ __forceinline__ void gemm_cp_async(void* dst, const void* src) {

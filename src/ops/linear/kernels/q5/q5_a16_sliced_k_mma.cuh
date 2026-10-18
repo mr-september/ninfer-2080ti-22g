@@ -3,6 +3,7 @@
 
 #include "ops/common/cuda/memory.cuh"
 #include "ops/common/cuda/mma.cuh"
+#include "ops/common/integer_operands.cuh"
 
 #include "ops/linear/kernels/q5/q5_schedule.cuh"
 
@@ -27,13 +28,7 @@ __device__ __forceinline__ unsigned q5_sliced_k_integer_pair(std::uint8_t code, 
     const int q0    = ((int(code & 15) | (((high >> shift) & 1) << 4)) ^ 16) - 16;
     const int q1    = ((int(code >> 4) | (((high >> (shift + 1)) & 1) << 4)) ^ 16) - 16;
 
-    union {
-        __nv_bfloat162 value;
-        unsigned bits;
-    } result;
-
-    result.value = __floats2bfloat162_rn(float(q0), float(q1));
-    return result.bits;
+    return common::integer_pair_operand(q0, q1);
 }
 
 __device__ __forceinline__ int q5_sliced_k_swizzle(int row, int col) {
@@ -182,7 +177,7 @@ __launch_bounds__(Schedule::kThreads, Schedule::kMinBlocksPerSm) void q5_a16_sli
                         b0, b1,
                         common::smem_addr(
                             &shared.staging.x[slot][warp][br][q5_sliced_k_swizzle(br, bk)]));
-                    common::mma_bf16(group_acc[mi][ni][0], group_acc[mi][ni][1],
+                    common::mma_integer_weights(group_acc[mi][ni][0], group_acc[mi][ni][1],
                                      group_acc[mi][ni][2], group_acc[mi][ni][3], a0, a1, a2, a3, b0,
                                      b1);
                 }

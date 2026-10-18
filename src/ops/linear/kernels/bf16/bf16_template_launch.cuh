@@ -29,7 +29,7 @@ void launch_bf16_a16_gemv(const Bf16A16Operands& p, Output output, Epilogue epil
     int bytes             = 0;
     if constexpr (Schedule::kActivationAccess == Bf16ActivationAccess::Shared) {
         constexpr int static_bytes = sizeof(Bf16GemvSharedStorage<Schedule>);
-        constexpr int max_dynamic  = (99 * 1024 - static_bytes) / 128 * 128;
+        constexpr int max_dynamic  = (kBf16MaxSharedBytes - static_bytes) / 128 * 128;
         if (p.k > max_dynamic / 2)
             throw std::invalid_argument("BF16 GEMV activation exceeds shared memory capacity");
         bytes = p.k * 2;
@@ -117,7 +117,7 @@ void launch_bf16_a16_sliced_k_mma(const Bf16A16Operands& p, Output output, Epilo
         throw std::invalid_argument("BF16 sliced-K requires compatible row/K tiles");
     constexpr auto kernel = bf16_a16_sliced_k_mma_kernel<Schedule, Output, Epilogue>;
     const int bytes       = common::prepare_shared<Schedule::kSharedBytes, kernel, true>();
-    common::for_each_token_slice(p.tokens, Schedule::kBlockTokens, [&](int offset, int count) {
+    common::for_each_token_slice(p.tokens, Schedule::kBlockTokens, [&, kernel](int offset, int count) {
         const dim3 grid(bf16_predicated_rows<Schedule>
                             ? common::div_up(p.rows, Schedule::kBlockRows)
                             : p.rows / Schedule::kBlockRows,
@@ -127,5 +127,13 @@ void launch_bf16_a16_sliced_k_mma(const Bf16A16Operands& p, Output output, Epilo
         CUDA_CHECK(cudaGetLastError());
     });
 }
+
+#if defined(NINFER_SM75)
+template <class Schedule, class Output, class Epilogue>
+void launch_bf16_a16_tma_mma(const Bf16A16Operands& p, Output output, Epilogue epilogue,
+                             cudaStream_t stream) {
+    launch_bf16_a16_mma<Schedule>(p, output, epilogue, stream);
+}
+#endif
 
 } // namespace ninfer::ops::detail

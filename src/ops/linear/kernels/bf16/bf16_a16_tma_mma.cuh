@@ -1,4 +1,5 @@
 #pragma once
+#if !defined(NINFER_SM75)
 
 #include "ops/common/cuda/pipeline.cuh"
 #include "ops/common/host/launch.h"
@@ -203,3 +204,4 @@ void launch_bf16_a16_tma_mma(const Bf16A16Operands& p, Output output, Epilogue e
 }
 
 } // namespace ninfer::ops::detail
+#endif // !NINFER_SM75

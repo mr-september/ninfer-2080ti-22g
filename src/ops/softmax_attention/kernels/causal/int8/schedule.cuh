@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/arch_traits.cuh"
 #include "ops/softmax_attention/kernels/causal/geometry.h"
 
 namespace ninfer::ops::detail {
@@ -42,7 +43,7 @@ struct Int8KvTiledMmaSchedule {
     static constexpr int kStatsBytes      = 2 * QueryTile * 4;
     static constexpr int kSharedBytes = kQBytes + kQScaleBytes + kKBytes + kVBytes + kVStageBytes +
                                         kPBytes + kScaleBytes + kStatsBytes;
-    static_assert(kSharedBytes <= 99 * 1024);
+    static_assert(kSharedBytes <= core::kMaxCtaSharedBytes);
 };
 
 template <int DChunk>

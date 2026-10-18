@@ -128,9 +128,11 @@ __global__ __launch_bounds__(Cfg::THREADS, Cfg::MIN_BLOCKS) void rowsplit_groupe
             const int kk       = k0 + kl;
             __nv_bfloat16* dst = &Bs[stage][tl * BK + common::swizzle_xor_64(tl, kl)];
             if constexpr (FullTiles) {
-                gemm_cp_async<16, Cfg>(dst, &x[static_cast<std::int64_t>(col) * k + kk]);
+                common::stage_activation_operand<16, Cfg::CG_LOAD ? Cache::cg : Cache::ca>(
+                    dst, &x[static_cast<std::int64_t>(col) * k + kk]);
             } else if (col < t && kk + 8 <= k) {
-                gemm_cp_async<16, Cfg>(dst, &x[static_cast<std::int64_t>(col) * k + kk]);
+                common::stage_activation_operand<16, Cfg::CG_LOAD ? Cache::cg : Cache::ca>(
+                    dst, &x[static_cast<std::int64_t>(col) * k + kk]);
             } else {
                 common::store_vec(dst, make_int4(0, 0, 0, 0));
             }
@@ -238,10 +240,93 @@ __global__ __launch_bounds__(Cfg::THREADS, Cfg::MIN_BLOCKS) void rowsplit_groupe
         stage_load_quant(stage, kt);
     };
 
+#if defined(NINFER_SM75)
+    // Turing has no cp.async, so a stage is a global load followed by a shared store. With a single
+    // stage the next tile is loaded into registers before the current tile's MMAs and stored after
+    // them, which overlaps its global-memory latency with the MMAs and issues a thread's loads
+    // together instead of serially after the tile.
+    constexpr bool kRegPrefetch = S == 1;
+    static_assert(!kRegPrefetch || (SB == 4 && Cfg::SCALE_PAIR_LOAD && BM * 2 <= Cfg::THREADS),
+                  "register prefetch assumes pair scale loads and one code vector per thread");
+    constexpr int kActItems = (BN * (BK / 8) + Cfg::THREADS - 1) / Cfg::THREADS;
+    int4 act_regs[kActItems];
+    int4 code_reg           = make_int4(0, 0, 0, 0);
+    std::uint64_t high_reg  = 0;
+    std::uint32_t scale_reg = 0;
+    // Whether this tile's rows carry a high-bit plane (Q5 rows).
+    const bool has_high = Codec == RowSplitGroupedMmaCodec::Q5 ||
+                          (Codec == RowSplitGroupedMmaCodec::Mixed && job.q5);
+    auto prefetch_to_regs = [&](int kt) {
+        const int k0 = kt * BK;
+#pragma unroll
+        for (int i = 0; i < kActItems; ++i) {
+            const int c = tid + i * Cfg::THREADS;
+            int4 v      = make_int4(0, 0, 0, 0);
+            if (c < BN * (BK / 8)) {
+                const int tl  = c / (BK / 8);
+                const int kl  = (c - tl * (BK / 8)) * 8;
+                const int col = t0 + tl;
+                const int kk  = k0 + kl;
+                if (FullTiles || (col < t && kk + 8 <= k)) {
+                    v = common::load_vec<int4>(&x[static_cast<std::int64_t>(col) * k + kk]);
+                }
+            }
+            act_regs[i] = v;
+        }
+        const int g = (kt * BK) >> 6;
+        if (tid < BM * 2) {
+            const int row  = tid >> 1;
+            const int half = tid & 1;
+            code_reg       = make_int4(0, 0, 0, 0);
+            if (FullTiles || m0 + row < job.n) {
+                const std::int64_t gi = static_cast<std::int64_t>(m0 + row) * kg + g;
+                code_reg              = common::load_vec<int4>(&job.codes[gi * 32 + half * 16]);
+            }
+        }
+        if (tid < BM) {
+            high_reg  = 0;
+            scale_reg = 0;
+            if (FullTiles || m0 + tid < job.n) {
+                const std::int64_t base = static_cast<std::int64_t>(m0 + tid) * kg;
+                if (has_high) { high_reg = common::load_vec<std::uint64_t>(&job.high[(base + g) * 8]); }
+                const int aligned_g = g & ~1;
+                if (aligned_g + 1 < kg) {
+                    scale_reg = common::load_vec<std::uint32_t>(&job.scales[(base + aligned_g) * 2]);
+                } else {
+                    scale_reg = common::load_vec<std::uint16_t>(&job.scales[(base + g) * 2]);
+                }
+            }
+        }
+    };
+    auto store_from_regs = [&](int stage) {
+#pragma unroll
+        for (int i = 0; i < kActItems; ++i) {
+            const int c = tid + i * Cfg::THREADS;
+            if (c < BN * (BK / 8)) {
+                const int tl = c / (BK / 8);
+                const int kl = (c - tl * (BK / 8)) * 8;
+                common::store_vec(&Bs[stage][tl * BK + common::swizzle_xor_64(tl, kl)],
+                          common::bf16x8_to_f16x8_operand(act_regs[i]));
+            }
+        }
+        if (tid < BM * 2) {
+            common::store_vec(&Cr[stage][(tid >> 1) * 32 + (tid & 1) * 16], code_reg);
+        }
+        if (tid < BM) {
+            if constexpr (Codec != RowSplitGroupedMmaCodec::Q4) {
+                if (has_high) {
+                    *reinterpret_cast<std::uint64_t*>(&Hr[stage][tid * 8]) = high_reg;
+                }
+            }
+            *reinterpret_cast<std::uint32_t*>(&Sr[stage][tid * SB]) = scale_reg;
+        }
+    };
+#endif
+
     auto dequant_to_As = [&](int stage, int kt) {
         const int scale_off = ((kt * BK >> 6) & 1) * 2;
         for (int row = warp; row < BM; row += Cfg::WARPS) {
-            __nv_bfloat162 w;
+            unsigned w;
             if constexpr (Codec == RowSplitGroupedMmaCodec::Q5) {
                 if constexpr (Cfg::SCALE_PAIR_LOAD) {
                     w = common::Q5MmaDecodeAtom::decode_pair(
@@ -293,6 +378,12 @@ __global__ __launch_bounds__(Cfg::THREADS, Cfg::MIN_BLOCKS) void rowsplit_groupe
         dequant_to_As(stage, it);
         __syncthreads();
 
+#if defined(NINFER_SM75)
+        if constexpr (kRegPrefetch) {
+            if (it + 1 < NKT) { prefetch_to_regs(it + 1); }
+        }
+#endif
+
         unsigned af[MT][4];
         unsigned bf[NT][2];
 #pragma unroll
@@ -318,7 +409,7 @@ __global__ __launch_bounds__(Cfg::THREADS, Cfg::MIN_BLOCKS) void rowsplit_groupe
             for (int mi = 0; mi < MT; ++mi) {
 #pragma unroll
                 for (int ni = 0; ni < NT; ++ni) {
-                    common::mma_bf16(acc[mi][ni][0], acc[mi][ni][1], acc[mi][ni][2], acc[mi][ni][3],
+                    common::mma_operands(acc[mi][ni][0], acc[mi][ni][1], acc[mi][ni][2], acc[mi][ni][3],
                                      af[mi][0], af[mi][1], af[mi][2], af[mi][3], bf[ni][0],
                                      bf[ni][1]);
                 }
@@ -326,7 +417,14 @@ __global__ __launch_bounds__(Cfg::THREADS, Cfg::MIN_BLOCKS) void rowsplit_groupe
         }
         __syncthreads();
         const int next = it + S;
-        if (next < NKT) { stage_load(stage, next); }
+#if defined(NINFER_SM75)
+        if constexpr (kRegPrefetch) {
+            if (next < NKT) { store_from_regs(stage); }
+        } else
+#endif
+        {
+            if (next < NKT) { stage_load(stage, next); }
+        }
         common::cp_commit();
     }
 

@@ -1,11 +1,15 @@
 #pragma once
 
+#include "core/arch_traits.cuh"
 #include "ops/common/cuda/memory.cuh"
 
 #include <cuda_bf16.h>
 #include <cstdint>
 
 namespace ninfer::ops::detail {
+
+// Opt-in dynamic shared-memory limit of one CTA on the compiled architecture.
+inline constexpr int kBf16MaxSharedBytes = core::kMaxCtaSharedBytes;
 
 enum class Bf16ActivationAccess : std::uint8_t {
     Direct,
@@ -132,7 +136,12 @@ struct Bf16A16MmaSchedule {
     static constexpr int kBlockK                               = BlockK;
     static constexpr int kWarpRows                             = WarpRows;
     static constexpr int kWarpTokens                           = WarpTokens;
-    static constexpr int kStages                               = Stages;
+    // The tuned stage depth is for the 99 KiB Blackwell limit; smaller-shared-memory targets
+    // keep the tile shape and shorten the cp.async ring (down to one stage) until it fits.
+    static constexpr int kStagesFit =
+        kBf16MaxSharedBytes / ((BlockRows + BlockTokens) * BlockK * 2);
+    static constexpr int kStages =
+        Stages <= kStagesFit ? Stages : (kStagesFit < 1 ? 1 : kStagesFit);
     static constexpr int kMinBlocksPerSm                       = MinBlocksPerSm;
     static constexpr Cache kWeightCache                        = WeightCache;
     static constexpr Cache kActivationCache                    = ActivationCache;
@@ -155,10 +164,10 @@ struct Bf16A16MmaSchedule {
     static_assert(kBlockRows % kWarpRows == 0 && kBlockTokens % kWarpTokens == 0);
     static_assert(kWarpRows % 16 == 0 && kWarpTokens % 8 == 0);
     static_assert(kBlockK % 64 == 0);
-    static_assert(kStages >= 2 && kStages <= 8);
+    static_assert(kStages >= 1 && kStages <= 8);
     static_assert(kMinBlocksPerSm >= 1);
     static_assert(kWarps >= 1 && kThreads <= 1024);
-    static_assert(kSharedBytes <= 99 * 1024);
+    static_assert(kSharedBytes <= kBf16MaxSharedBytes);
     static_assert(kRaster != Bf16MmaRaster::Grouped || kRasterGroupRows > 0);
 };
 
@@ -176,7 +185,9 @@ struct Bf16A16SlicedKMmaSchedule {
     static constexpr int kKWarps             = KWarps;
     static constexpr int kWarpK              = WarpK;
     static constexpr int kBlockK             = KWarps * WarpK;
-    static constexpr int kStages             = Stages;
+    // Tuned for the 99 KiB Blackwell limit; a smaller CTA limit single-buffers the K ring.
+    static constexpr int kStages =
+        Stages * (BlockRows + BlockTokens) * KWarps * WarpK * 2 <= kBf16MaxSharedBytes ? Stages : 1;
     static constexpr int kThreads            = KWarps * 32;
     static constexpr int kMinBlocksPerSm     = MinBlocksPerSm;
     static constexpr int kMmaRows            = BlockRows / 16;
@@ -185,13 +196,24 @@ struct Bf16A16SlicedKMmaSchedule {
     static constexpr Cache kActivationCache  = ActivationCache;
     static constexpr Bf16MmaSwizzle kSwizzle = Bf16MmaSwizzle::Xor64;
     static constexpr int kStageElements      = (BlockRows + BlockTokens) * kBlockK;
-    static constexpr int kStagingBytes       = Stages * kStageElements * 2;
+    static constexpr int kStagingBytes       = kStages * kStageElements * 2;
     static constexpr int kPartialBytes       = KWarps * BlockRows * BlockTokens * sizeof(float);
     static constexpr int kSharedBytes =
         kStagingBytes > kPartialBytes ? kStagingBytes : kPartialBytes;
-    static_assert(kSharedBytes <= 99 * 1024);
+    static_assert(kSharedBytes <= kBf16MaxSharedBytes);
 };
 
+#if defined(NINFER_SM75)
+// Turing has no TMA or mbarrier. The TMA tuning keeps its tile geometry and runs through the
+// cp.async-protocol MMA kernel (plain loads on sm_75) with the Xor64 shared-memory swizzle.
+template <int BlockRows, int BlockTokens, int BlockK, int WarpRows, int WarpTokens, int Stages,
+          int MinBlocksPerSm = 1, Bf16MmaRaster Raster = Bf16MmaRaster::TokenFast,
+          int RasterGroupRows = 1, int ConsumerKUnroll = 1>
+struct Bf16A16TmaMmaSchedule
+    : Bf16A16MmaSchedule<BlockRows, BlockTokens, BlockK, WarpRows, WarpTokens, Stages,
+                         MinBlocksPerSm, Cache::cg, Cache::cg, Bf16MmaFragmentPipeline::PingPong,
+                         Raster, Bf16MmaSwizzle::Xor64, RasterGroupRows> {};
+#else
 template <int BlockRows, int BlockTokens, int BlockK, int WarpRows, int WarpTokens, int Stages,
           int MinBlocksPerSm = 1, Bf16MmaRaster Raster = Bf16MmaRaster::TokenFast,
           int RasterGroupRows = 1, int ConsumerKUnroll = 1>
@@ -210,6 +232,8 @@ struct Bf16A16TmaMmaSchedule
     static_assert(BlockRows <= 256 && BlockTokens <= 256 && BlockK <= 16384);
     static_assert(ConsumerKUnroll > 0);
 };
+
+#endif
 
 // Row predicates preserve the compact physical matrix; full-tile schedules keep their fast path.
 template <class Schedule>

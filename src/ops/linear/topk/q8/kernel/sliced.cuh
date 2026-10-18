@@ -2,6 +2,7 @@
 #include "ops/common/numeric/convert.cuh"
 #include "ops/common/cuda/pipeline.cuh"
 #include "ops/common/cuda/mma.cuh"
+#include "ops/common/operand16.cuh"
 #include "ops/common/cuda/memory.cuh"
 #include "ops/linear/kernels/q8/q8_geometry.h"
 #include "core/weight.h"
@@ -155,11 +156,11 @@ __launch_bounds__(Schedule::kThreads, Schedule::kMinBlocksPerSm) void q8_grouped
                         return static_cast<unsigned>(*reinterpret_cast<const std::uint16_t*>(
                             &code_shared[local_row][offset]));
                     };
-                    const unsigned a0 = common::int8x2_to_bf16x2_bits(load_pair(gid, code_col));
-                    const unsigned a1 = common::int8x2_to_bf16x2_bits(load_pair(gid + 8, code_col));
-                    const unsigned a2 = common::int8x2_to_bf16x2_bits(load_pair(gid, code_col + 8));
+                    const unsigned a0 = common::int8x2_to_mma_pair(load_pair(gid, code_col));
+                    const unsigned a1 = common::int8x2_to_mma_pair(load_pair(gid + 8, code_col));
+                    const unsigned a2 = common::int8x2_to_mma_pair(load_pair(gid, code_col + 8));
                     const unsigned a3 =
-                        common::int8x2_to_bf16x2_bits(load_pair(gid + 8, code_col + 8));
+                        common::int8x2_to_mma_pair(load_pair(gid + 8, code_col + 8));
 #pragma unroll
                     for (int token_mma = 0; token_mma < kTokenMmas; ++token_mma) {
                         unsigned b0;
@@ -170,7 +171,7 @@ __launch_bounds__(Schedule::kThreads, Schedule::kMinBlocksPerSm) void q8_grouped
                             common::smem_addr(
                                 &x_shared[k_split][row * kTileK + common::swizzle_xor_64(
                                                                       row, k_step * 16 + b_koff)]));
-                        common::mma_bf16(group_acc[token_mma][0], group_acc[token_mma][1],
+                        common::mma_integer_weights(group_acc[token_mma][0], group_acc[token_mma][1],
                                          group_acc[token_mma][2], group_acc[token_mma][3], a0, a1,
                                          a2, a3, b0, b1);
                     }

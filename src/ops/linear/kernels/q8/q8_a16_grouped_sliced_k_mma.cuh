@@ -4,6 +4,7 @@
 
 #include "ops/common/cuda/memory.cuh"
 #include "ops/common/cuda/mma.cuh"
+#include "ops/common/operand16.cuh"
 
 // Q8G32 RowSplit medium-T split-K MMA core. K-split warps share one 16-row
 // weight tile while N-groups cover disjoint column ranges. Output owns the
@@ -182,10 +183,10 @@ __global__ __launch_bounds__(
                     return static_cast<unsigned>(
                         *reinterpret_cast<const unsigned short*>(&code_shared[code_row][offset]));
                 };
-                const unsigned af0 = common::int8x2_to_bf16x2_bits(load_code_pair(gid, code_col));
-                const unsigned af1 = common::int8x2_to_bf16x2_bits(load_code_pair(gid + 8, code_col));
-                const unsigned af2 = common::int8x2_to_bf16x2_bits(load_code_pair(gid, code_col + 8));
-                const unsigned af3 = common::int8x2_to_bf16x2_bits(load_code_pair(gid + 8, code_col + 8));
+                const unsigned af0 = common::int8x2_to_mma_pair(load_code_pair(gid, code_col));
+                const unsigned af1 = common::int8x2_to_mma_pair(load_code_pair(gid + 8, code_col));
+                const unsigned af2 = common::int8x2_to_mma_pair(load_code_pair(gid, code_col + 8));
+                const unsigned af3 = common::int8x2_to_mma_pair(load_code_pair(gid + 8, code_col + 8));
 #pragma unroll
                 for (int ni = 0; ni < kNt; ++ni) {
                     unsigned bf0, bf1;
@@ -195,7 +196,7 @@ __global__ __launch_bounds__(
                         common::smem_addr(
                             &b_shared[warp]
                                      [br * kTileK + common::swizzle_xor_64(br, ks * 16 + b_koff)]));
-                    common::mma_bf16(group_acc[ni][0], group_acc[ni][1], group_acc[ni][2],
+                    common::mma_integer_weights(group_acc[ni][0], group_acc[ni][1], group_acc[ni][2],
                                      group_acc[ni][3], af0, af1, af2, af3, bf0, bf1);
                 }
             }

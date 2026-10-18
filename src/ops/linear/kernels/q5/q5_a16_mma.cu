@@ -15,4 +15,23 @@ void launch_q5_a16_mma_r64_t96_k128_s1_a1(const Tensor& x, const Weight& w, Tens
                                           cudaStream_t stream) {
     launch_q5_a16_mma_instance<q5_instances::MmaR64T96K128S1A1>(x, w, out, stream);
 }
+void launch_q5_a16_mma_r64_t128_a1(const Tensor& x, const Weight& w, Tensor& out,
+                                cudaStream_t stream) {
+    launch_q5_a16_mma_instance<q5_instances::MmaR64T128A1>(x, w, out, stream);
+}
+
+void launch_q5_a16_mma_r64_t64_a1(const Tensor& x, const Weight& w, Tensor& out,
+                                cudaStream_t stream) {
+    launch_q5_a16_mma_instance<q5_instances::MmaR64T64A1>(x, w, out, stream);
+}
+
+void launch_q5_a16_mma_r64_t128_s1_a1(const Tensor& x, const Weight& w, Tensor& out,
+                                cudaStream_t stream) {
+    launch_q5_a16_mma_instance<q5_instances::MmaR64T128S1A1>(x, w, out, stream);
+}
+
+void launch_q5_a16_mma_r128_t64_s1_a1(const Tensor& x, const Weight& w, Tensor& out,
+                                cudaStream_t stream) {
+    launch_q5_a16_mma_instance<q5_instances::MmaR128T64S1A1>(x, w, out, stream);
+}
 } // namespace ninfer::ops::detail
