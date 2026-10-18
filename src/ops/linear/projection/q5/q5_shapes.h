@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ops/linear/common/token_route.h"
 #include "ops/linear/kernels/q5/q5_launch.h"
 
 namespace ninfer::ops::detail {

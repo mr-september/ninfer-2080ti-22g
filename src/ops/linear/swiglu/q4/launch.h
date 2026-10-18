@@ -13,6 +13,9 @@ void launch_q4_swiglu_mma_split_half_pair_r32_c128(const Tensor& x, const Weight
 // Wide folded tiles for the leading column blocks plus a narrow route for a small remainder.
 void launch_q4_swiglu_mma_split_half_pair_r32_c128_tail(const Tensor& x, const Weight& w,
                                                         Tensor& out, cudaStream_t stream);
+// Turing: single-stage 128-token folded tiles, two resident per SM.
+void launch_q4_swiglu_mma_turing_prefill(const Tensor& x, const Weight& w, Tensor& out,
+                                         cudaStream_t stream);
 void launch_q4_swiglu_small_t_tiled(const Tensor& x, const Weight& w, Tensor& out,
                                     cudaStream_t stream);
 

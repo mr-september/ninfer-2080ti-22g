@@ -126,9 +126,15 @@ void launch_matrix(const Tensor& x, const Weight& first, const Weight& second,
     if (x.ne[1] <= 104)
         return launch<GemmCfg<32, 64, 64, 32, 16, 3, 2, false, true, true>>(
             x, first, second, out[0], out[2], out[1], out[3], stream);
-    if (x.ne[1] <= 128 || x.ne[1] >= 193)
+    if (x.ne[1] <= 128 || x.ne[1] >= 193) {
+#if defined(NINFER_SM75)
+        return launch_mixed<TuringPrefillCfg>(x, first, second, out[0], out[2], out[1], out[3],
+                                              stream);
+#else
         return launch_mixed<GemmCfg<64, 128, 64, 64, 16, 2, 2, false, true, true>>(
             x, first, second, out[0], out[2], out[1], out[3], stream);
+#endif
+    }
     launch<MmaR32C64S4>(x, first, second, out[0], out[2], out[1], out[3], stream);
 }
 } // namespace ninfer::ops::detail::linear_split::q4_q5_n7168_n7168_k5120

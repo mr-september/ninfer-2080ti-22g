@@ -36,6 +36,7 @@ const SplitShape& select_split_shape(ProjectionProfile weights) {
                                 &kQ8SplitN6144K2048,  &kQ8SplitN6144K5120,  &kQ8SplitN12288K2048};
         return match(shapes, weights);
     }
+#if !defined(NINFER_SM75) // The FP8 and NVFP4 split shapes are not built for Turing.
     case QType::FP8_E4M3FN_ROW_BF16: {
         const std::array shapes{&kFp8SplitN14336K5120, &kFp8SplitN16384K5120};
         return match(shapes, weights);
@@ -44,6 +45,7 @@ const SplitShape& select_split_shape(ProjectionProfile weights) {
         const std::array shapes{&kNvfp4SplitN14336K5120, &kNvfp4SplitN16384K5120};
         return match(shapes, weights);
     }
+#endif
     default:
         throw std::invalid_argument("linear_split: unsupported weight format");
     }

@@ -94,6 +94,9 @@ void launch_q4_q5_gdn_input_grouped_mma(const Tensor& x, const Weight& qk_weight
         launch_grouped<GemmCfg<64, 128, 64, 64, 16, 2, 1, false, true, true>>(
             x, qk_weight, value_z_weight, qkv, z, stream);
         return;
+    case Q4Q5GdnInputScheduleId::MmaTuringPrefill:
+        launch_grouped<TuringPrefillCfg>(x, qk_weight, value_z_weight, qkv, z, stream);
+        return;
     }
     throw std::logic_error("Q4/Q5 GDN input: grouped MMA schedule is unknown");
 }

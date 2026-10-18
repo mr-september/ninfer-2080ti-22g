@@ -6,7 +6,11 @@ namespace {
 Q4Q5GdnInputScheduleId select_grouped_projection(int columns) {
     if (columns <= 32) return Q4Q5GdnInputScheduleId::Mma32x32;
     if (columns <= 64) return Q4Q5GdnInputScheduleId::Mma32x64;
+#if defined(NINFER_SM75)
+    return Q4Q5GdnInputScheduleId::MmaTuringPrefill; // faster than the 5090 tile from 65 columns up
+#else
     return Q4Q5GdnInputScheduleId::Mma64x128;
+#endif
 }
 } // namespace
 

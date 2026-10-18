@@ -6,7 +6,8 @@
 
 namespace ninfer::ops::detail {
 
-enum class Q4Q5GdnInputScheduleId { Mma32x32, Mma32x64, Mma64x128 };
+// MmaTuringPrefill: Turing's eight-warp single-stage tile, two resident per SM (no cp.async).
+enum class Q4Q5GdnInputScheduleId { Mma32x32, Mma32x64, Mma64x128, MmaTuringPrefill };
 
 void q4_q5_gdn_input_dispatch(const Tensor& x, const Weight& qk_weight,
                               const Weight& value_z_weight, Tensor& qkv, Tensor& z,

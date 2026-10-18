@@ -23,8 +23,15 @@ struct Bf16KvInstanceTraits;
     }
 NINFER_BF16_KV_INSTANCE(Grouped32, true, Bf16KvGroupedMmaSchedule<32, 32>);
 NINFER_BF16_KV_INSTANCE(Grouped64, true, Bf16KvGroupedMmaSchedule<64, 32>);
+#if defined(NINFER_SM75)
+// The tuned tiles stage (Q + 2K) rows of 256 BF16 in shared memory: 96 KiB, over the 64 KiB a
+// Turing CTA may use. A 32x32 tile stages 48 KiB.
+NINFER_BF16_KV_INSTANCE(Tiled64, false, Bf16KvTiledMmaSchedule<32, 32>);
+NINFER_BF16_KV_INSTANCE(Tiled128, false, Bf16KvTiledMmaSchedule<32, 32>);
+#else
 NINFER_BF16_KV_INSTANCE(Tiled64, false, Bf16KvTiledMmaSchedule<64, 64>);
 NINFER_BF16_KV_INSTANCE(Tiled128, false, Bf16KvTiledMmaSchedule<128, 32>);
+#endif
 NINFER_BF16_KV_INSTANCE(GroupedDecode, true, Bf16KvGroupedMmaSchedule<16, 32, 2, 2, 1>);
 #undef NINFER_BF16_KV_INSTANCE
 

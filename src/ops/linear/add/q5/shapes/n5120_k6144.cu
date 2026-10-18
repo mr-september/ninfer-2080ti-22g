@@ -4,8 +4,17 @@
 
 namespace ninfer::ops::detail {
 namespace {
+#if defined(NINFER_SM75)
+// Turing: single-buffered activations fit two resident tiles per SM (the finish reuses the
+// activation buffer as scratch), overlapping one tile's MMA with the other's loads.
+using AddPointwiseT128  = q5_instances::MmaR32T128A1;
+using AddCollectiveT128 = q5_instances::MmaR64T128A1;
+#else
+using AddPointwiseT128  = q5_instances::MmaR32T128;
+using AddCollectiveT128 = q5_instances::MmaR64T128;
+#endif
 void launch_wide_tail(const Tensor& x, const Weight& w, Tensor& residual, cudaStream_t stream) {
-    constexpr auto wide_launch = launch_q5_add_collective<q5_instances::MmaR64T128>;
+    constexpr auto wide_launch = launch_q5_add_collective<AddCollectiveT128>;
     const int wide             = (x.ne[1] / 512) * 512;
     const int tail             = x.ne[1] - wide;
     if (wide == 0 || tail == 0 || tail > 192) return wide_launch(x, w, residual, stream);
@@ -32,8 +41,8 @@ LinearAddLaunch select_q5_linear_add_n5120_k6144(std::int32_t tokens) {
     if (tokens <= 96) return launch_q5_add_pointwise<q5_instances::MmaR32T32K128S2A2>;
     if (tokens <= 128) return launch_q5_add_sliced<q5_instances::SlicedR32T32W2S2>;
     if (tokens <= 160) return launch_q5_add_sliced<q5_instances::SlicedR32T64W2S1>;
-    if (tokens <= 256) return launch_q5_add_pointwise<q5_instances::MmaR32T128>;
-    if (tokens <= 512) return launch_q5_add_collective<q5_instances::MmaR64T128>;
+    if (tokens <= 256) return launch_q5_add_pointwise<AddPointwiseT128>;
+    if (tokens <= 512) return launch_q5_add_collective<AddCollectiveT128>;
     return launch_wide_tail;
 }
 } // namespace ninfer::ops::detail

@@ -124,12 +124,24 @@ void launch_q4_t1(const Tensor& x, const Weight& qk_weight,
         Q4GdnDecodeEpilogue<Publish>{qk_epilogue}, stream);
 }
 
+template <int Tokens, class Publish, bool TriggerPdl, bool JoinPdl, bool Dependent>
+void launch_q5_small_t(const Tensor& x, const Weight& value_z_weight,
+                       const GdnConvEpilogue<Publish>& value_epilogue, Tensor& z,
+                       cudaStream_t stream);
+
 template <class Publish, bool TriggerPdl, bool JoinPdl, bool Dependent>
 void launch_q5_t1(const Tensor& x, const Weight& value_z_weight,
                   const GdnConvEpilogue<Publish>& value_epilogue, Tensor& z, cudaStream_t stream) {
+#if defined(NINFER_SM75)
+    // Turing: the staged GEMV's shared-memory pipeline cannot overlap loads (no cp.async), while the
+    // direct SIMT kernel keeps independent loads in flight; it reads this projection faster.
+    launch_q5_small_t<1, Publish, TriggerPdl, JoinPdl, Dependent>(x, value_z_weight,
+                                                                  value_epilogue, z, stream);
+#else
     launch_q5_a16_gemv<q5_instances::GemvR16W1G16S2XK5120, TriggerPdl, JoinPdl, Dependent>(
         q5_linear_operands(x, value_z_weight), Q5GdnZOutput{static_cast<__nv_bfloat16*>(z.data)},
         Q5GdnProjectionEpilogue<1, Publish>{value_epilogue}, stream);
+#endif
 }
 
 template <int Tokens, class Q4Schedule, class Publish, bool TriggerPdl, bool JoinPdl,

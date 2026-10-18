@@ -16,6 +16,19 @@ struct Plan {
     bool materialized = false;
 };
 
+#if defined(NINFER_SM75)
+constexpr std::array<Plan, 4> kPlans{{
+    // Turing: gate/up through the tuned Linear routes (FP16-mantissa GEMV at T=1, SIMT up to T=4)
+    // plus an elementwise SwiGLU beats the fused kernels at these widths.
+    {4, launch_q4_swiglu_materialized_projection, true},
+    {32, launch_q4_swiglu_small_t_tiled},
+    {128, launch_q4_swiglu_materialized_projection, true},
+    // Prefill: single-stage 128-token folded tiles, two resident per SM, so one tile's MMA
+    // overlaps the other's loads (cp.async is unavailable). Faster than the 5090 table's tiles and
+    // than the materialized route from 129 columns up, measured on the 2080 Ti.
+    {std::numeric_limits<int>::max(), launch_q4_swiglu_mma_turing_prefill},
+}};
+#else
 constexpr std::array<Plan, 10> kPlans{{
     {1, launch_q4_swiglu_gemv_pair},
     {32, launch_q4_swiglu_small_t_tiled},
@@ -28,6 +41,8 @@ constexpr std::array<Plan, 10> kPlans{{
     {640, launch_q4_swiglu_materialized_projection, true},
     {std::numeric_limits<int>::max(), launch_q4_swiglu_mma_split_half_pair_r32_c128},
 }};
+
+#endif
 
 const Plan& select_plan(int rows, int k, int tokens) {
     if (rows != 34816 || k != 5120 || tokens <= 0)

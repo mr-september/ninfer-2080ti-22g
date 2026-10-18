@@ -21,6 +21,11 @@ using C40 =
 } // namespace
 
 Q8Launch select_q8_n248320_k5120(std::int32_t tokens) {
+#if defined(NINFER_SM75)
+    // Turing: the SIMT/direct decode kernels beat the tensor-core small-T routes (tuned on
+    // RTX 5090) at the MTP verify widths, measured per shape with the 2080 Ti.
+    if (tokens <= 3) return launch_q8_a16_simt_r8_t4;
+#endif
     if (tokens <= 8) return launch_q8_a16_sliced<Geometry, 8, C8>;
     if (tokens <= 16) return launch_q8_a16_sliced<Geometry, 16, C16>;
     if (tokens <= 24) return launch_q8_a16_sliced<Geometry, 24, C24>;
