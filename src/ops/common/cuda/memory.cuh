@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/arch_traits.cuh"
+
 #include <cuda_runtime.h>
 #include <cstddef>
 
@@ -65,7 +67,7 @@ __device__ __forceinline__ unsigned swizzle_xor_address(unsigned base, unsigned 
 // Storage and launch must select the same static/dynamic representation.
 template <int Bytes>
 __device__ __forceinline__ unsigned char* shared_storage() {
-    static_assert(Bytes > 0 && Bytes <= 99 * 1024);
+    static_assert(Bytes > 0 && Bytes <= core::kMaxCtaSharedBytes);
     if constexpr (Bytes > 48 * 1024) {
         extern __shared__ __align__(16) unsigned char dynamic_storage[];
         return dynamic_storage;

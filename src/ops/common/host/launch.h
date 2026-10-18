@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/arch_traits.cuh"
 #include "core/device.h"
 
 #include <algorithm>
@@ -13,7 +14,7 @@ namespace ninfer::ops::common {
 // admit the requested dynamic capacity even when it alone fits within 48 KiB.
 template <int Bytes, auto Kernel, bool AlwaysDynamic = false>
 int prepare_shared() {
-    static_assert(Bytes >= 0 && Bytes <= 99 * 1024);
+    static_assert(Bytes >= 0 && Bytes <= core::kMaxCtaSharedBytes);
     if constexpr (Bytes > 48 * 1024 || (AlwaysDynamic && Bytes > 0)) {
         static const cudaError_t status =
             cudaFuncSetAttribute(Kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, Bytes);

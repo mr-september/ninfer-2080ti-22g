@@ -41,6 +41,23 @@ __device__ __forceinline__ float warp_max(float x, unsigned mask = kFullWarpMask
     return x;
 }
 
+// Unsigned maximum over the lanes [0, Width) selected by `mask`. sm_80+ has a single REDUX
+// instruction; Turing falls back to a shuffle butterfly over the same lanes.
+template <int Width = kWarpSize>
+__device__ __forceinline__ unsigned warp_reduce_max_u32(unsigned mask, unsigned x) {
+    static_assert(Width > 0 && Width <= kWarpSize && (Width & (Width - 1)) == 0);
+#if defined(NINFER_SM75)
+#pragma unroll
+    for (int offset = Width / 2; offset > 0; offset >>= 1) {
+        const unsigned other = __shfl_xor_sync(mask, x, offset, Width);
+        x                    = other > x ? other : x;
+    }
+    return x;
+#else
+    return __reduce_max_sync(mask, x);
+#endif
+}
+
 template <int BlockSize>
 __device__ __forceinline__ float block_reduce_sum(float x, float* sums) {
     static_assert(BlockSize >= kWarpSize && BlockSize <= 1024);
