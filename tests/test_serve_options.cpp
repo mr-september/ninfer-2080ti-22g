@@ -34,6 +34,25 @@ int main() {
     failures +=
         check(!defaults.preserve_thinking, "thinking history is unexpectedly preserved by default");
     failures += check(!defaults.enable_vision, "Vision is not disabled by default");
+    failures += check(defaults.vision_max_item_tokens == ninfer::kMaximumVisionItemTokens,
+                      "serve did not default to the native Vision item extent");
+    failures += check(parse({"ninfer-serve", "model.ninfer", "--vision", "--vision-max-item-tokens",
+                             "4096"})
+                              .vision_max_item_tokens == 4096,
+                      "serve lost --vision-max-item-tokens");
+    for (const char* bad : {"0", "255", "16385", "x"}) {
+        bool rejected = false;
+        try {
+            (void)parse(
+                {"ninfer-serve", "model.ninfer", "--vision", "--vision-max-item-tokens", bad});
+        } catch (const std::invalid_argument&) { rejected = true; }
+        failures += check(rejected, "serve accepted an invalid --vision-max-item-tokens");
+    }
+    failures += check(defaults.chat_template_path.empty() && !defaults.artifact_chat_template,
+                      "the embedded Sharp template is not the server default");
+    failures += check(parse({"ninfer-serve", "model.ninfer", "--artifact-chat-template"})
+                          .chat_template_path.empty(),
+                      "--artifact-chat-template did not select the artifact template");
     failures += check(defaults.request_log_jsonl.empty(),
                       "request JSONL logging is not disabled by default");
     failures += check(defaults.context_cost_presets.empty(),
@@ -59,8 +78,25 @@ int main() {
         } catch (const std::invalid_argument&) { rejected = true; }
         failures += check(rejected, "invalid prefill chunk was accepted");
     }
-    failures += check(defaults.speculative.backend == ninfer::SpeculativeBackend::None,
-                      "speculative decoding is not disabled by default");
+    failures +=
+        check(defaults.speculative.backend == ninfer::product::default_speculative().backend &&
+                  defaults.speculative.draft_tokens ==
+                      ninfer::product::default_speculative().draft_tokens &&
+                  defaults.speculative.proposal_head ==
+                      ninfer::product::default_speculative().proposal_head,
+              "speculation does not follow the product defaults");
+    failures += check(defaults.max_context == ninfer::product::kDefaultServeMaxContext &&
+                          defaults.kv_cache == ninfer::product::default_kv_cache(),
+                      "default context or KV representation does not follow the product defaults");
+    const ServeOptions no_speculation =
+        parse({"ninfer-serve", "model.ninfer", "--spec", "none"});
+    failures += check(no_speculation.speculative.backend == ninfer::SpeculativeBackend::None &&
+                          no_speculation.speculative.draft_tokens == 0 &&
+                          no_speculation.speculative.proposal_head == ninfer::ProposalHead::Full,
+                      "--spec none did not clear the speculative defaults");
+    failures += check(parse({"ninfer-serve", "model.ninfer", "--no-lm-head-draft"})
+                              .speculative.proposal_head == ninfer::ProposalHead::Full,
+                      "--no-lm-head-draft did not select the full proposal head");
     failures += check(defaults.response_store_max_records == kDefaultResponseStoreRecords &&
                           defaults.response_store_max_bytes == kDefaultResponseStoreBytes,
                       "Responses store defaults mismatch");
@@ -143,11 +179,18 @@ int main() {
                           dflash_vision.speculative.draft_tokens == 15,
                       "serve options did not preserve combined DFlash and Vision features");
 
-    bool implicit_backend_rejected = false;
+    bool draft_without_backend_rejected = false;
     try {
-        (void)parse({"ninfer-serve", "model.ninfer", "--draft-tokens", "3"});
-    } catch (const std::invalid_argument&) { implicit_backend_rejected = true; }
-    failures += check(implicit_backend_rejected, "--draft-tokens selected a backend implicitly");
+        (void)parse({"ninfer-serve", "model.ninfer", "--spec", "none", "--draft-tokens", "3"});
+    } catch (const std::invalid_argument&) { draft_without_backend_rejected = true; }
+    failures +=
+        check(draft_without_backend_rejected, "--draft-tokens was accepted with --spec none");
+    bool dflash_without_window_rejected = false;
+    try {
+        (void)parse({"ninfer-serve", "model.ninfer", "--spec", "dflash"});
+    } catch (const std::invalid_argument&) { dflash_without_window_rejected = true; }
+    failures += check(dflash_without_window_rejected,
+                      "--spec dflash was accepted without its own --draft-tokens");
 
     const ServeOptions configured = parse({"ninfer-serve",
                                            "model.ninfer",

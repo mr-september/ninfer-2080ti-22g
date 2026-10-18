@@ -133,7 +133,7 @@ int main() {
     namespace q35        = ninfer::models::qwen3_5;
     const char* artifact = std::getenv("NINFER_TEST_ARTIFACT");
     if (!artifact || !*artifact) { return 77; }
-    static_assert(ninfer::models::qwen::kMaximumVisionItemTokens == 16384);
+    static_assert(ninfer::kMaximumVisionItemTokens == 16384);
     // The current Vision route fits below 827 MiB, including arena alignment and empty-scratch
     // backing. The context growth check below protects the single-item lifetime bound.
     constexpr std::size_t kWorkspaceCeiling = 827ULL << 20;
@@ -152,16 +152,24 @@ int main() {
         selected.proposal_head = ninfer::ProposalHead::Optimized;
         auto model             = q35::load_model(artifact, selected, device);
         const q35::execution::Parameters parameters(*model);
-        const auto capacity = [&](std::uint32_t max_context) {
+        const auto capacity = [&](std::uint32_t max_context,
+                                  std::uint32_t item_tokens = ninfer::kMaximumVisionItemTokens) {
             ninfer::EngineOptions options;
             options.max_context         = max_context;
             options.kv_capacity         = ninfer::KvCapacityPolicy::explicit_capacity(max_context);
             options.prefill_chunk       = 1024;
+#if defined(NINFER_SM75)
+            // Turing builds have no FP8 KV; INT8 group-64 is the product default there. KV storage
+            // does not enter the Vision encode extent, which dominates the workspace checked below.
+            options.kv_cache            = ninfer::KvCacheStorage::Int8Group64;
+#else
             options.kv_cache            = ninfer::KvCacheStorage::Fp8E4M3Row256;
+#endif
             options.speculative.backend = ninfer::SpeculativeBackend::Mtp;
             options.speculative.draft_tokens         = 3;
             options.speculative.proposal_head        = ninfer::ProposalHead::Optimized;
             options.enable_vision                    = true;
+            options.vision_max_item_tokens           = item_tokens;
             options.use_cuda_graph                   = false;
             options.context_cache.device_state_slots = 1;
             auto planner     = q35::make_sequence_planner(parameters, device, options);
@@ -176,6 +184,15 @@ int main() {
             throw std::runtime_error("Vision workspace exceeded the single-item bound: at=" +
                                      std::to_string(at_item_limit) +
                                      " above=" + std::to_string(above_item_limit));
+        }
+        // The item cap sizes the Vision extent: smaller caps shrink the workspace monotonically
+        // until the general prefix plus handoff floor.
+        const auto at_8k = capacity(131072, 8192);
+        const auto at_4k = capacity(131072, 4096);
+        if (!(at_4k <= at_8k && at_8k < above_item_limit)) {
+            throw std::runtime_error("Vision item cap did not shrink the workspace: 16k=" +
+                                     std::to_string(above_item_limit) + " 8k=" +
+                                     std::to_string(at_8k) + " 4k=" + std::to_string(at_4k));
         }
         test_handoff_lifetime(device, parameters);
         std::cout << "Vision workspace remains bounded for long text context\n";

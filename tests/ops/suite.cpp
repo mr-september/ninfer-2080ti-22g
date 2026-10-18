@@ -1,6 +1,7 @@
 #include "ops/suite.h"
 
 #include "core/cpu/task_pool.h"
+#include "ops/format_support.h"
 #include "ops/op_tester.h"
 
 #include <algorithm>
@@ -13,6 +14,24 @@
 #include <thread>
 
 namespace ninfer::test {
+namespace {
+
+// Case IDs are slash-separated and name the format as one component (for example
+// "nvfp4/34816x5120/..." or "gdn_input_record/fp8/..."). Formats the target cannot execute are
+// counted as skipped.
+bool supported_on_target(const std::string& id) {
+    if (kSm120Formats) return true;
+    std::size_t begin = 0;
+    while (begin <= id.size()) {
+        const std::size_t end = std::min(id.find('/', begin), id.size());
+        const std::string part = id.substr(begin, end - begin);
+        if (part == "fp8" || part == "nvfp4" || part == "k8v4") return false;
+        begin = end + 1;
+    }
+    return true;
+}
+
+} // namespace
 
 void OpSuite::add(std::string id, std::function<int()> run,
                   std::vector<std::pair<std::string, std::string>> tags) {
@@ -78,7 +97,8 @@ int OpSuite::main(int argc, char** argv) const {
 
         std::set<std::string> ids;
         std::vector<std::vector<std::size_t>> selected(groups_.size());
-        std::size_t count = 0;
+        std::size_t count       = 0;
+        std::size_t unsupported = 0;
         for (std::size_t g = 0; g < groups_.size(); ++g) {
             for (std::size_t c = 0; c < groups_[g].cases.size(); ++c) {
                 const auto& test = groups_[g].cases[c];
@@ -93,8 +113,13 @@ int OpSuite::main(int argc, char** argv) const {
                             });
                     });
                 if (!matches) continue;
-                selected[g].push_back(c);
                 ++count;
+                if (!supported_on_target(test.id)) {
+                    ++unsupported;
+                    if (list) std::cout << test.id << '\n';
+                    continue;
+                }
+                selected[g].push_back(c);
                 if (list) std::cout << test.id << '\n';
             }
         }
@@ -107,7 +132,7 @@ int OpSuite::main(int argc, char** argv) const {
 
         const auto start    = std::chrono::steady_clock::now();
         int failures        = 0;
-        std::size_t skipped = 0;
+        std::size_t skipped = unsupported;
         for (std::size_t g = 0; g < groups_.size(); ++g) {
             if (selected[g].empty()) continue;
             const auto& id = groups_[g].cases[selected[g].front()].id;
@@ -119,6 +144,14 @@ int OpSuite::main(int argc, char** argv) const {
                 skipped += selected[g].size();
                 std::cout << "SKIP " << id << ": " << reason.what() << '\n';
             } catch (const std::exception& error) {
+                // A route this target does not build reports it through its throwing stub
+                // (src/ops/unsupported); that is a skipped case, not a failure.
+                if (std::string(error.what()).find("not available on the Turing") !=
+                    std::string::npos) {
+                    skipped += selected[g].size();
+                    std::cout << "SKIP " << id << ": " << error.what() << '\n';
+                    continue;
+                }
                 std::cerr << "FAIL group starting at " << id << ": " << error.what() << '\n';
                 ++failures;
             }

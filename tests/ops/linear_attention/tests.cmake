@@ -1,6 +1,8 @@
-ninfer_add_op_test(ninfer_kimi_delta_attention_test
-  SOURCES "${CMAKE_CURRENT_LIST_DIR}/kimi_delta_attention.cpp"
-  LIBRARIES ninfer_ops)
+if(NOT NINFER_TARGET STREQUAL "turing") # Kimi delta attention is not built for Turing.
+  ninfer_add_op_test(ninfer_kimi_delta_attention_test
+    SOURCES "${CMAKE_CURRENT_LIST_DIR}/kimi_delta_attention.cpp"
+    LIBRARIES ninfer_ops)
+endif()
 
 ninfer_add_op_test(ninfer_causal_conv1d_silu_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/causal_conv1d_silu.cpp"

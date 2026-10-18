@@ -2,6 +2,7 @@
 #include "core/decode_graph.h"
 #include "core/expert_cache.h"
 
+#include <algorithm>
 #include <cuda_runtime.h>
 
 #include <array>

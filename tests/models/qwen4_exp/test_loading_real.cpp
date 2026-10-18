@@ -1,13 +1,13 @@
 #include "models/qwen4_exp/load.h"
 #include "models/qwen4_exp/program/resources.h"
 #include "artifact/fixture.h"
+#include "core/os.h"
 #include "core/transfer.h"
 
 #include <chrono>
 #include <cstring>
 #include <iostream>
 #include <thread>
-#include <sys/resource.h>
 
 namespace {
 using namespace ninfer;
@@ -252,14 +252,12 @@ int main(int argc, char** argv) {
             q4::Resources resources(parameters, std::move(*selected), device);
             ple_window(resources, *model, device);
 
-            struct rusage usage {};
 
-            getrusage(RUSAGE_SELF, &usage);
             const auto& s = model->storage_stats();
             std::cout << "loaded host=" << s.host_capacity_bytes
                       << " registered=" << s.registered_host_bytes
                       << " gpu=" << s.device_capacity_bytes << " staging=" << s.peak_staging_bytes
-                      << " read=" << s.read_bytes << " rss_kib=" << usage.ru_maxrss << '\n';
+                      << " read=" << s.read_bytes << " rss_kib=" << os::peak_rss_kib() << '\n';
         }
         std::cout << "PASS\n";
         return 0;

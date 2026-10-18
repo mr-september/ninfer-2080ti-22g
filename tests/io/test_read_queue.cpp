@@ -1,20 +1,26 @@
 #include "core/io/file.h"
 #include "core/io/read_queue.h"
 #include "core/buffer.h"
+
+#if !defined(_WIN32)
 #include "symbol_interpose.h"
 
 #include <liburing.h>
+#endif
 
 #include <algorithm>
 #include <array>
 #include <cerrno>
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <stdexcept>
 #include <thread>
 #include <vector>
 
 namespace {
+// Fault injection into io_uring_submit exists only on the io_uring backend; the completion-port
+// backend is covered by the behavioral checks below.
 bool interrupt_submit = false;
 bool short_submit     = false;
 bool fail_submit      = false;
@@ -41,10 +47,11 @@ struct Files {
     static constexpr std::size_t bytes = 4096 + 123;
 
     Files() {
-        std::string name = (std::filesystem::temp_directory_path() / "ninfer-io-XXXXXX").string();
-        auto* path       = ::mkdtemp(name.data());
-        if (!path) throw std::runtime_error("mkdtemp failed");
-        directory = path;
+        std::random_device random;
+        directory = std::filesystem::temp_directory_path() /
+                    ("ninfer-io-" + std::to_string(random()) + std::to_string(random()));
+        if (!std::filesystem::create_directory(directory))
+            throw std::runtime_error("fixture directory already exists");
         std::vector<std::byte> data(bytes);
         for (std::size_t file = 0; file < 2; ++file) {
             for (std::size_t i = 0; i < data.size(); ++i) data[i] = pattern(file, i);
@@ -115,7 +122,9 @@ void run() {
     rejects([&] { (void)queue.try_enqueue({1, 0, 0, 4096, 999}); });
     enqueue(1);
     require(queue.try_enqueue({0, 0, 0, 4096, 999}) == ReadAdmission::Full, "queue is not bounded");
+#if !defined(_WIN32)
     interrupt_submit = short_submit = true;
+#endif
     queue.submit();
     std::array<ReadCompletion, 1> output;
     while (completed < seen.size()) {
@@ -147,6 +156,7 @@ void run() {
 
     require(queue.try_enqueue({0, 0, 0, 4096, 1234}) == ReadAdmission::Accepted,
             "error probe rejected");
+#if !defined(_WIN32)
     fail_submit = true;
     rejects<std::system_error>([&] { queue.submit(); });
     fail_read = true;
@@ -154,6 +164,12 @@ void run() {
     while (!queue.poll(output)) (void)queue.wait();
     require(output[0].tag == 1234 && output[0].error == EBADF && !output[0].bytes,
             "kernel I/O failure was not delivered");
+#else
+    queue.submit();
+    while (!queue.poll(output)) (void)queue.wait();
+    require(output[0].tag == 1234 && !output[0].error && output[0].bytes == 4096,
+            "probe read was not delivered");
+#endif
 
     require(queue.try_enqueue({0, 0, 4096, 4096, 9999}) == ReadAdmission::Accepted,
             "close probe rejected");
@@ -176,6 +192,7 @@ void run() {
 }
 } // namespace
 
+#if !defined(_WIN32)
 extern "C" int io_uring_submit(io_uring* ring) {
     static const auto real = ninfer::test::next_symbol<int (*)(io_uring*)>("io_uring_submit");
     if (interrupt_submit) {
@@ -202,6 +219,8 @@ extern "C" int io_uring_submit(io_uring* ring) {
     }
     return real(ring);
 }
+
+#endif
 
 int main() {
     try {

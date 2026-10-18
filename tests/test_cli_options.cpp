@@ -1,5 +1,8 @@
 #include "options.h"
+#include "product/defaults.h"
 
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <iostream>
 #include <stdexcept>
@@ -47,6 +50,70 @@ int main() {
                                "--choice", "a|b", "--choice", "你好"});
     failures += check(choice.choices == std::vector<std::string>{"", "a|b", "你好"},
                       "choice flags changed literal text or order");
+    const auto defaults = parse({"ninfer", "model.ninfer", "--prompt", "hello"});
+    failures += check(defaults.max_context == ninfer::product::kDefaultCliMaxContext &&
+                          defaults.kv_capacity.explicit_tokens == defaults.max_context &&
+                          defaults.kv_cache == ninfer::product::default_kv_cache(),
+                      "CLI defaults do not follow the product defaults");
+    failures +=
+        check(defaults.speculative.backend == ninfer::product::default_speculative().backend &&
+                  defaults.speculative.draft_tokens ==
+                      ninfer::product::default_speculative().draft_tokens &&
+                  defaults.speculative.proposal_head ==
+                      ninfer::product::default_speculative().proposal_head,
+              "speculation does not follow the product defaults");
+    failures += check(defaults.chat_template_path.empty() && !defaults.artifact_chat_template,
+                      "the embedded Sharp template is not the CLI default");
+    {
+        ninfer::EngineOptions engine;
+        ninfer::product::select_chat_template(engine, defaults.chat_template_path,
+                                              defaults.artifact_chat_template);
+        failures += check(engine.chat_template_path.empty() &&
+                              engine.chat_template_source ==
+                                  ninfer::product::default_chat_template_source() &&
+                              engine.chat_template_source.find("template_version") !=
+                                  std::string::npos,
+                          "the default engine template is not the embedded source");
+    }
+    failures += check(rejects([] {
+                          (void)parse({"ninfer", "model.ninfer", "--prompt", "hello",
+                                       "--chat-template", "does-not-exist.jinja"});
+                      }),
+                      "--chat-template accepted a file that does not exist");
+    {
+        const auto template_file =
+            std::filesystem::temp_directory_path() / "ninfer-cli-options-template.jinja";
+        std::ofstream(template_file) << "{{ messages }}";
+        failures += check(parse({"ninfer", "model.ninfer", "--prompt", "hello", "--chat-template",
+                                 template_file.string()})
+                                  .chat_template_path == template_file,
+                          "--chat-template did not override the default template");
+        std::filesystem::remove(template_file);
+    }
+    failures += check(parse({"ninfer", "model.ninfer", "--prompt", "hello",
+                             "--artifact-chat-template"})
+                          .chat_template_path.empty(),
+                      "--artifact-chat-template did not select the artifact template");
+    failures += check(rejects([] {
+                          (void)parse({"ninfer", "model.ninfer", "--prompt", "hello",
+                                       "--artifact-chat-template", "--chat-template", "x.jinja"});
+                      }),
+                      "--artifact-chat-template was accepted with --chat-template");
+    const auto plain = parse({"ninfer", "model.ninfer", "--prompt", "hello", "--spec", "none"});
+    failures += check(plain.speculative.backend == ninfer::SpeculativeBackend::None &&
+                          plain.speculative.draft_tokens == 0 &&
+                          plain.speculative.proposal_head == ninfer::ProposalHead::Full,
+                      "--spec none did not clear the speculative defaults");
+    failures += check(rejects([] {
+                          (void)parse({"ninfer", "model.ninfer", "--prompt", "hello", "--spec",
+                                       "none", "--draft-tokens", "3"});
+                      }),
+                      "--draft-tokens was accepted with --spec none");
+    failures += check(rejects([] {
+                          (void)parse({"ninfer", "model.ninfer", "--prompt", "hello", "--spec",
+                                       "dflash"});
+                      }),
+                      "--spec dflash was accepted without its own --draft-tokens");
     failures +=
         check(parse({"ninfer", "model.ninfer", "--prompt", "hello", "--regex", ""}).regex == "",
               "empty regex must be distinct from no regex");
@@ -105,6 +172,20 @@ int main() {
                           dflash_vision.speculative.backend == ninfer::SpeculativeBackend::DFlash &&
                           dflash_vision.speculative.draft_tokens == 7,
                       "CLI did not preserve the combined DFlash and Vision startup features");
+    failures += check(parse({"ninfer-cli", "model.ninfer", "--prompt", "hello", "--vision"})
+                              .vision_max_item_tokens == ninfer::kMaximumVisionItemTokens,
+                      "CLI did not default to the native Vision item extent");
+    failures += check(parse({"ninfer-cli", "model.ninfer", "--prompt", "hello", "--vision",
+                             "--vision-max-item-tokens", "4096"})
+                              .vision_max_item_tokens == 4096,
+                      "CLI lost --vision-max-item-tokens");
+    for (const char* bad : {"0", "255", "16385", "x"}) {
+        failures += check(rejects([&] {
+                              (void)parse({"ninfer-cli", "model.ninfer", "--prompt", "hello",
+                                           "--vision", "--vision-max-item-tokens", bad});
+                          }),
+                          "CLI accepted an invalid --vision-max-item-tokens");
+    }
     for (const auto k : {1U, 2U, 7U, 15U}) {
         const auto dflash2 = parse({"ninfer-cli", "model.ninfer", "--prompt", "hello", "--spec",
                                     "dflash2", "--draft-tokens", std::to_string(k)});

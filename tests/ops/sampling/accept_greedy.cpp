@@ -5,6 +5,7 @@
 #include "ops/op_tester.h"
 #include "core/decode_graph.h"
 #include "core/device.h"
+#include <array>
 #include <string_view>
 
 #include <algorithm>

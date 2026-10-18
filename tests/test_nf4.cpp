@@ -2,6 +2,10 @@
 
 #include <algorithm>
 #include <bit>
+#if defined(_WIN32)
+#include <fcntl.h>
+#include <io.h>
+#endif
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -52,6 +56,11 @@ int main(int argc, char**) {
             return 0;
         }
         // Binary test protocol: divisor word -> success word and LUT, or zero on rejection.
+#if defined(_WIN32)
+        // Text mode would translate line-ending bytes and stop at 0x1A.
+        (void)::_setmode(::_fileno(stdin), _O_BINARY);
+        (void)::_setmode(::_fileno(stdout), _O_BINARY);
+#endif
         std::uint32_t divisor;
         while (std::cin.read(reinterpret_cast<char*>(&divisor), sizeof(divisor))) {
             ninfer::Nf4Bf16Lut lut;

@@ -7,6 +7,7 @@
 #include "ops/input_projection_test_common.h"
 #include "ops/linear/weights.h"
 
+#include <array>
 #include <memory>
 #include <numeric>
 #include <set>

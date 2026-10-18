@@ -1,6 +1,8 @@
 #include "runtime/engine/kv_capacity.h"
 #include "runtime/engine/startup_memory.h"
 
+#include "ninfer/memory_errors.h"
+
 #include <iostream>
 #include <stdexcept>
 
@@ -73,6 +75,14 @@ int main() {
                       "shared Host payload capacity was not reserved");
     failures += check(shared.fits({3000, 12000}) && !shared.fits({2999, 12000}),
                       "startup consumed the shared Host payload reservation");
+
+    bool shortfall_typed = false;
+    try {
+        (void)ninfer::runtime::resolve_kv_capacity(ninfer::KvCapacityPolicy::explicit_capacity(129),
+                                                   curve, 1127);
+    } catch (const ninfer::DeviceMemoryError&) { shortfall_typed = true; }
+    failures += check(shortfall_typed,
+                      "an explicit reservation that does not fit did not throw DeviceMemoryError");
 
     if (failures == 0) { std::cout << "ok\n"; }
     return failures == 0 ? 0 : 1;

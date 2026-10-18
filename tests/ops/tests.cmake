@@ -12,6 +12,10 @@ include("${CMAKE_CURRENT_LIST_DIR}/rope/tests.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/sequence/tests.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/sampling/tests.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/linear/tests.cmake")
+# Tensor-core wrappers against naive math in the PTX fragment layouts (Turing decompositions).
+ninfer_add_op_test(ninfer_mma_shim_test
+  SOURCES "${CMAKE_CURRENT_LIST_DIR}/test_mma_shim.cu")
+
 include("${CMAKE_CURRENT_LIST_DIR}/dynamic_grouped_conv/tests.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/gated_residual/tests.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/linear_attention/tests.cmake")

@@ -1,3 +1,4 @@
+#include "ops/format_support.h"
 #include "core/weight.h"
 #include "cuda_fixture.h"
 #include "core/buffer.h"

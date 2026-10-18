@@ -1,11 +1,13 @@
 #pragma once
 
 #include "artifact/schema.h"
+#include "core/os.h"
 
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -46,12 +48,11 @@ struct Fixture {
     std::vector<std::byte> payload;
 
     Fixture() : payload(1344) {
-        auto pattern = (std::filesystem::temp_directory_path() / "ninfer-artifact-XXXXXX").string();
-        std::vector<char> buffer(pattern.begin(), pattern.end());
-        buffer.push_back('\0');
-        const char* path = ::mkdtemp(buffer.data());
-        if (!path) { throw std::runtime_error("cannot create fixture directory"); }
-        directory = path;
+        static std::atomic<unsigned> counter{0};
+        directory = std::filesystem::temp_directory_path() /
+                    ("ninfer-artifact-" + std::to_string(ninfer::os::process_id()) + "-" +
+                     std::to_string(counter.fetch_add(1)));
+        std::filesystem::create_directories(directory);
         entry     = directory / "model.ninfer";
         root      = {
             {"components",

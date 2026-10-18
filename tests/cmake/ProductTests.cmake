@@ -59,3 +59,6 @@ ninfer_add_test(ninfer_http_error_handler_test
 ninfer_add_test(ninfer_http_transport_test
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/../test_http_transport.cpp"
   LIBRARIES ninfer_serve)
+
+ninfer_add_test(ninfer_context_fit_test
+  SOURCES "${CMAKE_CURRENT_LIST_DIR}/../test_context_fit.cpp")

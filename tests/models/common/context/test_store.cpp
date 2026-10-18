@@ -315,6 +315,7 @@ void test_migration_state_fields(ninfer::DeviceContext& device) {
     for (std::size_t i = 0; i < words.size(); ++i) words[i] = std::byte((i * 29 + 13) & 0xff);
     CUDA_CHECK(cudaMemcpy(storage.image(states.physical_slot(source)).data, words.data(),
                           words.size(), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaDeviceSynchronize());
     states.complete_initialization(source);
     states.freeze(source);
     for (bool clear : {false, true}) {
@@ -323,6 +324,9 @@ void test_migration_state_fields(ninfer::DeviceContext& device) {
         const auto image = storage.image(states.physical_slot(destination));
         CUDA_CHECK(
             cudaMemcpy(image.data, expected.data(), expected.size(), cudaMemcpyHostToDevice));
+        // A pageable copy can return before its DMA lands; the migration stream is not ordered
+        // against the legacy default stream, so wait for the seeded bytes explicitly.
+        CUDA_CHECK(cudaDeviceSynchronize());
         store::MigrationBatch migration(executor, nullptr);
         migration.own_state(states, destination);
         if (clear) {

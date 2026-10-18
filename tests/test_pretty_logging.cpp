@@ -3,7 +3,21 @@
 
 #include <spdlog/logger.h>
 
-#include <unistd.h>
+#if defined(_WIN32)
+#    include <fcntl.h>
+#    include <io.h>
+#    include <cstddef>
+// POSIX descriptor calls under their Windows CRT names.
+#    define STDERR_FILENO 2
+#    define pipe(fds) _pipe((fds), 1 << 20, _O_BINARY)
+#    define dup _dup
+#    define dup2 _dup2
+#    define close _close
+#    define read _read
+using ssize_t = std::ptrdiff_t;
+#else
+#    include <unistd.h>
+#endif
 
 #include <algorithm>
 #include <array>

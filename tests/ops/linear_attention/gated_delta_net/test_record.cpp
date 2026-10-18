@@ -136,7 +136,7 @@ int run_case(std::int32_t value_heads, std::int32_t width, std::int32_t batch,
                                {kStateDim, value_heads, width, batch});
     Tensor gate_record_tensor(gate_record.span(), DType::FP32, {2, value_heads, width, batch});
 
-    constexpr float kScale = 1.0F / std::sqrt(128.0F);
+    const float kScale = 1.0F / std::sqrt(128.0F);
     cudaStream_t stream;
     CUDA_CHECK(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
     const auto stream_execution = ninfer::test::cuda_environment().context.execution_view(stream);
