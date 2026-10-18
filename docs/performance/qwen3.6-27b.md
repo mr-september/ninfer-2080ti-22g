@@ -155,7 +155,7 @@ The original directory also contains other target/mode runs. This command select
 
 ```bash
 "$NINFER_BENCH_PYTHON" tools/bench/run_serve_corpus.py \
-  --serve build/apps/ninfer-serve \
+  --serve build/rtx5090-release/apps/ninfer-serve \
   --artifact qwen3_6_27b=out/qwen3_6_27b.ninfer \
   --mode mtp0 --sampling stochastic \
   --output profiles/bench/serve_corpus_27b_mtp0
@@ -167,7 +167,7 @@ Historical reports: `profiles/bench/serve_corpus_27b_nvfp4_w8_20260731/`.
 
 ```bash
 "$NINFER_BENCH_PYTHON" tools/bench/run_serve_corpus.py \
-  --serve build/apps/ninfer-serve \
+  --serve build/rtx5090-release/apps/ninfer-serve \
   --artifact qwen3_6_27b=out/qwen3_6_27b_nvfp4.ninfer \
   --mode mtp0 --sampling stochastic \
   --output profiles/bench/serve_corpus_27b_nvfp4_w8_20260731
@@ -179,7 +179,7 @@ Historical reports: `profiles/bench/serve_corpus_27b_mtp3_20260724/`.
 
 ```bash
 "$NINFER_BENCH_PYTHON" tools/bench/run_serve_corpus.py \
-  --serve build/apps/ninfer-serve \
+  --serve build/rtx5090-release/apps/ninfer-serve \
   --artifact qwen3_6_27b=out/qwen3_6_27b.ninfer \
   --mode mtp3 \
   --output profiles/bench/serve_corpus_27b_mtp3_20260724
@@ -191,7 +191,7 @@ Historical reports: `profiles/bench/concurrent_corpus_27b_nvfp4_mtp3_20260811/`.
 
 ```bash
 "$NINFER_BENCH_PYTHON" tools/bench/run_serve_concurrency.py \
-  --serve build/apps/ninfer-serve \
+  --serve build/rtx5090-release/apps/ninfer-serve \
   --artifact qwen3_6_27b=out/qwen3_6_27b_nvfp4.ninfer \
   --mode mtp3 --suite corpus-makespan --concurrency 1 \
   --max-context 131072 --kv-capacity auto \
@@ -204,7 +204,7 @@ Historical reports: `profiles/bench/concurrent_decode_27b_mtp3_20260811/`.
 
 ```bash
 "$NINFER_BENCH_PYTHON" tools/bench/run_serve_concurrency.py \
-  --serve build/apps/ninfer-serve \
+  --serve build/rtx5090-release/apps/ninfer-serve \
   --artifact qwen3_6_27b=out/qwen3_6_27b.ninfer \
   --mode mtp3 --suite decode-saturation \
   --concurrency 1 --concurrency 2 --concurrency 4 --concurrency 8 \
@@ -218,7 +218,7 @@ Historical reports: `profiles/bench/concurrent_decode_27b_nvfp4_mtp3_20260811/`.
 
 ```bash
 "$NINFER_BENCH_PYTHON" tools/bench/run_serve_concurrency.py \
-  --serve build/apps/ninfer-serve \
+  --serve build/rtx5090-release/apps/ninfer-serve \
   --artifact qwen3_6_27b=out/qwen3_6_27b_nvfp4.ninfer \
   --mode mtp3 --suite decode-saturation \
   --concurrency 1 --concurrency 2 --concurrency 4 --concurrency 8 \

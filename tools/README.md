@@ -7,6 +7,10 @@ To build your own weights, use the [weight conversion guide](../docs/weight-conv
 Run commands from the repository root with a Python environment containing the dependencies
 for the selected tool. The maintained environment uses Python 3.11.
 
+The artifact, conversion and upgrade tools run on Linux and native Windows. Offset I/O and
+page-cache hints are in `artifact/file_io.py`; on Windows they use seek-and-read under a lock and
+skip the cache hints.
+
 Python tools are independent of CMake; there is no `NINFER_BUILD_TOOLS` option.
 Tools that launch native binaries require an explicit executable or build-directory argument.
 The stored-scale CUDA quantization extension uses PyTorch's visible-device architecture selection;

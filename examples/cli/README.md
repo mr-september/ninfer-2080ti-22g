@@ -1,20 +1,15 @@
 # Stable CLI examples
 
-This directory contains committed, offline `--messages` inputs for exercising the product CLI from
-the repository root. It covers short text, chat history, images, video, mixed multimodal history,
-hard thinking problems, long decode, and four long-context lengths. This is an operator-facing
-example set, not a second correctness framework.
+This directory contains committed, offline `--messages` inputs for exercising the product CLI from the repository root. It covers short text, chat history, images, video, mixed multimodal history, hard thinking problems, long decode, and four long-context lengths. This is an operator-facing example set, not a second correctness framework.
 
-[`manifest.json`](manifest.json) lists the frozen comparison cases, their intended observations,
-recommended runtime budgets, and prepared-prompt token counts. Standalone exploratory prompts may
-also live beside them when they deliberately have no frozen output oracle.
+[`manifest.json`](manifest.json) lists the frozen comparison cases, their intended observations, recommended runtime budgets, and prepared-prompt token counts. Standalone exploratory prompts may also live beside them when they deliberately have no frozen output oracle.
 
 ## Quick start
 
 Run from the repository root because media paths in the JSON files are repository-relative:
 
 ```bash
-CLI=./build/apps/ninfer
+CLI=./build/turing-release/apps/ninfer
 MODEL=models/qwen3_6_27b.ninfer
 
 $CLI "$MODEL" \
@@ -22,16 +17,11 @@ $CLI "$MODEL" \
   --no-thinking --greedy --max-new 8
 ```
 
-Expected stdout is exactly `42`. `--no-thinking --greedy` is the normal comparison mode for simple
-cases. Reasoning, progress, timings, memory, and MTP statistics are written to stderr; answer content
-is written to stdout.
+Expected stdout is exactly `42`. `--no-thinking --greedy` is the normal comparison mode for simple cases. Reasoning, progress, timings, memory, and MTP statistics are written to stderr; answer content is written to stdout.
 
 ## Send the same fixture to Serve
 
-`send_to_serve` submits one CLI messages file to an already-running OpenAI Chat Completions
-endpoint. Run it as a repository module so it uses the maintained Serve client. Local CLI image and
-video paths are read on the client and encoded as data URIs; the server never receives a local
-filesystem path.
+`send_to_serve` submits one CLI messages file to an already-running OpenAI Chat Completions endpoint. Run it as a repository module so it uses the maintained Serve client. Local CLI image and video paths are read on the client and encoded as data URIs; the server never receives a local filesystem path.
 
 ```bash
 python3 -m examples.cli.send_to_serve \
@@ -40,9 +30,7 @@ python3 -m examples.cli.send_to_serve \
   --model qwen3.6-27b --no-thinking --max-tokens 64
 ```
 
-Start `ninfer-serve` with `--vision` for media fixtures. Relative media paths use the current
-working directory by default; pass `--media-root` when invoking the command elsewhere. `--dry-run`
-prints the exact converted request without contacting a server.
+Start `ninfer-serve` with `--vision` for media fixtures. Relative media paths use the current working directory by default; pass `--media-root` when invoking the command elsewhere. `--dry-run` prints the exact converted request without contacting a server.
 
 ## Text and multimodal cases
 
@@ -83,8 +71,7 @@ $CLI "$MODEL" --messages examples/cli/messages/text_smoke_zh.json \
 
 ## Thinking cases
 
-Do not pass `--no-thinking` for these inputs. Give reasoning enough room to complete and transition
-to answer content; the model is free to stop before the requested maximum.
+Do not pass `--no-thinking` for these inputs. Give reasoning enough room to complete and transition to answer content; the model is free to stop before the requested maximum.
 
 ```bash
 $CLI "$MODEL" --messages examples/cli/messages/thinking_logic_grid.json \
@@ -97,15 +84,11 @@ $CLI "$MODEL" --messages examples/cli/messages/reasoning_jacobian_counterexample
   --greedy --max-context 32768 --max-new 16384
 ```
 
-The logic grid has one solution and must end with `CHECK=4606`. The multimodal case reads independent
-facts from two images and one video, then must end with `CHECKSUM=2238`. The Jacobian prompt is a
-standalone exact-proof stress case without a frozen model-output oracle, so it is intentionally not
-part of the comparison manifest.
+The logic grid has one solution and must end with `CHECK=4606`. The multimodal case reads independent facts from two images and one video, then must end with `CHECKSUM=2238`. The Jacobian prompt is a standalone exact-proof stress case without a frozen model-output oracle, so it is intentionally not part of the comparison manifest.
 
 ## Long decode
 
-The three frozen AIME 2026 cases deliberately get generous budgets. They are meant to run until the
-model's stop token, not to discover the smallest `max-new` value that happens to fit one output.
+The three frozen AIME 2026 cases deliberately get generous budgets. They are meant to run until the model's stop token, not to discover the smallest `max-new` value that happens to fit one output.
 
 ```bash
 for CASE in 01 15 30; do
@@ -118,8 +101,7 @@ The boxed integer answers for cases 01, 15, and 30 are respectively `277`, `83`,
 
 ## Long context
 
-These prompt lengths include the chat template with thinking disabled. Each input freezes one long
-document with the same retrieval needle placed at 50% depth.
+These prompt lengths include the artifact's chat template with thinking disabled (run them with `--artifact-chat-template`; the default Sharp template adds about 150 tokens). Each input freezes one long document with the same retrieval needle placed at 50% depth.
 
 ```bash
 $CLI "$MODEL" --messages examples/cli/messages/long_niah_8k.json \
@@ -145,15 +127,10 @@ All four must output:
 ORCHID=493817; COLOR=COBALT
 ```
 
-The committed prompt token counts were validated against the Qwen3.6-27B and Qwen3.6-35B-A3B
-frontend profiles, which produce identical sequences for these files. Qwen3.8-27B uses the same CLI
-surface but carries its own tokenizer and chat-template resources; inspect its prepared token count
-when using these fixtures.
+The committed prompt token counts were validated against the Qwen3.6-27B and Qwen3.6-35B-A3B frontend profiles, which produce identical sequences for these files. Qwen3.8-27B uses the same CLI surface but carries its own tokenizer and chat-template resources; inspect its prepared token count when using these fixtures.
 
 ## Fixture construction
 
-All PNG and MP4 media are project-authored deterministic scenes. The video is five seconds at 8 FPS
-with forty H.264 frames. Runtime tests never depend on a network URL or mutable external content.
+All PNG and MP4 media are project-authored deterministic scenes. The video is five seconds at 8 FPS with forty H.264 frames. Runtime tests never depend on a network URL or mutable external content.
 
-The committed files are the canonical inputs; there is no in-tree regeneration script. A deliberate
-replacement must update the file, its manifest hash, prompt-token count, and oracle together.
+The committed files are the canonical inputs; there is no in-tree regeneration script. A deliberate replacement must update the file, its manifest hash, prompt-token count, and oracle together.

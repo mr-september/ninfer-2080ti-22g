@@ -1,5 +1,11 @@
 # syntax=docker/dockerfile:1
 
+# Build:  docker build -t ninfer .
+# Run:    docker run --gpus all -v /path/to/models:/models -p 8080:8080 ninfer
+# The models folder must contain qwen3_8_27b.ninfer; for another artifact or flags, name the command:
+#         docker run --gpus all -v /path/to/models:/models -p 8080:8080 ninfer \
+#             ninfer-serve /models/other.ninfer --host 0.0.0.0 --max-context 32768
+
 FROM nvidia/cuda:13.1.2-devel-ubuntu24.04 AS build
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -11,6 +17,7 @@ RUN apt-get update \
         libavutil-dev \
         libcurl4-openssl-dev \
         libhwloc-dev \
+        liburing-dev \
         libswscale-dev \
         ninja-build \
         pkg-config \
@@ -20,7 +27,7 @@ WORKDIR /src
 COPY . .
 
 RUN cmake -S . -B /build -G Ninja \
-        -DCMAKE_BUILD_TYPE=Release -DNINFER_TARGET=rtx5090 \
+        -DCMAKE_BUILD_TYPE=Release -DNINFER_TARGET=turing \
         -DNINFER_BUILD_APPS=ON \
         -DBUILD_TESTING=OFF \
         -DNINFER_BUILD_BENCHMARKS=OFF \
@@ -37,14 +44,19 @@ RUN apt-get update \
         libavutil58 \
         libcurl4t64 \
         libhwloc15 \
+        liburing2 \
         libswscale7 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=build /build/apps/ninfer /usr/local/bin/ninfer
-COPY --from=build /build/apps/ninfer-serve /usr/local/bin/ninfer-serve
+# The executables find the shared libraries through a relative RPATH (../lib), so both folders keep
+# the build tree's layout; the PATH entries are symlinks, which the loader resolves.
+COPY --from=build /build/apps/ninfer /build/apps/ninfer-serve /opt/ninfer/apps/
+COPY --from=build /build/lib /opt/ninfer/lib
+RUN ln -s /opt/ninfer/apps/ninfer /usr/local/bin/ninfer \
+    && ln -s /opt/ninfer/apps/ninfer-serve /usr/local/bin/ninfer-serve
 
 WORKDIR /workspace
 EXPOSE 8080
 STOPSIGNAL SIGTERM
 
-CMD ["ninfer-serve", "--help"]
+CMD ["ninfer-serve", "/models/qwen3_8_27b.ninfer", "--host", "0.0.0.0"]

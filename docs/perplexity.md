@@ -12,24 +12,24 @@ English reference text, English long-form text, Chinese reference text, and NInf
 `full` selects all streams; `--quick` selects one stream from each domain.
 
 ```bash
-./build/rtx5090-release/apps/ninfer-perplexity models/qwen3_8_27b_nvfp4.ninfer \
+./build/turing-release/apps/ninfer-perplexity models/qwen3_8_27b.ninfer \
   --corpus eval/corpora/perplexity-1m/manifest.json \
   --quick \
-  --kv-dtype fp8
+  --kv-dtype int8
 ```
 
 The default evaluation uses a 4,096-token context and a 2,048-token stride. Use `--context` and
 `--stride` to change that protocol, or score one UTF-8 file with `--text FILE`. The available Main
-KV representations are `bf16`, `int8`, `fp8`, `nvfp4`, and `k8v4`.
+KV representations are `bf16`, `int8`, `fp8`, `nvfp4`, and `k8v4`; `fp8`, `nvfp4` and `k8v4` are not available on Turing builds.
 
 ```bash
-./build/rtx5090-release/apps/ninfer-perplexity models/qwen3_8_27b.ninfer \
+./build/turing-release/apps/ninfer-perplexity models/qwen3_8_27b.ninfer \
   --text notes.txt \
   --context 16384 --stride 8192 \
   --kv-dtype int8
 ```
 
-Run `./build/rtx5090-release/apps/ninfer-perplexity --help` for the complete command surface. The evaluator loads
+Run `./build/turing-release/apps/ninfer-perplexity --help` for the complete command surface. The evaluator loads
 the model once, reads and tokenizes every selected stream before scoring, and writes readable
 startup, corpus, scoring, and per-stream summaries to stderr. Interactive weight loading and
 scoring use one transient progress line; redirected scoring emits persistent progress every ten

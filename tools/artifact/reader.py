@@ -9,7 +9,7 @@ from typing import Iterator
 
 from .framing import HEADER, MAGIC, PART_MAGIC, PAYLOAD_ALIGNMENT
 from .layouts import align_up
-from .file_io import discard_cached_pages, IO_CHUNK_BYTES
+from .file_io import discard_cached_pages, IO_CHUNK_BYTES, open_read, pread
 from .schema import (
     ArtifactError,
     ArtifactObject,
@@ -32,10 +32,10 @@ class Artifact:
         self._fds: dict[int, int] = {}
         self._validated: set[str] = set()
         try:
-            fd = os.open(self.path, os.O_RDONLY)
+            fd = open_read(self.path)
             self._fds[0] = fd
             entry_bytes = os.fstat(fd).st_size
-            raw = os.pread(fd, HEADER.size, 0)
+            raw = pread(fd, HEADER.size, 0)
             if len(raw) != HEADER.size:
                 raise ArtifactError("truncated v3 entry header")
             magic, json_bytes, self.artifact_id = HEADER.unpack(raw)
@@ -44,7 +44,7 @@ class Artifact:
             integer(json_bytes, "json_bytes", positive=True)
             if json_bytes > entry_bytes - HEADER.size:
                 raise ArtifactError("directory JSON exceeds entry file")
-            raw_json = os.pread(fd, json_bytes, HEADER.size)
+            raw_json = pread(fd, json_bytes, HEADER.size)
             if len(raw_json) != json_bytes:
                 raise ArtifactError("truncated directory JSON")
             self.directory: Directory = decode_directory(
@@ -98,9 +98,9 @@ class Artifact:
             return self._fds[index]
         file = self.directory.files[index]
         path = self.path.parent / file.path
-        fd = os.open(path, os.O_RDONLY)
+        fd = open_read(path)
         try:
-            raw = os.pread(fd, HEADER.size, 0)
+            raw = pread(fd, HEADER.size, 0)
             if len(raw) != HEADER.size:
                 raise ArtifactError(f"{path}: truncated continuation header")
             magic, actual_index, artifact_id = HEADER.unpack(raw)
@@ -145,7 +145,7 @@ class Artifact:
             file_offset = self.payload_offset if index == 0 else PAYLOAD_ALIGNMENT
             file_offset += offset - self._prefixes[index]
             fd = self._file(index)
-            data = os.pread(fd, count, file_offset)
+            data = pread(fd, count, file_offset)
             if len(data) != count:
                 raise ArtifactError(
                     f"short read at logical offset {offset}: {len(data)} of {count}"

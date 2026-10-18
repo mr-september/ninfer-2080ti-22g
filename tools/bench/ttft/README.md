@@ -94,12 +94,14 @@ run. Use the standalone ordinary case when an isolated whole-run resource compar
 
 The default artifact is `out/qwen3_8_27b_nvfp4.ninfer`, with FP8 KV. GPU campaigns run serially.
 
+That artifact and the built-in profiles use FP8 KV and NVFP4 weights, which the `turing` target cannot run. On a Turing GPU select a `groupwise-int` artifact with `--artifact` and replace the profiles' `--kv-dtype fp8` with `--kv-dtype int8` through `--profile-config` (below). The campaign scripts are upstream's and have not been qualified on Turing by this fork.
+
 ```bash
 python3 tools/bench/run_serve_ttft_campaign.py \
-  --serve build/rtx5090-dev/apps/ninfer-serve --campaign preemption --samples 1
+  --serve build/turing-dev/apps/ninfer-serve --campaign preemption --samples 1
 
 python3 tools/bench/run_serve_ttft_campaign.py \
-  --serve build/rtx5090-dev/apps/ninfer-serve \
+  --serve build/turing-dev/apps/ninfer-serve \
   --case session-hot-continuation \
   --case private-state-working-set-shift \
   --samples 3
@@ -120,7 +122,8 @@ Campaigns select workloads by purpose:
 
 The default is `resource` with one sample. `--serve` is required; use
 `--artifact` when selecting another artifact. Fixture token facts
-still need to match the selected tokenizer/template.
+still need to match the selected tokenizer/template. The fixtures' token facts come from the artifact's template, so add `--artifact-chat-template` to the profile's `common_args` (the default
+Sharp template adds about 150 tokens per request).
 
 `--profile-config FILE` replaces the built-in profile catalog. This allows a preserved baseline
 binary to use its own CLI without compatibility flags in the candidate:

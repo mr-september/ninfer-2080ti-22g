@@ -11,8 +11,17 @@ CUDA 13.4 is the validated development toolkit. Product commands and prerequisit
 
 | Target | System | CUDA architecture |
 |---|---|---|
-| `rtx5090` (default) | Linux x86-64 | `120a` |
+| `turing` (default in this fork) | Linux x86-64 or native Windows x86-64 | `75` |
+| `rtx5090` | Linux x86-64 | `120a` |
 | `dgx_spark` | Linux AArch64 | `121a` |
+
+`turing` composes its sources from the `rtx5090` trees: `NINFER_SOURCE_TARGET` is `rtx5090` and keys the
+source directories, while `NINFER_TARGET` stays `turing` for behavior that must differ (no CPU expert
+executor, `NINFER_EXPERT_OFFLOAD` 0). `src/ops/CMakeLists.txt` filters the Blackwell-only Op sources
+(FP8/NVFP4/K8V4 weights and KV, TMA, block-scaled MoE, QSA sparse attention, Kimi delta attention,
+hyper-connection mix) out of those manifests, and `src/ops/unsupported/turing_unsupported.cpp` links
+throwing stubs for the declarations that remain, so these Ops report unsupported at their capacity/execution
+entries. `NINFER_SM75` is defined for device code that differs on sm_75.
 
 [`cmake/NinferPlatform.cmake`](../../cmake/NinferPlatform.cmake) resolves the target and validates
 `CMAKE_CUDA_ARCHITECTURES` before `project()` detects CUDA. After toolchain initialization it checks
@@ -23,7 +32,7 @@ Libraries and executables retain their logical names across targets; their build
 
 The same selection generates `<build-dir>/generated/core/platform.h` from
 [`src/core/platform.h.in`](../../src/core/platform.h.in). Internal consumers explicitly include
-`core/platform.h`; `ninfer_internal_includes()` supplies its private include root. Both
+`core/platform.h`; `ninfer_internal_includes()` supplies its private include root. `NINFER_TARGET_TURING`,
 `NINFER_TARGET_RTX5090` and `NINFER_TARGET_SPARK` are defined as 0 or 1, so test them with `#if`.
 These definitions do not propagate into public headers or third-party targets.
 
@@ -48,7 +57,7 @@ composition. The default configuration is Release. Ninja links and archives shar
 
 | Cache option | Default | Scope |
 |---|---|---|
-| `NINFER_TARGET` | `rtx5090` | Execution target and native architecture |
+| `NINFER_TARGET` | `turing` | Execution target and native architecture |
 | `NINFER_BUILD_ENGINE` | ON | Frontend, media decode, models and Engine |
 | `NINFER_BUILD_APPS` | ON | CLI, HTTP server and perplexity evaluator; requires Engine |
 | `BUILD_TESTING` | OFF | Tests for the selected components |
@@ -81,6 +90,11 @@ The checked-in presets use independent `build/<preset-name>/` directories:
 - `dgx-spark-release`: AArch64/SM121a product binaries;
 - `dgx-spark-dev`: AArch64/SM121a products, tests and benchmarks;
 - `dgx-spark-ops`: AArch64/SM121a Core, Artifact and Ops development.
+- `turing-release`, `turing-dev`, `turing-ops`: the same three presets for Turing on Linux;
+- `turing-windows`, `turing-windows-dev`, `turing-windows-ops`: native Windows with MSVC and the vcpkg
+  toolchain file (`VCPKG_ROOT`), building in `build/turing-windows/` and so on. The `vcpkg.json` manifest
+  supplies FFmpeg, hwloc and curl on Windows, whose direct-file I/O uses an I/O completion port instead of
+  liburing;
 
 Each has a matching build preset; development presets also have test presets. For example:
 

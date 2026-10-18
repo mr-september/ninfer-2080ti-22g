@@ -76,7 +76,7 @@ def _function(value: str):
     if value in RECIPES:
         return RECIPES[value]
     filename, separator, function = value.rpartition(":")
-    if not separator:
+    if not separator or "/" in function or "\\" in function:  # no ":FUNCTION", or a drive letter
         filename, function = value, "configure"
     path = Path(filename).resolve()
     spec = importlib.util.spec_from_file_location("ninfer_user_recipe", path)

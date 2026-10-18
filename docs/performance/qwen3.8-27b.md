@@ -259,7 +259,7 @@ for perf_profile in nvfp4 groupwise-int; do
     nvfp4) perf_artifact=out/qwen3_8_27b_nvfp4.ninfer ;;
     groupwise-int) perf_artifact=out/qwen3_8_27b.ninfer ;;
   esac
-  perf_common=(--serve build/apps/ninfer-serve
+  perf_common=(--serve build/rtx5090-release/apps/ninfer-serve
     --artifact "qwen3_8_27b=$perf_artifact"
     --kv-dtype fp8 --sampling stochastic --port 18080)
 

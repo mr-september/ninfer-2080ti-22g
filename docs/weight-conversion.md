@@ -410,8 +410,10 @@ The official conversion examples select these maintained templates:
 The Flash Next template maps `minimal` to `low`, `high`/`max` to `xhigh`, and `none` to disabled
 thinking. Final-assistant continuation preserves its content, including trailing whitespace.
 
-Use your own Jinja file to change the artifact's default template. A startup
-[`--chat-template FILE`](cli.md#text-input) overrides the stored template.
+Use your own Jinja file to change the artifact's default template. The executables do not use the
+stored template by default: they render with the vendored Sharp template, and
+`--artifact-chat-template` selects the stored one. A startup
+[`--chat-template FILE`](cli.md#text-input) overrides either.
 `generation_config.json` is preserved; sampling presets remain determined by the architecture
 and explicit application/request settings.
 

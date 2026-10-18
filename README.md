@@ -1,309 +1,219 @@
-# NInfer
+# NInfer for Turing (RTX 2080 Ti 22 GB)
 
-> Selected checkpoints. Maximum single-GPU inference performance.
+> Selected checkpoints. Maximum single-GPU inference performance on modified 22 GB RTX 2080 Ti (`sm_75`) cards. Runs on Windows natively or on Linux/WSL2.
 
-NInfer is a from-scratch C++/CUDA inference engine for a single NVIDIA GeForce RTX 5090 or DGX Spark GPU.
-Qwen3.5 Dense/MoE and Qwen4Exp (Qwen3.8-Flash-Next) support text, image/video prompts and native MTP.
-They use the local CLI or OpenAI-/Anthropic-compatible HTTP APIs. The runtime uses one GPU, one
-resident model, and one to eight execution lanes fixed at startup.
+NInfer is a from-scratch C++/CUDA inference engine for a single GPU: Qwen3.5 Dense/MoE (and upstream's Qwen4Exp) with text, image/video prompts and native MTP, through a local CLI or OpenAI-/Anthropic-compatible HTTP APIs, with one resident model and one to eight execution lanes fixed at startup.
 
-Five official artifacts are available. The quick-start commands use Qwen3.8-27B NVFP4.
+This fork adds a `turing` build target to [Neroued/ninfer](https://github.com/Neroued/ninfer) for NVIDIA Turing (`sm_75`, RTX 2080 Ti 22 GB), plus a native Windows build. The Engine, runtime, frontend, scheduling, CLI and OpenAI/Anthropic serving are upstream's; the Turing kernels, the Windows port and a few memory and tuning changes are this fork's. The `turing` target compiles upstream's `rtx5090` source trees with `NINFER_SM75` defined and replaces the Blackwell-only Ops (FP8/NVFP4/K8V4, TMA, block-scaled MoE and others) with stubs that throw, so the fork follows upstream through that target (see [docs/turing-port.md](docs/turing-port.md) and [build organization](docs/maintainer/build-system.md)). The `rtx5090` and `dgx_spark` targets are still upstream's and are neither built nor tested here.
 
-| Model | Weights | Artifact | Download and model card |
-|---|---|---|---|
-| Qwen3.6-27B | `groupwise-int` | `qwen3_6_27b.ninfer` | [Qwen3.6-27B](https://huggingface.co/neroued/Qwen3.6-27B-NInfer) |
-| Qwen3.6-27B | `nvfp4` | `qwen3_6_27b_nvfp4.ninfer` | [Qwen3.6-27B NVFP4](https://huggingface.co/neroued/Qwen3.6-27B-nvfp4-NInfer) |
-| Qwen3.8-27B | `groupwise-int` | `qwen3_8_27b.ninfer` | [Qwen3.8-27B](https://huggingface.co/neroued/Qwen3.8-27B-NInfer) |
-| Qwen3.8-27B | `nvfp4` | `qwen3_8_27b_nvfp4.ninfer` | [Qwen3.8-27B NVFP4](https://huggingface.co/neroued/Qwen3.8-27B-nvfp4-NInfer) |
-| Qwen3.6-35B-A3B | `groupwise-int` | `qwen3_6_35b_a3b.ninfer` | [Qwen3.6-35B-A3B](https://huggingface.co/neroued/Qwen3.6-35B-A3B-NInfer) |
+## What runs here
 
-Each v3 `.ninfer` artifact carries model configuration, encoded weights, logical bindings and
-frontend resources. Runtime execution uses those facts with the implemented model and Op
-capabilities. You can also [convert your own weights](docs/weight-conversion.md), reuse an official
-recipe or choose another supported mixture of formats.
+| Area | Status on `sm_75` |
+|---|---|
+| Artifacts | v3 `groupwise-int` (Q4/Q5/Q6/Q8 + BF16): Qwen3.8-27B (tested) |
+| NVFP4 / FP8 weights | not available (need Blackwell); the NVFP4 artifacts do not load |
+| KV cache | `int8` (default), `bf16`; `fp8`, `nvfp4`, `k8v4` unavailable |
+| Text, thinking, prefix reuse, CUDA Graph decode | yes |
+| Image / video Vision | yes (`--vision`) |
+| MTP speculation with the optimized proposal head | yes, on by default |
+| Qwen3.6-27B, Qwen3.6-35B-A3B, DFlash | untested; the kernels build and pass op tests, so they may work in theory, but nothing is guaranteed. The 35B-A3B artifact (21.2 GiB) cannot fit a 22 GB card |
+| OpenAI Chat/Responses, Anthropic Messages, streaming | yes |
+| Kimi delta attention | not built (needs more than the 64 KiB CTA shared memory limit) |
+| Qwen4Exp (Flash Next), CPU expert offload, other Blackwell-only Ops (QSA sparse attention, hyper-connection mix, block-scaled MoE) | not available: the Ops are stubbed on `turing` and `NINFER_EXPERT_OFFLOAD` is 0 |
 
-The current engine requires v3 artifacts. Existing official v2 downloads can be
-[upgraded locally](docs/weight-conversion.md#upgrade-an-existing-v2-artifact) without downloading
-the weights again.
+Checked on one 2080 Ti 22 GB with Qwen3.8-27B `groupwise-int`, natively on Windows: CLI text, image and image+video prompts, a 64k-token needle retrieval, and `ninfer-serve` answering OpenAI chat, SSE streaming, Responses, Anthropic messages, tool calls and two concurrent requests. The CTest suite (130 entries) was run on Linux/WSL2: everything passes except the real-model tests that exercise FP8 KV, which this build does not support, and two real-model tests (`prefix_real`, `agent_continuation_real`) that fail on artifact-template and request-validation checks not yet traced. The Python-oracle tests need `jinja2` and `jsonschema`, and the real-model tests need `NINFER_TEST_ARTIFACT`. See [Tests](tests/README.md).
 
 ## Quick start
 
-The Engine builds natively on Linux: x86-64/`sm_120a` for RTX 5090, or AArch64/`sm_121a`
-for DGX Spark. Both require a CUDA toolkit supporting the selected architecture,
-CMake 3.28 or newer, a C++20 host compiler, Ninja, `pkg-config`, FFmpeg development libraries
-(`libavformat`, `libavcodec`, `libavutil`, and `libswscale`), `hwloc >= 2.5`, `liburing >= 2.5`,
-and `libcurl >= 7.85`.
-CUDA 13.4 is the validated development toolkit; CMake does not impose a CUDA version floor.
-RTX 5090 supports resident and CPU expert offload execution. DGX Spark uses resident GPU
-weights and Device context storage; Flash Next Text/Vision/MTP shares the same model implementation.
-
-Build the product binaries:
+Download the artifact (or [convert your own](#models-formats-and-converting-your-own-weights)), build (next section), then run:
 
 ```bash
-git clone https://github.com/Neroued/ninfer.git
-cd ninfer
+# one request: answer on stdout, diagnostics on stderr
+./build/turing-release/apps/ninfer models/qwen3_8_27b.ninfer --prompt "Explain prefill and decode in two sentences."
 
-cmake --preset rtx5090-release
-cmake --build build/rtx5090-release -j
+# OpenAI- and Anthropic-compatible server on http://127.0.0.1:8080
+./build/turing-release/apps/ninfer-serve models/qwen3_8_27b.ninfer
 ```
 
-On DGX Spark, use `dgx-spark-release` and `build/dgx-spark-release` in these commands.
+On native Windows the binaries are `build\turing-windows\apps\ninfer.exe` and `ninfer-serve.exe`, for example:
 
-Tests and benchmarks are excluded from the product presets. `cmake --preset rtx5090-dev`
-or `cmake --preset dgx-spark-dev` enables both and finds a Python 3 interpreter. The `rtx5090-ops`
-and `dgx-spark-ops` presets build Core, Artifact and Ops with their tests and benchmarks.
-Each preset uses its own `build/<preset-name>/` directory.
-Machine-specific compiler and Python paths belong in the ignored `CMakeUserPresets.json`.
-See [build organization and configuration](docs/maintainer/build-system.md) for details.
+```bat
+build\turing-windows\apps\ninfer.exe E:\path\to\qwen3_8_27b.ninfer --prompt "Hello"
+```
 
-There is no install target or packaged binary distribution; run NInfer from its source build tree.
-Executables use shared libraries in the same build's `lib/` directory through relative RPATH;
-keep that directory alongside `apps/`, `tests/` and `bench/` when moving build outputs.
-Python tools run independently of CMake; the standalone HBM probe has its own
-[build command](tools/README.md#standalone-hbm-probe).
-
-Download the artifact used by this example with the Hugging Face CLI:
+Add `--vision` for image and video input and `--messages FILE` for structured input; see the [CLI guide](docs/cli.md), [HTTP serving](docs/serving.md) and [committed examples](examples/cli/).
 
 ```bash
-hf download neroued/Qwen3.8-27B-nvfp4-NInfer \
-  qwen3_8_27b_nvfp4.ninfer \
-  --local-dir models
+curl http://127.0.0.1:8080/v1/chat/completions -H 'Content-Type: application/json' \
+  -d '{"model": "qwen3.8-27b", "messages": [{"role": "user", "content": "Hi"}], "max_tokens": 64}'
 ```
 
-Start a long-running text/agent server with two execution lanes and prefix caching:
+## Defaults
+
+Those two commands already use the best-tested configuration for this GPU. Written out in full, the CLI default is
 
 ```bash
-./build/rtx5090-release/apps/ninfer-serve models/qwen3_8_27b_nvfp4.ninfer \
-  --max-context 240000 \
-  --kv-capacity 240000 \
-  --max-concurrency 2 \
-  --kv-dtype fp8 \
-  --device-state-slots 2 \
-  --spec mtp --draft-tokens 3 \
-  --lm-head-draft \
-  --preserve-thinking
+./build/turing-release/apps/ninfer models/qwen3_8_27b.ninfer --prompt "..." \
+  --max-context 65536 --kv-capacity 65536 --kv-dtype int8 \
+  --spec mtp --draft-tokens 3 --lm-head-draft \
+  --max-new 128 --prefill-chunk 1024 --device 0 \
+  --chat-template tools/chat_templates/qwen3_8_sharp_v22_5.jinja
 ```
 
-Each request has a 240,000-token logical ceiling. A shared 240,000-token Device KV pool serves
-resident requests and retained prefixes. Requests acquire KV pages as execution advances; under
-pressure, the scheduler can pause a request and resume it later. The profile provides two extra
-Device StateImages and the default shared pinned Host budget: 8 GiB plus eight model StateImages,
-used for retained state, KV and pause snapshots.
-
-Send an OpenAI-style request:
+and the server default is
 
 ```bash
-curl http://127.0.0.1:8080/v1/chat/completions \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "model": "qwen3.8-27b",
-    "messages": [{"role": "user", "content": "Reply with one short sentence."}],
-    "max_tokens": 64
-  }'
+./build/turing-release/apps/ninfer-serve models/qwen3_8_27b.ninfer --port 8080 \
+  --max-context 65536 --kv-capacity 65536 --kv-dtype int8 \
+  --spec mtp --draft-tokens 3 --lm-head-draft \
+  --max-concurrency 1 --prefill-chunk 1024 \
+  --chat-template tools/chat_templates/qwen3_8_sharp_v22_5.jinja
 ```
 
-Run a one-shot CLI request with a 32,768-token allocation:
+(`--lm-head-draft` is applied automatically when the artifact carries a proposal head, as the official ones do.) Each default is an ordinary flag, so an ablation changes exactly one of them:
+
+| To get | Pass |
+|---|---|
+| BF16 KV cache (twice the KV memory) | `--kv-dtype bf16` |
+| no speculative decoding | `--spec none` |
+| MTP with the full output head for proposals | `--no-lm-head-draft` |
+| a different draft window | `--draft-tokens 1..5` (3 is best for code, 1 to 2 for prose) |
+| a shorter or longer context | `--max-context N` (the KV pool follows it) |
+| the largest KV pool that fits | `--kv-capacity auto` |
+| image and video input | `--vision` |
+| more retained-prefix memory in RAM | `--host-context-mib N` (default 2 GiB plus eight state images, 3.15 GiB) |
+| the artifact's own chat template instead of Sharp v22.5.0 | `--artifact-chat-template` |
+| no CUDA Graph decode | `--no-cuda-graph` |
+| another GPU | `--device N` ([multi-GPU notes](docs/multi-gpu.md)) |
+
+The default is a 64k-token context with MTP. That needs most of the 22 GB (the embedding table lives in host memory to make room), and the limit with MTP is about 97k tokens (110k without it). The card is also a desktop GPU: other programs that hold VRAM reduce what is available, and when the default context does not fit in the free VRAM, startup retries at 32768 and then 16384 tokens and logs `max-context reduced to N to fit free VRAM`. An explicit `--max-context` is never lowered; if it does not fit, startup fails, and `--kv-capacity auto` sizes the KV pool to what is free.
+
+## Build
+
+On native Windows, install the NVIDIA driver, CUDA 12.8+ and Visual Studio 2022 (or Build Tools) with "Desktop development with C++", then run two commands from a PowerShell prompt in the clone:
+
+```powershell
+scripts\build.ps1    # configures with vcpkg.json and builds (about 11 minutes, plus the first-time FFmpeg build)
+scripts\serve.ps1    # downloads the default model if needed and serves http://127.0.0.1:8080/v1
+```
+
+`serve.ps1` takes `-Model PATH`, `-Port N` and `-ServerArgs '--max-context','32768'`. The two paths side by side, with the steps those scripts perform (the sources are the same):
+
+| | Linux / WSL2 | Windows native |
+|---|---|---|
+| **Shell** | any bash | **"x64 Native Tools Command Prompt for VS 2022"** (plain PowerShell or cmd cannot find the compiler) |
+| **Needs** | 64-bit Linux, CUDA 12.8+, CMake 3.28+, Ninja, a C++20 compiler, `pkg-config`, FFmpeg dev libraries (`libavformat`, `libavcodec`, `libavutil`, `libswscale`), `hwloc >= 2.5`, `liburing >= 2.5`, `libcurl >= 7.85` | Windows 10/11 x64, NVIDIA driver, CUDA 12.8+ (validated with 12.9), Visual Studio 2022 or Build Tools with "Desktop development with C++" (MSVC v143 + a Windows SDK), CMake 3.28+ and Ninja (both ship with the VS workload), vcpkg (the copy bundled with VS 2022 17.6+ works) |
+| **1. Libraries (once)** | Debian/Ubuntu: `sudo apt install pkg-config libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libcurl4-openssl-dev libhwloc-dev liburing-dev` | nothing to run: [`vcpkg.json`](vcpkg.json) lists FFmpeg, hwloc and curl, and step 4 installs them into the build folder (FFmpeg compiles from source, about 20 minutes the first time) |
+| **2. Get the source** | `git clone https://github.com/mr-september/ninfer-2080ti-22g.git`<br>`cd ninfer-2080ti-22g` | the same clone; then `cd /d C:\path\to\ninfer-2080ti-22g` |
+| **3. Point at the libraries** | not needed (found through `pkg-config`) | nothing in the "x64 Native Tools" prompt, which sets `VCPKG_ROOT`; otherwise `set VCPKG_ROOT=C:\path\to\vcpkg` |
+| **4. Configure** | `cmake --preset turing-release` | `cmake --preset turing-windows` |
+| **5. Build** | `cmake --build build/turing-release -j` | `cmake --build build/turing-windows -j` |
+| **Binaries** | `build/turing-release/apps/ninfer`, `ninfer-serve`, `ninfer-perplexity` | `build\turing-windows\apps\ninfer.exe`, `ninfer-serve.exe`, `ninfer-perplexity.exe` (the FFmpeg and curl DLLs are copied next to them) |
+| **Tests and benchmarks** | `cmake --preset turing-dev` | `cmake --preset turing-windows-dev` |
+| **Keep the model on** | a Linux filesystem if you can | an NTFS drive (reading it through `\\wsl$` is slow) |
+
+The `zlib` and `dav1d` features in `vcpkg.json` provide the PNG and AV1 decoders; without `zlib` image prompts fail with "media codec is not supported". Linux/WSL2 is the original, longer-tested path; native Windows avoids carving memory and disk out for a WSL VM.
+
+Presets are named `<target>-release`, `<target>-dev` (adds tests and benchmarks) and `<target>-ops` (Core, Artifact and Ops only), and each builds in `build/<preset-name>/`; the Windows presets are `turing-windows`, `turing-windows-dev` and `turing-windows-ops`. The default `NINFER_TARGET` of this fork is `turing`, which requires `CMAKE_CUDA_ARCHITECTURES=75`. Machine-specific compiler and Python paths belong in the ignored `CMakeUserPresets.json`. On Linux the executables find the shared libraries in the same build's `lib/` directory through a relative RPATH, so keep it beside `apps/` when moving build outputs. There is no install target or packaged binary distribution beyond `scripts/package.ps1` below.
+
+Page-locked memory has to be free RAM: the server pins 3.15 GiB by default (the 2 GiB host-context budget plus eight state images) and the embedding table another 1.26 GiB, 4.4 GiB in all (the startup log prints both). `ninfer-serve` halves the default host-context budget when the available RAM looks too small for it and logs `host context reduced to N to fit free RAM`; the startup log also shows how much was pinned and warns if the embedding had to move to the GPU. An explicit `--host-context-mib` is never changed; if it cannot be pinned, startup fails with a message naming the flag. If startup still reports `cudaMallocHost ... out of memory`, close memory-hungry programs or lower `--host-context-mib`.
+
+A cold build of the three executables took 10.6 minutes on native Windows with 16 logical cores (measured with FFmpeg already in vcpkg's binary cache; compiling FFmpeg itself the first time adds to that and was not timed), dominated by the Q8 split-K kernels. Tests and benchmarks are off by default (`BUILD_TESTING`, `NINFER_BUILD_BENCHMARKS`; see [build organization](docs/maintainer/build-system.md)).
+
+`scripts\package.ps1` packs the built executables, their DLLs and `serve.ps1` into `dist\ninfer-windows.zip`; cudart is linked statically, so the machine that runs the zip needs only the NVIDIA driver.
+
+With Docker and the NVIDIA container toolkit (Linux or WSL2), the [Dockerfile](Dockerfile) builds the server for Turing and serves `qwen3_8_27b.ninfer` from a mounted models folder:
 
 ```bash
-./build/rtx5090-release/apps/ninfer models/qwen3_8_27b_nvfp4.ninfer \
-  --prompt "Explain prefill and decode, then give a concise conclusion." \
-  --max-context 32768 \
-  --max-new 8192 \
-  --kv-dtype fp8 \
-  --spec mtp --draft-tokens 3 \
-  --lm-head-draft
+docker build -t ninfer .
+docker run --gpus all -v /path/to/models:/models -p 8080:8080 ninfer
 ```
 
-Answer content is written to stdout. Human-readable startup/runtime diagnostics and the CLI-owned
-reasoning, timing, throughput, memory, and speculative-decoding report are written to stderr;
-reasoning and the result report remain unprefixed product output. On a terminal, weight
-materialization uses one transient progress line followed by a compact Engine-ready summary.
-Redirected stderr receives persistent readable progress without terminal control sequences. Use
-`--log-level debug` for complete startup detail. Option and local input errors remain direct command
-diagnostics. Use `--messages FILE` and `--vision` for structured image/video input; see the
-[CLI guide](docs/cli.md) and [committed examples](examples/cli/).
+## Models, formats and converting your own weights
 
-## Resource-aware long-context reuse
+An artifact is a `.ninfer` v3 container: the model configuration, the encoded weights, logical bindings and the tokenizer and chat-template resources. This fork changes none of the format; files converted before or after its kernel changes are interchangeable with upstream's. The weight formats this GPU runs are:
 
-A reusable checkpoint combines KV with the complete continuation state at an exact token frontier.
-The engine retains completed conversation endpoints and stable input boundaries for multi-turn and
-agent reuse. Inactive checkpoints share Device and pinned Host capacity; pressure reclaims retained
-resources before pausing resident requests. Paused requests resume from a snapshot or rebuild their
-state by replaying already committed tokens.
+| Format | Layout | Used for |
+|---|---|---|
+| Q4, Q5, Q6 | signed integer codes, one FP16 scale per 64 weights | most projections; Q6 optionally for the vocabulary head |
+| Q8 | signed integer codes, one FP16 scale per 32 weights | vocabulary tensors, MTP block |
+| BF16 | plain | norms and small tensors |
 
-See [Resource scheduling and context cache](docs/maintainer/resource-scheduling-and-context-cache.md)
-for the algorithm and [Serve TTFT benchmark](tools/bench/ttft/) for public-HTTP coverage of hot
-reuse, Host resume, eviction, shared prefixes, scheduling boundaries, and multimodal load.
+NVFP4 and FP8 are Blackwell-only, so the `nvfp4` artifacts and recipes do not apply. The kernels also exist only for the registered Qwen 27B-class shapes: converting some other model into the format would not make it runnable.
 
-## Performance
-
-Published measurements use an RTX 5090. The [performance index](docs/performance.md) links to
-per-model run records and the [measurement rules](docs/performance/methodology.md). The tables
-below are excerpts from those detailed results. Qwen3.8 uses FP8 E4M3 row-256 KV;
-Qwen3.6 uses INT8 group-64 KV.
-
-### Concurrent MTP3 decode
-
-Saturated decode used CUDA Graphs, MTP3, and one 8,192-token generation per active
-request. Throughput uses aggregate committed decode tokens from complete intervals whose actual
-decode batch equaled the configured concurrency. Acceptance covers the complete request wave;
-these rates are steady decode (tok/s).
-
-| Model profile | C=1 tok/s / accept | C=2 tok/s / accept | C=4 tok/s / accept | C=8 tok/s / accept |
-|---|---:|---:|---:|---:|
-| [Qwen3.6-27B](docs/performance/qwen3.6-27b.md#decode-saturation) `groupwise-int` | 185.8 / 68.2% | 247.0 / 69.0% | 309.5 / 68.4% | 535.0 / 68.3% |
-| [Qwen3.6-27B](docs/performance/qwen3.6-27b.md#decode-saturation) `nvfp4` | 202.4 / 69.3% | 399.7 / 71.4% | 699.7 / 69.3% | 1,146.9 / 68.6% |
-| [Qwen3.6-35B-A3B](docs/performance/qwen3.6-35b-a3b.md#decode-saturation) `groupwise-int` | 642.5 / 68.6% | 907.2 / 66.3% | 1,213.5 / 69.6% | 1,380.7 / 68.0% |
-| [Qwen3.8-27B](docs/performance/qwen3.8-27b.md#decode-saturation) `groupwise-int` | 136.5 / 44.4% | 253.3 / 45.2% | 398.1 / 46.1% | 582.4 / 46.4% |
-| [Qwen3.8-27B](docs/performance/qwen3.8-27b.md#decode-saturation) `nvfp4` | 147.7 / 46.2% | 291.0 / 48.7% | 522.2 / 45.8% | 922.4 / 46.1% |
-
-### Single-request serving
-
-The serial serving corpus used CUDA Graphs, a 1,024-token prefill chunk, and five
-fixed seeds after warm-up. The table keeps one short-prefill, one extreme-prefill, and one
-structured-output MTP3 point for each published profile; the full context and scenario matrices are
-linked from each model below.
-
-| Model profile | 7,680-token prefill | 260,096-token prefill | Structured MTP3 decode |
-|---|---:|---:|---:|
-| [Qwen3.6-35B-A3B](docs/performance/qwen3.6-35b-a3b.md#single-request-speculative-decode) `groupwise-int` | 17,705.4 tok/s | 5,247.0 tok/s | 779.6 tok/s |
-| [Qwen3.6-27B](docs/performance/qwen3.6-27b.md#single-request-speculative-decode) `groupwise-int` | 3,218.1 tok/s | 1,614.8 tok/s | 193.0 tok/s |
-| [Qwen3.6-27B](docs/performance/qwen3.6-27b.md#single-request-speculative-decode) `nvfp4` | 11,191.5 tok/s | 2,510.6 tok/s | 252.2 tok/s |
-| [Qwen3.8-27B](docs/performance/qwen3.8-27b.md#single-request-speculative-decode) `groupwise-int` | 3,331.9 tok/s | 2,139.4 tok/s | 214.7 tok/s |
-| [Qwen3.8-27B](docs/performance/qwen3.8-27b.md#single-request-speculative-decode) `nvfp4` | 12,819.1 tok/s | 4,016.4 tok/s | 231.7 tok/s |
-
-## Evaluation
-
-Capability scores were measured through NInfer's OpenAI-compatible serving route with thinking
-enabled, MTP3, and EvalScope 1.9.0 (0-shot, rule scoring, one sample per problem):
-
-| Model profile | AIME 2025 | AIME 2026 | GPQA-Diamond | ERQA | RealWorldQA |
-|---|---:|---:|---:|---:|---:|
-| [Qwen3.6-27B groupwise-int](model-cards/Qwen3.6-27B-NInfer/README.md) | 86.67% | 93.33% | 86.87% | — | — |
-| [Qwen3.6-27B NVFP4](model-cards/Qwen3.6-27B-nvfp4-NInfer/README.md) | 93.33% | 93.33% | 84.34% | — | — |
-| [Qwen3.6-35B-A3B groupwise-int](model-cards/Qwen3.6-35B-A3B-NInfer/README.md) | 90.00% | 90.00% | 85.35% | — | — |
-| [Qwen3.8-27B groupwise-int](model-cards/Qwen3.8-27B-NInfer/README.md) | 96.67% | 96.67% | 87.37% | 66.25% | 82.22% |
-| [Qwen3.8-27B NVFP4](model-cards/Qwen3.8-27B-nvfp4-NInfer/README.md) | 96.67% | 96.67% | 90.40% | 66.25% | 83.53% |
-
-The Qwen3.6 rows used temperature 0.6 and presence penalty 1.0; the Qwen3.8 rows used temperature
-1.0 and presence penalty 0.0. Multimodal evaluation used `--vision` and an 81,920-token context
-limit. Text evaluation used 262,144 tokens except Qwen3.8-27B NVFP4, which used 252,928 tokens to
-fit the RTX 5090 after weights. Each score is one sample per problem; model cards contain the
-correct/total counts and evaluation notes.
-
-## Startup notes
-
-GPU residency is fixed at process startup. `--spec` selects speculative decoding residency, and
-`--vision` independently selects Vision residency. Qwen3.6-35B-A3B DFlash can be combined with
-Vision; it accelerates generated-text decode after multimodal prefill, not Vision encode itself.
-
-## Docker
-
-Build the runtime image on a host with the NVIDIA Container Toolkit:
+**Download.** The official `groupwise-int` artifacts need no conversion:
 
 ```bash
-docker build --tag ninfer:local .
+hf download neroued/Qwen3.8-27B-NInfer qwen3_8_27b.ninfer --local-dir models
 ```
 
-Mount the downloaded model and run the same example server profile:
+**Convert from the original checkpoint.** Start from the original BF16 Hugging Face checkpoint (a local directory of safetensors). The converter quantizes once with group-wise absolute-max rounding; it reads safetensors and already-quantized NVFP4/FP8 checkpoints, and has no GGUF reader (converting a quantized file would round twice anyway). It needs Python 3.10 or newer with PyTorch and NumPy and runs the same on native Windows and on Linux/WSL2 (use `python` instead of `python3` on Windows); it uses CUDA by default and `--device cpu` otherwise. Windows CPU-only setup: `python -m pip install torch numpy safetensors`, with a CUDA build of PyTorch from pytorch.org for GPU conversion. From the repository root:
 
 ```bash
-docker run --rm \
-  --gpus '"device=0"' \
-  --publish 8080:8080 \
-  --volume "$PWD/models:/models:ro" \
-  ninfer:local \
-  ninfer-serve /models/qwen3_8_27b_nvfp4.ninfer \
-  --host 0.0.0.0 \
-  --max-context 240000 \
-  --kv-capacity 240000 \
-  --max-concurrency 2 \
-  --kv-dtype fp8 \
-  --device-state-slots 2 \
-  --spec mtp --draft-tokens 3 \
-  --lm-head-draft \
-  --preserve-thinking
+python3 -m tools.convert \
+  --model /path/to/Qwen3.8-27B \
+  --recipe qwen3_8_27b \
+  --components text,vision,mtp \
+  --resource chat_template.jinja=tools/chat_templates/qwen3_8.jinja \
+  --proposal \
+  --name qwen3.8-27b \
+  --out models/qwen3_8_27b.ninfer
 ```
+
+`--proposal` adds the proposal head the default speculative decoding uses. The recipes `qwen3_6_27b` and `qwen3_8_27b` select the Q4/Q5 mixture; part of a recipe can be overridden, see [Weight conversion](docs/weight-conversion.md) (including the v2 to v3 upgrade tool).
+
+**Shrink an existing artifact.** Re-encoding the output head from Q8 to Q6 is near-lossless (perplexity +0.014%) and frees 0.4 GiB of VRAM, without needing the source checkpoint:
+
+```bash
+python3 -m tools.artifact.requantize_tensor models/qwen3_8_27b.ninfer models/qwen3_8_27b.q6head.ninfer \
+  --object text/output_head --format q6_g64_fp16
+```
+
+The Windows and Linux paths produce the same weights: re-encoding the Qwen3.8-27B head natively on Windows gave tensor data byte-identical to the WSL run (only the artifact ID and provenance metadata differ).
+
+## Performance (one RTX 2080 Ti 22 GB)
+
+Qwen3.8-27B `groupwise-int`, INT8 KV, greedy, single request, native Windows (WSL2 matches within a few percent). Clocks and other programs move absolute figures by around 15% between sessions, so only same-session comparisons are meaningful.
+
+| Metric | Result |
+|---|---|
+| prefill, 122-token prompt | ~247 tok/s |
+| prefill, 8k-token prompt | ~479 tok/s |
+| prefill, 64k-token prompt | ~372 tok/s |
+| decode, no MTP | 24-29 tok/s |
+| decode, MTP3 with the proposal head (default) | 38-44 tok/s |
+| longest context that starts | 64k+ with MTP (about 97k); about 110k without |
+
+After the latest Turing kernel work (register-prefetched prefill GEMMs, a larger attention tile and a faster GDN projection at decode) the same build measures, with `ninfer_bench` on the repository token corpus and INT8 KV, about 614 tok/s at 512 prompt tokens, 612 at 8k and 493 at 64k (before: 498, 516, 397 in the same session) and about 27 tok/s decode without MTP (before: 26.4); the table above predates that work and is kept for the CLI prompts it was measured with. See [docs/turing-port.md](docs/turing-port.md) for the measurements.
+
+Prefill is about 1.9x faster on long prompts than before this fork's Turing tile tuning (8k: 253 to 479, 64k: about 205 to 372 tok/s) and 1.2x on a short one (122 tokens: 201 to 247). These are Turing numbers; the RTX 5090 tables in [docs/performance.md](docs/performance.md) are upstream's and do not apply here. Details and caveats are in [docs/turing-port.md](docs/turing-port.md).
 
 ## Capabilities and limits
 
-The official artifacts provide the following capabilities, with optional components enabled at startup:
+- thinking and non-thinking prompts; image, multi-image and video messages;
+- chunked prefill, exact-batch CUDA Graph decode, one to eight execution lanes with bounded FIFO ingress;
+- exact-prefix reuse with Device/Host state and KV retention, and pressure-driven pause/resume;
+- model-aware sampling defaults with explicit overrides;
+- OpenAI Responses, Chat Completions and Anthropic Messages, including streaming, tools, response state and token counting;
+- BF16 and grouped-integer weights with INT8 or BF16 KV on Turing; FP8, NVFP4 and K8V4 weights or KV, CPU expert offload and the other Blackwell-only features above are unavailable;
+- one resident model per Engine; no priority/QoS or distributed serving.
 
-- text generation with thinking and non-thinking prompt modes;
-- image, multi-image, video, and mixed multimodal messages;
-- chunked prefill, exact-batch CUDA Graph decode, and startup-bounded batched decode;
-- MTP speculative decoding with draft windows from one to five;
-- BF16, INT8, FP8, NVFP4, and K8V4 KV storage;
-- offline causal-perplexity scoring;
-- private and shared exact-prefix reuse with Device/Host State and KV retention;
-- model-aware sampling defaults and explicit sampler overrides;
-- OpenAI Responses Core, OpenAI Chat Completions, and Anthropic Messages, including streaming,
-  tools, local response state, token counting, and usage accounting.
-
-The 35B-A3B target additionally supports DFlash with draft windows from one to fifteen for Text and
-image/video Vision prompts, plus CPU/GPU MoE expert offload with CUDA Graph decode under a
-[GPU memory budget](docs/cli.md). Qwen3.8-27B artifacts with the DFlash2 companion weights support
-`--spec dflash2 --draft-tokens 7` for the same Text/Vision Engine path, with draft counts 1..15
-and either full or optimized proposal heads.
-
-Qwen3.8-Flash-Next uses CPU/GPU Main experts, disk-backed NF4 PLE and segmented CUDA Graph.
-Its native MTP uses the full shared head; DFlash/DFlash2 and optimized proposal heads are not
-supported for this architecture. See the [CLI commands](docs/cli.md),
-[conversion recipe](docs/weight-conversion.md) and
-[current support reference](docs/maintainer/qwen4_exp-execution.md).
-
-The product boundary remains intentionally small:
-
-- one RTX 5090 and one resident model per Engine;
-- one to eight resident execution lanes with bounded FIFO ingress;
-- resource-pressure preemption with snapshot or token-replay recovery;
-- no priority/QoS, multi-GPU, or distributed serving;
-- startup-fixed typed KV pools shared by active requests and retained prefixes;
-- model architectures and format/shape combinations use explicitly implemented native paths;
-- parsed tool calls are returned to the client; NInfer does not execute tools;
-- the in-tree C++ headers are not distributed as an installed SDK.
-
-`--max-context` is each sequence's logical limit. `--kv-capacity` sizes the shared Main Text KV pool
-used by active requests and retained prefixes; `auto` resolves the largest legal capacity at
-startup from the memory remaining after weights. Both explicit and automatic modes use 1 GiB of
-startup planning headroom. Explicit capacities remain fixed for the process lifetime.
+Run the relevant `--help` for the exact current option contract.
 
 ## Documentation
 
 - [Documentation index](docs/README.md)
-- [CLI](docs/cli.md)
-- [HTTP serving](docs/serving.md)
-- [Performance](docs/performance.md)
-- [Perplexity evaluation](docs/perplexity.md)
-- [Weight conversion and custom recipes](docs/weight-conversion.md)
+- [Turing port notes](docs/turing-port.md)
+- [CLI](docs/cli.md) and [HTTP serving](docs/serving.md)
+- [Multi-GPU](docs/multi-gpu.md)
+- [Weight conversion](docs/weight-conversion.md)
 - [Resource scheduling and context cache](docs/maintainer/resource-scheduling-and-context-cache.md)
-- [Serve TTFT benchmark](tools/bench/ttft/)
-- [CLI examples](examples/cli/)
 - [Contributing](CONTRIBUTING.md)
 
-Run the relevant `--help` for the exact current option contract.
-
-## Support
-
-NInfer is a personal project that I develop out of interest. If you find it useful and would like
-to support its continued development, you can [support the project on Ko-fi](https://ko-fi.com/neroued).
-
-Support is entirely voluntary. It is not a purchase or investment and does not come with financial
-returns, promised services or features, or a role in project decisions. The project's direction,
-priorities, technical choices, and release schedule remain independently determined by the
-maintainer.
+Based on [Neroued/ninfer](https://github.com/Neroued/ninfer); see the upstream repository for the original project and its support options.
 
 ## License
 
 NInfer is licensed under the [Apache License 2.0](LICENSE).
 
-The published artifacts are derived from
-[Qwen/Qwen3.6-27B](https://huggingface.co/Qwen/Qwen3.6-27B),
-[Qwen/Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B), and
-[Qwen/Qwen3.6-35B-A3B](https://huggingface.co/Qwen/Qwen3.6-35B-A3B). The Qwen3.6-27B NVFP4 artifact
-also uses the fixed packed weights from
-[rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm](https://huggingface.co/rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm).
-The Qwen3.8-27B NVFP4 artifact also uses the fixed mixed FP8/NVFP4 weights from
-[unsloth/Qwen3.8-27B-NVFP4](https://huggingface.co/unsloth/Qwen3.8-27B-NVFP4). These source
-repositories are distributed under Apache-2.0. Vendored dependencies retain their own license files
-under `third_party/`.
+The published artifacts are derived from [Qwen/Qwen3.6-27B](https://huggingface.co/Qwen/Qwen3.6-27B), [Qwen/Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B), and [Qwen/Qwen3.6-35B-A3B](https://huggingface.co/Qwen/Qwen3.6-35B-A3B). These source repositories are distributed under Apache-2.0. Vendored dependencies retain their own license files under `third_party/`.

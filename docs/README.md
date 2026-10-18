@@ -1,7 +1,6 @@
 # NInfer documentation
 
-Start with the [project README](../README.md) to build NInfer, download a published artifact, and
-run the CLI or HTTP server.
+Start with the [project README](../README.md) to build NInfer, download a published artifact, and run the CLI or HTTP server.
 
 ## User guides
 
@@ -9,6 +8,8 @@ run the CLI or HTTP server.
 |---|---|
 | [CLI](cli.md) | text, chat-history, image/video input, output streams, sampling, MTP, and common runtime options |
 | [HTTP serving](serving.md) | OpenAI Responses/Chat Completions, Anthropic Messages, state, streaming, token counting, authentication, and tool calls |
+| [Turing port](turing-port.md) | sm_75 differences, supported surface, Windows build and Turing measurements |
+| [Multi-GPU](multi-gpu.md) | device selection, multi-instance data parallelism, pipeline-parallelism design notes |
 | [Performance](performance.md) | RTX 5090 measurement coverage, per-model serving results, methodology, and publication rules |
 | [Weight conversion](weight-conversion.md) | official recipes, custom formats and sources, conversion methods, optional components and artifact output |
 | [Perplexity](perplexity.md) | fixed-corpus and custom-text causal perplexity, comparison rules, progress, and reports |
@@ -28,12 +29,9 @@ Published artifact downloads are listed in the [project README](../README.md).
 
 ## Maintainer references
 
-The active references under [`maintainer/`](maintainer/) record current architecture, model,
-artifact, and maintenance contracts. These files are not additional user workflows or installed
-API documentation.
+The active references under [`maintainer/`](maintainer/) record current architecture, model, artifact, and maintenance contracts. These files are not additional user workflows or installed API documentation.
 
-[Engine architecture](maintainer/engine-architecture.md) is the single top-level reference. The
-other references own narrower contracts:
+[Engine architecture](maintainer/engine-architecture.md) is the single top-level reference. The other references own narrower contracts:
 
 | Document | Responsibility |
 |---|---|

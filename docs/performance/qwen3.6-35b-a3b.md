@@ -222,7 +222,7 @@ cmake --build build -j --target ninfer-serve
 NINFER_BENCH_PYTHON=/home/neroued/miniconda3/envs/py311/bin/python
 NINFER_PERF_OUTPUT=profiles/bench/qwen3_6_35b_a3b_performance
 NINFER_PERF_COMMON=(
-  --serve build/apps/ninfer-serve
+  --serve build/rtx5090-release/apps/ninfer-serve
   --artifact qwen3_6_35b_a3b=out/qwen3_6_35b_a3b.ninfer
   --kv-capacity auto --prefill-chunk 1024 --device 0 --port 18080
 )

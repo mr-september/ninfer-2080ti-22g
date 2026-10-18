@@ -1,7 +1,7 @@
 # HTTP serving
 
-`build/rtx5090-release/apps/ninfer-serve` loads one v3 `.ninfer` artifact and exposes OpenAI- and
-Anthropic-compatible HTTP endpoints over one resident NInfer Engine.
+`build/turing-release/apps/ninfer-serve` (`build	uring-windowspps
+infer-serve.exe` on native Windows) loads one v3 `.ninfer` artifact and exposes OpenAI- and Anthropic-compatible HTTP endpoints over one resident NInfer Engine.
 
 Qwen3.8-Flash-Next supports Text/Vision/MTP serving with segmented CUDA Graph decode.
 Add `--vision` for media and `--spec mtp --draft-tokens 3` for native MTP with the full head.
@@ -10,10 +10,12 @@ See the [CLI example](cli.md) for commands and the
 
 ## Start the server
 
+> **Turing fork.** The commands in this page are upstream's RTX 5090 forms (NVFP4 weights, FP8 KV). On a GeForce RTX 2080 Ti use the `groupwise-int` artifact and the defaults of this build: INT8 KV, 65,536-token context, MTP with three draft tokens and the optimized proposal head when the artifact has one. Drop `--kv-dtype fp8`, or write `--kv-dtype int8`; see the [README](../README.md#defaults).
+
 See [CUDA synchronization](cli.md#cuda-synchronization) for the shared `NINFER_CUDA_SYNC` setting.
 
 ```bash
-./build/rtx5090-release/apps/ninfer-serve models/qwen3_8_27b_nvfp4.ninfer \
+./build/turing-release/apps/ninfer-serve models/qwen3_8_27b_nvfp4.ninfer \
   --host 127.0.0.1 \
   --port 8080 \
   --max-context 240000 \
@@ -32,7 +34,7 @@ when running alone. Requests acquire KV pages as execution advances; if concurre
 the pool, the scheduler can pause a request and restore it later.
 
 With `C=2` and two extra Device slots, the process owns four Device StateImages. The default shared
-pinned Host budget on RTX 5090 is 8 GiB plus eight model StateImages. This pool holds retained
+pinned Host budget is 8 GiB on RTX 5090 and 2 GiB on Turing builds (halved when the available RAM is too small), plus eight model StateImages. This pool holds retained
 state, KV and pause snapshots, including in-flight destinations; `--host-context-mib` sets an
 explicit total instead. DGX Spark uses Device context storage with zero Host context capacity.
 
@@ -74,21 +76,11 @@ selected for this process.
 | `POST /v1/messages` | Anthropic-style message generation |
 | `POST /v1/messages/count_tokens` | checkpoint-native expanded input-token count |
 
-`GET /health` returns HTTP 200 with `{"status":"ok"}` while the Engine can accept work. After an
-Engine-wide failure it returns HTTP 503 with `{"status":"unavailable"}`. Temporary queue
-saturation does not make the Engine unavailable. The endpoint remains unauthenticated.
+`GET /health` returns HTTP 200 with `{"status":"ok"}` while the Engine can accept work. After an Engine-wide failure it returns HTTP 503 with `{"status":"unavailable"}`. Temporary queue saturation does not make the Engine unavailable. The endpoint remains unauthenticated.
 
-Every OpenAI-compatible response carries a unique `x-request-id` header, including streaming and
-error responses. Anthropic endpoints use their separate `request-id` contract.
+Every OpenAI-compatible response carries a unique `x-request-id` header, including streaming and error responses. Anthropic endpoints use their separate `request-id` contract.
 
-All three generation SSE endpoints emit the standard `: keep-alive` comment after five seconds
-without a protocol event. The comment is transport-only: SSE clients ignore it, and it does not
-change generated text, event ordering, usage, stored Responses, or request logs. On Linux, accepted
-connections also use TCP keepalive and a 15-second `TCP_USER_TIMEOUT`; together with the heartbeat,
-a dead or unacknowledging peer is normally cancelled within about 20 seconds, including while the
-request is waiting or prefilling. A peer whose TCP stack remains connected and acknowledges data
-cannot be distinguished from a reading application; proxies must close their upstream NInfer
-connection when the downstream client disappears.
+All three generation SSE endpoints emit the standard `: keep-alive` comment after five seconds without a protocol event. The comment is transport-only: SSE clients ignore it, and it does not change generated text, event ordering, usage, stored Responses, or request logs. On Linux, accepted connections also use TCP keepalive and a 15-second `TCP_USER_TIMEOUT`; together with the heartbeat, a dead or unacknowledging peer is normally cancelled within about 20 seconds, including while the request is waiting or prefilling. A peer whose TCP stack remains connected and acknowledges data cannot be distinguished from a reading application; proxies must close their upstream NInfer connection when the downstream client disappears.
 
 ## OpenAI Chat Completions
 
@@ -108,33 +100,22 @@ curl http://127.0.0.1:8080/v1/chat/completions \
 The endpoint supports:
 
 - `system`, `developer`, `user`, `assistant`, and `tool` history, plus legacy `function` history;
-- string content and ordered text/refusal parts; adjacent parts are preserved without inserted
-  separators, and empty wire content remains an empty turn;
-- User `image_url` parts, tool-result `image_url` parts used by compatible clients, and the User
-  `video_url` extension using HTTP(S) or data URIs; image detail is omitted or `auto`;
-- nonnegative `max_completion_tokens` and the legacy `max_tokens` spelling; zero performs prompt
-  processing without generation;
+- string content and ordered text/refusal parts; adjacent parts are preserved without inserted separators, and empty wire content remains an empty turn;
+- User `image_url` parts, tool-result `image_url` parts used by compatible clients, and the User `video_url` extension using HTTP(S) or data URIs; image detail is omitted or `auto`;
+- nonnegative `max_completion_tokens` and the legacy `max_tokens` spelling; zero performs prompt processing without generation;
 - `temperature`, `top_p`, presence/frequency penalties, and signed integer `seed`;
 - the compatible `top_k` (`0..20`) and `min_p` (`0..1`) sampler extensions;
 - up to four non-empty stop strings, applied to both reasoning and answer output;
 - `n:1`, text-only `modalities`, and `response_format: {"type":"text"}`;
 - non-streaming responses and server-sent event streams;
 - `stream_options.include_usage`;
-- llama.cpp-compatible terminal `timings`, plus opt-in `timings_per_token` and
-  streaming `return_progress` observations;
-- function tools, optional `strict:true` argument schemas, `tool_choice` `auto`/`none`/`required`,
-  named selection, `allowed_tools`, and `parallel_tool_calls`; assistant tool-call history,
-  tool-result messages, and legacy function-call history;
+- llama.cpp-compatible terminal `timings`, plus opt-in `timings_per_token` and streaming `return_progress` observations;
+- function tools, optional `strict:true` argument schemas, `tool_choice` `auto`/`none`/`required`, named selection, `allowed_tools`, and `parallel_tool_calls`; assistant tool-call history, tool-result messages, and legacy function-call history;
 - the top-level `reasoning_effort` field;
-- `enable_thinking` and `preserve_thinking`, either at top level or in
-  `chat_template_kwargs`;
+- `enable_thinking` and `preserve_thinking`, either at top level or in `chat_template_kwargs`;
 - Assistant `reasoning_content` and `reasoning` history aliases.
 
-Options whose observable behavior the Engine cannot provide are rejected when they request that
-behavior. This includes nonzero `logit_bias`, requested log probabilities,
-audio/file input or audio output, explicit low/high image detail, web search,
-moderation, low/high verbosity, stored Chat Completions, and non-empty legacy `functions`.
-Each capability rejection identifies the affected field and the guarantee NInfer cannot provide.
+Options whose observable behavior the Engine cannot provide are rejected when they request that behavior. This includes nonzero `logit_bias`, requested log probabilities, audio/file input or audio output, explicit low/high image detail, web search, moderation, low/high verbosity, stored Chat Completions, and non-empty legacy `functions`. Each capability rejection identifies the affected field and the guarantee NInfer cannot provide.
 
 JSON mode and JSON Schema use the standard protocol fields:
 
@@ -144,25 +125,13 @@ JSON mode and JSON Schema use the standard protocol fields:
 | Responses | `text.format: {"type":"json_object"}` or `{"type":"json_schema","name":"answer","schema":{...},"strict":true}` |
 | Anthropic Messages | `output_config.format: {"type":"json_schema","schema":{...}}` |
 
-`json_object` requires an object root. Schema mode follows the supplied root type and enforces the
-[supported assertions](maintainer/constrained-decoding.md#42-json-与-schema-的执行合同), including when
-`strict` is omitted or false. Unsupported assertions return HTTP 400 before generation. OpenAI
-errors distinguish `invalid_json_schema`, `unsupported_json_schema` and `unsatisfiable_json_schema`;
-`param` identifies the request field followed by the schema JSON Pointer. Anthropic uses its
-`invalid_request_error` envelope with the schema location in the message. Responses echoes the
-selected `text.format` in aggregate responses and SSE response objects.
+`json_object` requires an object root. Schema mode follows the supplied root type and enforces the [supported assertions](maintainer/constrained-decoding.md#42-json-与-schema-的执行合同), including when `strict` is omitted or false. Unsupported assertions return HTTP 400 before generation. OpenAI errors distinguish `invalid_json_schema`, `unsupported_json_schema` and `unsatisfiable_json_schema`; `param` identifies the request field followed by the schema JSON Pointer. Anthropic uses its `invalid_request_error` envelope with the schema location in the message. Responses echoes the selected `text.format` in aggregate responses and SSE response objects.
 
-JSON output uses compact separators and declared property order. State the desired content in the
-prompt; the schema is not inserted into it. Only one output constraint may be supplied.
+JSON output uses compact separators and declared property order. State the desired content in the prompt; the schema is not inserted into it. Only one output constraint may be supplied.
 
-Schemas support positional arrays (`prefixItems` plus tail `items`) and inclusive/exclusive
-`number` ranges. Bounded numbers use exact int64 integers or finite binary64-compatible decimal
-and scientific notation with up to 17 significant digits. Bounds must retain their value when the
-schema is parsed; numbers requiring greater precision receive `unsupported_json_schema`.
-These capabilities also apply to strict tool parameters.
+Schemas support positional arrays (`prefixItems` plus tail `items`) and inclusive/exclusive `number` ranges. Bounded numbers use exact int64 integers or finite binary64-compatible decimal and scientific notation with up to 17 significant digits. Bounds must retain their value when the schema is parsed; numbers requiring greater precision receive `unsupported_json_schema`. These capabilities also apply to strict tool parameters.
 
-GBNF, choice and regex are available through the NInfer extension `structured_outputs`
-on Chat Completions, Responses and Anthropic Messages. Supply exactly one member:
+GBNF, choice and regex are available through the NInfer extension `structured_outputs` on Chat Completions, Responses and Anthropic Messages. Supply exactly one member:
 
 ```json
 {"structured_outputs": {"grammar": "root ::= \"yes\" | \"no\""}}
@@ -176,75 +145,25 @@ on Chat Completions, Responses and Anthropic Messages. Supply exactly one member
 {"structured_outputs": {"regex": "(BUG|TASK)-[0-9]{4}"}}
 ```
 
-Choice returns one literal string, preserving case and whitespace. The list must be nonempty;
-duplicate entries have no extra weight, and an empty-string entry permits empty content.
-Regex matches the complete content. It supports character classes, groups, alternatives and
-repetition; `.` excludes line terminators, `\d`/`\w` use ASCII ranges, and `\s` includes Unicode
-whitespace. Empty regex permits only empty content. Anchors are supported at the ends of top-level
-alternatives. Lookaround, backreferences, word boundaries, Unicode properties, flags and unknown
-escapes return HTTP 400. See the [language contract](maintainer/constrained-decoding.md#41-gbnf--regex--choice).
-Invalid choices and regexes use `invalid_choice` and `invalid_regex`, with the request field in `param`.
+Choice returns one literal string, preserving case and whitespace. The list must be nonempty; duplicate entries have no extra weight, and an empty-string entry permits empty content. Regex matches the complete content. It supports character classes, groups, alternatives and repetition; `.` excludes line terminators, `\d`/`\w` use ASCII ranges, and `\s` includes Unicode whitespace. Empty regex permits only empty content. Anchors are supported at the ends of top-level alternatives. Lookaround, backreferences, word boundaries, Unicode properties, flags and unknown escapes return HTTP 400. See the [language contract](maintainer/constrained-decoding.md#41-gbnf--regex--choice). Invalid choices and regexes use `invalid_choice` and `invalid_regex`, with the request field in `param`.
 
-These constraints apply to answer content; thinking is separate. GBNF supports recursive rules,
-Unicode and repetition. All modes support streaming and all speculative backends. For assistant
-continuation, the grammar covers the existing assistant content plus the generated suffix. Completion uses the model's EOS tokens;
-output limits and cancellation can produce an incomplete answer. JSON modes can be combined with
-active tools; GBNF, choice and regex require no active tools or `tool_choice:"none"`.
-Output constraints reject custom stops. OpenAI errors use
-`invalid_grammar` for invalid grammars and `constraint_dead_end` for a reachable prefix without a
-legal next token. Anthropic reports these through its `invalid_request_error` envelope.
-The `grammar` and `guided_*` aliases are not accepted.
+These constraints apply to answer content; thinking is separate. GBNF supports recursive rules, Unicode and repetition. All modes support streaming and all speculative backends. For assistant continuation, the grammar covers the existing assistant content plus the generated suffix. Completion uses the model's EOS tokens; output limits and cancellation can produce an incomplete answer. JSON modes can be combined with active tools; GBNF, choice and regex require no active tools or `tool_choice:"none"`. Output constraints reject custom stops. OpenAI errors use `invalid_grammar` for invalid grammars and `constraint_dead_end` for a reachable prefix without a legal next token. Anthropic reports these through its `invalid_request_error` envelope. The `grammar` and `guided_*` aliases are not accepted.
 
-Constrained responses include a NInfer `constraint` observation. `branch` is `undecided`, `content`,
-or `tools`; `complete` means the committed language can end, and `terminated` means it accepted EOS.
-A complete JSON value can therefore have `complete:true`, `terminated:false` and a length finish
-reason. The observation also includes `cache` (`hit`, `built`, `waited`), `mask_positions`,
-`mask_upload_bytes`, and `timings_seconds` for preparation, CPU mask work and matcher work.
-These times are parts of existing request time and can overlap GPU execution.
-Streaming sends the observation once: the Chat finish/usage chunk, the Responses terminal response
-object, or Anthropic `message_delta`. Unconstrained responses omit it.
+Constrained responses include a NInfer `constraint` observation. `branch` is `undecided`, `content`, or `tools`; `complete` means the committed language can end, and `terminated` means it accepted EOS. A complete JSON value can therefore have `complete:true`, `terminated:false` and a length finish reason. The observation also includes `cache` (`hit`, `built`, `waited`), `mask_positions`, `mask_upload_bytes`, and `timings_seconds` for preparation, CPU mask work and matcher work. These times are parts of existing request time and can overlap GPU execution. Streaming sends the observation once: the Chat finish/usage chunk, the Responses terminal response object, or Anthropic `message_delta`. Unconstrained responses omit it.
 
-Semantically neutral fields do not make an otherwise executable request fail. All-zero
-`logit_bias`, `logprobs:false`, `top_logprobs:0`, `verbosity:"medium"`, empty legacy tool controls,
-text-only `audio` configuration, and `prediction` are accepted without changing Engine execution.
-Metadata, user/safety identifiers, service-tier and prompt-cache hints are likewise advisory.
-Unknown top-level fields are ignored.
+Semantically neutral fields do not make an otherwise executable request fail. All-zero `logit_bias`, `logprobs:false`, `top_logprobs:0`, `verbosity:"medium"`, empty legacy tool controls, text-only `audio` configuration, and `prediction` are accepted without changing Engine execution. Metadata, user/safety identifiers, service-tier and prompt-cache hints are likewise advisory. Unknown top-level fields are ignored.
 
-A string `name` on a `tool` message is accepted as an ignored, output-neutral compatibility
-extension for clients that mirror the function name onto tool results. It does not participate in
-tool identity, prompt rendering, or output. Non-string values are malformed; non-empty names on
-other message roles remain unsupported because they carry participant identity that the loaded chat
-template cannot represent.
+A string `name` on a `tool` message is accepted as an ignored, output-neutral compatibility extension for clients that mirror the function name onto tool results. It does not participate in tool identity, prompt rendering, or output. Non-string values are malformed; non-empty names on other message roles remain unsupported because they carry participant identity that the loaded chat template cannot represent.
 
-For commonly generated OpenAI-compatible payloads, `repetition_penalty` is accepted only at its
-neutral value `1`, and `mm_processor_kwargs` when empty or containing only null values. String-form
-image/video URLs are also accepted.
+For commonly generated OpenAI-compatible payloads, `repetition_penalty` is accepted only at its neutral value `1`, and `mm_processor_kwargs` when empty or containing only null values. String-form image/video URLs are also accepted.
 
-Malformed protocol values return field-specific HTTP 400 errors. Invalid media sources, bytes, or
-decoded content use `invalid_media`; remote fetch and timeout failures retain their dedicated
-server-error codes. Failures in the normalized prompt contract use `invalid_prompt`; typed capacity
-and availability failures retain their dedicated codes. Internal invariant failures are not
-relabeled as client input errors.
+Malformed protocol values return field-specific HTTP 400 errors. Invalid media sources, bytes, or decoded content use `invalid_media`; remote fetch and timeout failures retain their dedicated server-error codes. Failures in the normalized prompt contract use `invalid_prompt`; typed capacity and availability failures retain their dedicated codes. Internal invariant failures are not relabeled as client input errors.
 
-The request `model` must equal the public model ID: the artifact `metadata.name` by default
-(falling back to its architecture name when absent), or the explicit `--model-id` override.
-Reasoning is returned separately as `reasoning_content`; answer text remains in `content`.
+The request `model` must equal the public model ID: the artifact `metadata.name` by default (falling back to its architecture name when absent), or the explicit `--model-id` override. Reasoning is returned separately as `reasoning_content`; answer text remains in `content`.
 
-For non-strict tools, a direct top-level tool-parameter
-`type`, or an `anyOf`/`oneOf` composed entirely of explicit primitive types, guides conversion of
-Qwen's untyped parameter text. It does not decide whether structurally complete markup is a tool
-call. String-admitting values remain strings, including the empty string. An empty block for a
-declared non-string parameter is omitted. Admitted JSON values retain their JSON type;
-case-insensitive boolean text is normalized to `true` or `false`. A nonempty schema mismatch remains
-a structured call: valid JSON retains its represented type and other text becomes a JSON string so
-the tool consumer can report the validation error and continue the agent loop. Schemas without a
-supported explicit type retain untyped inference. NInfer does not apply defaults, enforce required
-properties, or perform recursive JSON Schema validation on this route.
+For non-strict tools, a direct top-level tool-parameter `type`, or an `anyOf`/`oneOf` composed entirely of explicit primitive types, guides conversion of Qwen's untyped parameter text. It does not decide whether structurally complete markup is a tool call. String-admitting values remain strings, including the empty string. An empty block for a declared non-string parameter is omitted. Admitted JSON values retain their JSON type; case-insensitive boolean text is normalized to `true` or `false`. A nonempty schema mismatch remains a structured call: valid JSON retains its represented type and other text becomes a JSON string so the tool consumer can report the validation error and continue the agent loop. Schemas without a supported explicit type retain untyped inference. NInfer does not apply defaults, enforce required properties, or perform recursive JSON Schema validation on this route.
 
-On the unconstrained route, string parameters preserve function/tool-call markers and balanced nested
-`<parameter=...>...</parameter>` text as value bytes. The Qwen wire format has no delimiter escape,
-so an unmatched nested parameter opener or a standalone `</parameter>` cannot be represented
-unambiguously; either causes the complete tool-call region to fall back to ordinary content.
+On the unconstrained route, string parameters preserve function/tool-call markers and balanced nested `<parameter=...>...</parameter>` text as value bytes. The Qwen wire format has no delimiter escape, so an unmatched nested parameter opener or a standalone `</parameter>` cannot be represented unambiguously; either causes the complete tool-call region to fall back to ordinary content.
 
 ### Tool constraints
 
@@ -259,111 +178,43 @@ The three protocols share one constrained tool implementation:
 | Anthropic named `tool` | One or more calls to that tool |
 | OpenAI `parallel_tool_calls:false` / Anthropic `disable_parallel_tool_use:true` | At most one call; exactly one when a call is required |
 
-OpenAI `allowed_tools` supports `auto` and `required`. Selection changes generation permissions,
-while all declarations retain their original order in the prompt. Requests with tools enable
-**basic structural constraints by default**, including ordinary `auto` calls without `strict`.
-The model can answer normally or start a tool call; a call must use the model's tool framing and a
-declared function name.
+OpenAI `allowed_tools` supports `auto` and `required`. Selection changes generation permissions, while all declarations retain their original order in the prompt. Requests with tools enable **basic structural constraints by default**, including ordinary `auto` calls without `strict`. The model can answer normally or start a tool call; a call must use the model's tool framing and a declared function name.
 
-Non-strict parameter names and order remain open. Their schema supplies the existing value
-normalization hints; it is not compiled as a strict constraint. Open objects, root unions, and
-unsupported schema assertions therefore remain usable. Repeated parameter names use the last
-value, retaining the first key position; the published JSON object contains each key once.
-`strict:true` additionally enforces the parameter contract below.
+Non-strict parameter names and order remain open. Their schema supplies the existing value normalization hints; it is not compiled as a strict constraint. Open objects, root unions, and unsupported schema assertions therefore remain usable. Repeated parameter names use the last value, retaining the first key position; the published JSON object contains each key once. `strict:true` additionally enforces the parameter contract below.
 
-Top-level `tool_constraints:"auto"` opts into request-driven constraints: ordinary non-strict
-`tool_choice:"auto"` then uses free generation. Strict tools, selection/count restrictions, and
-`tool_choice:"none"` still enforce their requirements. `tool_constraints:"basic"` is the default.
+Top-level `tool_constraints:"auto"` opts into request-driven constraints: ordinary non-strict `tool_choice:"auto"` then uses free generation. Strict tools, selection/count restrictions, and `tool_choice:"none"` still enforce their requirements. `tool_constraints:"basic"` is the default.
 
-With JSON object/schema output, `auto` permits either a JSON answer or a complete tool-call sequence.
-Required/named choices permit calls for that turn; after supplying the tool result, use `auto` for
-the final JSON answer. `none` permits only JSON. The JSON schema is validated on every turn.
-This combination enforces tool framing even with `tool_constraints:"auto"`; `strict` continues to
-control argument-value validation. Tool markers inside JSON strings remain ordinary string data.
+With JSON object/schema output, `auto` permits either a JSON answer or a complete tool-call sequence. Required/named choices permit calls for that turn; after supplying the tool result, use `auto` for the final JSON answer. `none` permits only JSON. The JSON schema is validated on every turn. This combination enforces tool framing even with `tool_constraints:"auto"`; `strict` continues to control argument-value validation. Tool markers inside JSON strings remain ordinary string data.
 
-A function's `strict:true` also constrains its argument values against its schema. Its parameter
-root must reduce to a `type:"object"` schema with `additionalProperties:false`, including supported
-`allOf` and local-reference combinations.
-Properties are emitted in declaration order; optional properties may be omitted. Root
-const/enum/unions are not supported. Values use the supported JSON Schema subset described above.
-Top-level pure string parameters use raw text and preserve whitespace. Other values use JSON;
-a top-level string/non-string union (such as string/null) is rejected because the Qwen parameter
-format cannot distinguish those branches. Such unions inside JSON objects or arrays are supported.
-Raw values cannot contain the delimiter `\n</parameter>`; unsatisfiable required values are rejected.
-Integer arguments use signed 64-bit values; number arguments use finite binary64-compatible
-representations. Unsupported schemas fail with HTTP 400 before generation.
+A function's `strict:true` also constrains its argument values against its schema. Its parameter root must reduce to a `type:"object"` schema with `additionalProperties:false`, including supported `allOf` and local-reference combinations. Properties are emitted in declaration order; optional properties may be omitted. Root const/enum/unions are not supported. Values use the supported JSON Schema subset described above. Top-level pure string parameters use raw text and preserve whitespace. Other values use JSON; a top-level string/non-string union (such as string/null) is rejected because the Qwen parameter format cannot distinguish those branches. Such unions inside JSON objects or arrays are supported. Raw values cannot contain the delimiter `\n</parameter>`; unsatisfiable required values are rejected. Integer arguments use signed 64-bit values; number arguments use finite binary64-compatible representations. Unsupported schemas fail with HTTP 400 before generation.
 
-For `auto` without JSON output, text can precede the first call. Required/named choices start directly with calls
-(after thinking, if enabled). Once a constrained call starts, the suffix consists of complete calls
-and model EOS. Active tool constraints require model EOS and reject custom stop strings.
-For ordinary non-strict auto calls that need custom stops, select `tool_constraints:"auto"`.
-Token limits and cancellation can still stop generation: only completed calls are published.
-A later call truncated by the token limit keeps `length`/`max_tokens`/Responses `incomplete` as the
-terminal status. Streaming publishes each completed call in the terminal event sequence;
-arguments are not streamed incrementally.
-Assistant continuation may finish a partial call; a prefix containing a completed call is rejected.
+For `auto` without JSON output, text can precede the first call. Required/named choices start directly with calls (after thinking, if enabled). Once a constrained call starts, the suffix consists of complete calls and model EOS. Active tool constraints require model EOS and reject custom stop strings. For ordinary non-strict auto calls that need custom stops, select `tool_constraints:"auto"`. Token limits and cancellation can still stop generation: only completed calls are published. A later call truncated by the token limit keeps `length`/`max_tokens`/Responses `incomplete` as the terminal status. Streaming publishes each completed call in the terminal event sequence; arguments are not streamed incrementally. Assistant continuation may finish a partial call; a prefix containing a completed call is rejected.
 
-Messages enter the selected template in their input order. The maintained Qwen templates keep
-system/developer messages at their original positions.
+Messages enter the selected template in their input order. The maintained Qwen templates keep system/developer messages at their original positions.
 
-Prompt-bearing JSON objects retain their received member order through request parsing and prompt
-rendering, including tool schemas and historical tool inputs. Canonical model-origin tool arguments
-retain that member order in aggregate and streaming responses, so an unmodified replay reconstructs
-the same ordered tool call. NInfer does not canonicalize semantically equivalent JSON: if a client
-reorders members, inserts defaults, or otherwise rewrites a tool object, the changed rendered input
-does not match the model-held endpoint and can reuse only an earlier exact checkpoint.
-Generated token segmentation can also differ from re-encoding the same text, limiting prefix reuse.
+Prompt-bearing JSON objects retain their received member order through request parsing and prompt rendering, including tool schemas and historical tool inputs. Canonical model-origin tool arguments retain that member order in aggregate and streaming responses, so an unmodified replay reconstructs the same ordered tool call. NInfer does not canonicalize semantically equivalent JSON: if a client reorders members, inserts defaults, or otherwise rewrites a tool object, the changed rendered input does not match the model-held endpoint and can reuse only an earlier exact checkpoint. Generated token segmentation can also differ from re-encoding the same text, limiting prefix reuse.
 
-`--chat-template FILE` selects a local Jinja template; by default, the server uses the template
-stored in the artifact. See the [CLI guide](cli.md#text-input) for an example.
+`--chat-template FILE` selects a local Jinja template; by default, the server uses the vendored Sharp v22.5.0 template, and `--artifact-chat-template` selects the template stored in the artifact instead. See the [CLI guide](cli.md#text-input) for an example. The Sharp template accepts `chat_template_kwargs: {"terse": false}` to omit its terse-answer instruction.
 
-Control-token spellings quoted in message content, tool data or ordinary template kwargs are
-encoded as text. Media placeholders come from the template and bind to actual image/video inputs.
+Control-token spellings quoted in message content, tool data or ordinary template kwargs are encoded as text. Media placeholders come from the template and bind to actual image/video inputs.
 
-`chat_template_kwargs` passes a JSON object to the template in Chat Completions, Responses and
-Anthropic Messages. Values duplicated in typed request fields must agree. Null standard options
-mean unspecified; other null values remain `none`. Messages, tools, generation mode and tokenizer
-special tokens cannot be overridden through kwargs.
+`chat_template_kwargs` passes a JSON object to the template in Chat Completions, Responses and Anthropic Messages. Values duplicated in typed request fields must agree. Null standard options mean unspecified; other null values remain `none`. Messages, tools, generation mode and tokenizer special tokens cannot be overridden through kwargs.
 
-`--default-thinking-budget N` sets a positive default thinking-token cap for requests that start
-in thinking mode. Non-thinking requests receive no cap. It may coexist with `--no-thinking`
-because requests can explicitly enable thinking. Anthropic
-`thinking:{"type":"enabled","budget_tokens":N}` overrides this default for that request.
+`--default-thinking-budget N` sets a positive default thinking-token cap for requests that start in thinking mode. Non-thinking requests receive no cap. It may coexist with `--no-thinking` because requests can explicitly enable thinking. Anthropic `thinking:{"type":"enabled","budget_tokens":N}` overrides this default for that request.
 
-Add `--default-thinking-budget 512` to the startup command to cap model-origin thinking at 512
-tokens for every thinking-enabled request.
+Add `--default-thinking-budget 512` to the startup command to cap model-origin thinking at 512 tokens for every thinking-enabled request.
 
-At the cap boundary, Engine first honors a natural `</think>`, stop condition, cancellation, or
-total output/context limit. If thinking remains open, it commits Qwen's canonical early-close
-guidance and close marker to the same model sequence without sampling, streams the guidance as a
-reasoning delta, and continues normal content or tool-call generation. Inserted tokens count in
-completion usage and the request's `max_tokens`/`max_output_tokens` budget. If the effective output
-capacity extends past the cap but cannot fit the complete tokenizer-derived control suffix plus one
-post-close model token, preparation is rejected with HTTP 400 code
-`thinking_budget_capacity_insufficient` rather than partially inserting control. The server does
-not promise that the model will emit nonempty content or a tool call after the marker.
+At the cap boundary, Engine first honors a natural `</think>`, stop condition, cancellation, or total output/context limit. If thinking remains open, it commits Qwen's canonical early-close guidance and close marker to the same model sequence without sampling, streams the guidance as a reasoning delta, and continues normal content or tool-call generation. Inserted tokens count in completion usage and the request's `max_tokens`/`max_output_tokens` budget. If the effective output capacity extends past the cap but cannot fit the complete tokenizer-derived control suffix plus one post-close model token, preparation is rejected with HTTP 400 code `thinking_budget_capacity_insufficient` rather than partially inserting control. The server does not promise that the model will emit nonempty content or a tool call after the marker.
 
-For Chat Completions, `reasoning_effort: "none"` requests disabled thinking. The selected template
-interprets the other standard values (`minimal`, `low`, `medium`, `high`, `xhigh`, `max`).
-Conflicting explicit `enable_thinking` and effort values return `conflicting_template_option`.
+For Chat Completions, `reasoning_effort: "none"` requests disabled thinking. The selected template interprets the other standard values (`minimal`, `low`, `medium`, `high`, `xhigh`, `max`). Conflicting explicit `enable_thinking` and effort values return `conflicting_template_option`.
 
-`preserve_thinking` controls reasoning retention according to the selected template. Request
-options override server defaults set with `--no-thinking` and `--preserve-thinking`. Unspecified
-thinking, effort and preservation options use the template's defaults.
+`preserve_thinking` controls reasoning retention according to the selected template. Request options override server defaults set with `--no-thinking` and `--preserve-thinking`. Unspecified thinking, effort and preservation options use the template's defaults.
 
-Streaming begins with an assistant-role chunk, sends separate reasoning and content deltas, then a
-finish-reason chunk and `[DONE]`. When `stream_options.include_usage` is true, a final empty
-`choices` chunk contains completed usage. Aggregate and streamed usage include cached prompt tokens
-and reasoning-token details; choices carry `logprobs: null` when log probabilities were not
-requested, and aggregate assistant messages carry `refusal: null` because refusal output is not
-supported.
+Streaming begins with an assistant-role chunk, sends separate reasoning and content deltas, then a finish-reason chunk and `[DONE]`. When `stream_options.include_usage` is true, a final empty `choices` chunk contains completed usage. Aggregate and streamed usage include cached prompt tokens and reasoning-token details; choices carry `logprobs: null` when log probabilities were not requested, and aggregate assistant messages carry `refusal: null` because refusal output is not supported.
 
 ### llama.cpp-compatible request observations
 
-Every successful Chat Completions response includes a top-level `timings` object. This is a
-llama.cpp-compatible response extension, not an OpenAI field. In a stream it is attached to the
-last JSON chunk before `[DONE]`: the empty `choices` usage chunk when
-`stream_options.include_usage` is true, otherwise the finish-reason chunk.
+Every successful Chat Completions response includes a top-level `timings` object. This is a llama.cpp-compatible response extension, not an OpenAI field. In a stream it is attached to the last JSON chunk before `[DONE]`: the empty `choices` usage chunk when `stream_options.include_usage` is true, otherwise the finish-reason chunk.
 
 ```json
 {
@@ -381,24 +232,11 @@ last JSON chunk before `[DONE]`: the empty `choices` usage chunk when
 }
 ```
 
-`cache_n` is the exact Engine-proven reused prompt prefix and `prompt_n` is the remaining prompt
-suffix, so `cache_n + prompt_n` equals `usage.prompt_tokens`. Prompt time starts when admission
-commits that exact reuse choice and ends when the first output token is committed. Generation time
-starts at that first token and ends at the last committed output token. Accordingly, generation
-speed uses `max(predicted_n - 1, 0)` token intervals; the first token belongs to prompt latency and
-is not counted again as a decode interval. Zero-token, one-token, zero-duration, and exact-cache-hit
-cases report finite zero rates rather than `NaN` or infinity. Speculative requests additionally
-include terminal `draft_n` and `draft_n_accepted` when draft work occurred.
+`cache_n` is the exact Engine-proven reused prompt prefix and `prompt_n` is the remaining prompt suffix, so `cache_n + prompt_n` equals `usage.prompt_tokens`. Prompt time starts when admission commits that exact reuse choice and ends when the first output token is committed. Generation time starts at that first token and ends at the last committed output token. Accordingly, generation speed uses `max(predicted_n - 1, 0)` token intervals; the first token belongs to prompt latency and is not counted again as a decode interval. Zero-token, one-token, zero-duration, and exact-cache-hit cases report finite zero rates rather than `NaN` or infinity. Speculative requests additionally include terminal `draft_n` and `draft_n_accepted` when draft work occurred.
 
-Set top-level `timings_per_token: true` on a streaming request to attach the latest cumulative
-timing snapshot to each visible reasoning or content chunk. This does not enable terminal timings,
-which are always present. A model commit that is temporarily hidden by UTF-8, stop-string,
-reasoning, or tool-call buffering still advances the cumulative token count; the next visible chunk
-observes that committed frontier. The option increases response serialization and transport volume
-and is off by default.
+Set top-level `timings_per_token: true` on a streaming request to attach the latest cumulative timing snapshot to each visible reasoning or content chunk. This does not enable terminal timings, which are always present. A model commit that is temporarily hidden by UTF-8, stop-string, reasoning, or tool-call buffering still advances the cumulative token count; the next visible chunk observes that committed frontier. The option increases response serialization and transport volume and is off by default.
 
-Set top-level `return_progress: true` together with `stream: true` to receive prompt-processing
-chunks:
+Set top-level `return_progress: true` together with `stream: true` to receive prompt-processing chunks:
 
 ```json
 {
@@ -411,13 +249,7 @@ chunks:
 }
 ```
 
-The initial event has `processed == cache`. Later cumulative events are published only after the
-corresponding prefill unit commits, may be coalesced when the consumer is slower than prefill, and
-never move backwards. The final event has `processed == total` and precedes the first output delta.
-For an exact full-prefix hit, the initial event already has `cache == processed == total` and no
-synthetic prompt work is reported. `time_ms` is elapsed wall time since committed admission;
-clients may calculate actual suffix progress as `(processed-cache)/(total-cache)` when the
-denominator is nonzero.
+The initial event has `processed == cache`. Later cumulative events are published only after the corresponding prefill unit commits, may be coalesced when the consumer is slower than prefill, and never move backwards. The final event has `processed == total` and precedes the first output delta. For an exact full-prefix hit, the initial event already has `cache == processed == total` and no synthetic prompt work is reported. `time_ms` is elapsed wall time since committed admission; clients may calculate actual suffix progress as `(processed-cache)/(total-cache)` when the denominator is nonzero.
 
 ### Multimodal request
 
@@ -441,60 +273,30 @@ curl http://127.0.0.1:8080/v1/chat/completions \
 
 OpenAI image and video sources may be HTTP(S) URLs or base64 data URLs.
 
-Text and media requests use one complete-prompt context contract. After chat-template rendering and
-media-token expansion, the result must fit Engine `--max-context`. The current Vision runtime also
-has a 32,768 merged-token envelope (131,072 raw patches); the effective Vision limit is therefore
-`min(--max-context, 32768)`. There is no fixed image/video item-count limit: item count is admitted
-through aggregate source-byte, decoded-pixel, raw-patch, Vision-token, and live-memory budgets.
+Text and media requests use one complete-prompt context contract. After chat-template rendering and media-token expansion, the result must fit Engine `--max-context`. The current Vision runtime also has a 32,768 merged-token envelope (131,072 raw patches); the effective aggregate Vision limit is therefore `min(--max-context, 32768)`. One image or video item is further bounded by `--vision-max-item-tokens` (default 16,384, the native 4096x4096 geometry): the processor downscales larger media to fit. There is no fixed image/video item-count limit: item count is admitted through aggregate source-byte, decoded-pixel, raw-patch, Vision-token, and live-memory budgets.
 
-Media cache misses run as independent decode → resize → BF16-pack tasks on a bounded host worker
-pool. Prepared payloads are keyed by SHA-256 of the acquired bytes plus modality, so repeated media
-in later requests reuses the exact immutable BF16 patch input; concurrent identical misses use one
-single-flight build. `--media-cache-mib` bounds LRU-retained payloads, while
-`--media-live-mib` bounds every cache-, request-, or runtime-referenced payload. Cache eviction does
-not invalidate a request reference, and live bytes are returned only when the final reference is
-released. A request-level preparation gate derived from the live limit prevents concurrent partial
-builds from deadlocking the memory account.
+Media cache misses run as independent decode → resize → BF16-pack tasks on a bounded host worker pool. Prepared payloads are keyed by SHA-256 of the acquired bytes plus modality, so repeated media in later requests reuses the exact immutable BF16 patch input; concurrent identical misses use one single-flight build. `--media-cache-mib` bounds LRU-retained payloads, while `--media-live-mib` bounds every cache-, request-, or runtime-referenced payload. Cache eviction does not invalidate a request reference, and live bytes are returned only when the final reference is released. A request-level preparation gate derived from the live limit prevents concurrent partial builds from deadlocking the memory account.
 
-An expanded prompt beyond `--max-context` returns HTTP 400 `context_length_exceeded`, including
-the prepared token count and configured context ceiling. A media preprocessing resource rejection
-returns HTTP 400 `media_budget_exceeded`. HTTP 413 `request_too_large` is reserved for a raw request
-body that exceeds `--max-request-mib` before JSON parsing; it is not used for model-context or media
-resource errors.
+An expanded prompt beyond `--max-context` returns HTTP 400 `context_length_exceeded`, including the prepared token count and configured context ceiling. A media preprocessing resource rejection returns HTTP 400 `media_budget_exceeded`. HTTP 413 `request_too_large` is reserved for a raw request body that exceeds `--max-request-mib` before JSON parsing; it is not used for model-context or media resource errors.
 
 ## OpenAI prompt caching
 
-Chat Completions and Responses translate OpenAI cache hints into optional shared-prefix write
-candidates:
+Chat Completions and Responses translate OpenAI cache hints into optional shared-prefix write candidates:
 
-- omitted `prompt_cache_options` creates a default implicit candidate at the end of the latest
-  cacheable content part;
+- omitted `prompt_cache_options` creates a default implicit candidate at the end of the latest cacheable content part;
 - `mode:"implicit"` requests the same automatic candidate explicitly;
 - `mode:"explicit"` disables that implicit write for the request;
-- `prompt_cache_breakpoint:{"mode":"explicit"}` on supported content creates an explicit
-  candidate.
+- `prompt_cache_breakpoint:{"mode":"explicit"}` on supported content creates an explicit candidate.
 
-The automatic candidate precedes the message closing tokens, allowing reuse when the same message
-body grows and its previous tokens remain an exact prefix. An explicit marker keeps its requested
-location. Responses applies this policy after expanding stored history.
+The automatic candidate precedes the message closing tokens, allowing reuse when the same message body grows and its previous tokens remain an exact prefix. An explicit marker keeps its requested location. Responses applies this policy after expanding stored history.
 
-One request carries at most four writes. Explicit markers take precedence: four explicit candidates
-leave no extra slot for an automatic candidate. If more explicit markers appear in the history, the
-latest four remain write candidates. Exact reads of already-published prefixes do not require the
-request to repeat a marker.
+One request carries at most four writes. Explicit markers take precedence: four explicit candidates leave no extra slot for an automatic candidate. If more explicit markers appear in the history, the latest four remain write candidates. Exact reads of already-published prefixes do not require the request to repeat a marker.
 
-These fields are optimization hints. A legal boundary that cannot be represented as an exact
-rendered-token frontier is ignored without changing prompt content. `prompt_cache_key` is not an
-Engine session key or prefix identity. Valid TTL/retention values are accepted, but NInfer does not
-promise their wall-clock residency; physical retention follows the resource scheduler.
+These fields are optimization hints. A legal boundary that cannot be represented as an exact rendered-token frontier is ignored without changing prompt content. `prompt_cache_key` is not an Engine session key or prefix identity. Valid TTL/retention values are accepted, but NInfer does not promise their wall-clock residency; physical retention follows the resource scheduler.
 
 ## OpenAI Responses Core
 
-NInfer implements the typed-Item and semantic-event core of the OpenAI
-[Responses API](https://developers.openai.com/api/reference/resources/responses/overview). All
-supported model instances use this same adapter and Engine route. It is intentionally not
-advertised as full parity with OpenAI-hosted tools, durable cloud storage, background jobs,
-Conversations, or compaction.
+NInfer implements the typed-Item and semantic-event core of the OpenAI [Responses API](https://developers.openai.com/api/reference/resources/responses/overview). All supported model instances use this same adapter and Engine route. It is intentionally not advertised as full parity with OpenAI-hosted tools, durable cloud storage, background jobs, Conversations, or compaction.
 
 ### Create a Response
 
@@ -525,8 +327,7 @@ response = client.responses.create(
 print(response.output_text)  # SDK helper derived from response.output
 ```
 
-`output_text` is an SDK convenience property. It is not emitted as a top-level wire field; the
-wire response contains typed `output` Items.
+`output_text` is an SDK convenience property. It is not emitted as a top-level wire field; the wire response contains typed `output` Items.
 
 ### Create request fields
 
@@ -559,8 +360,7 @@ wire response contains typed `output` Items.
 | `stream_options.include_obfuscation` | optional boolean; accepted as a transport hint, but this local server emits no padding |
 | cache and client hints | `prompt_cache_key`, `prompt_cache_options`, `prompt_cache_retention`, and explicit breakpoints follow [OpenAI prompt caching](#openai-prompt-caching); `safety_identifier` and `user` are accepted as client hints |
 
-Unknown top-level fields fail with `unknown_parameter`. Recognized but unsupported features fail
-with a field-specific 400 error instead of being silently ignored.
+Unknown top-level fields fail with `unknown_parameter`. Recognized but unsupported features fail with a field-specific 400 error instead of being silently ignored.
 
 ### Input Item contract
 
@@ -578,35 +378,17 @@ String `input` is normalized to one user `message` with an `input_text` part. Ar
 | `function_call` | completed assistant call with optional `id` and namespace, plus required `call_id`, `name`, and JSON-object string `arguments` |
 | `function_call_output` | completed result with required `call_id` and optional matching name/namespace assertion; `output` may be a string or a non-empty array of `input_text`/`input_image` parts |
 
-Contiguous assistant-owned Items form one assistant history turn in the representable order
-`reasoning` -> assistant message content -> `function_call`. Multiple message Items append their
-content parts, multiple calls retain declaration order, and a reasoning-only turn is retained. A
-user, system, developer, or `function_call_output` Item ends the group; an order that would require
-rearranging assistant content fails with `invalid_assistant_history`. Results are validated by
-`call_id` and reordered to call declaration order before prompt rendering; unknown, duplicate, or
-unrepresentable partial result sets fail with `invalid_tool_history`. Canonical input Items retain
-client order. Input Item IDs are preserved when supplied and generated otherwise; duplicate IDs
-fail.
+Contiguous assistant-owned Items form one assistant history turn in the representable order `reasoning` -> assistant message content -> `function_call`. Multiple message Items append their content parts, multiple calls retain declaration order, and a reasoning-only turn is retained. A user, system, developer, or `function_call_output` Item ends the group; an order that would require rearranging assistant content fails with `invalid_assistant_history`. Results are validated by `call_id` and reordered to call declaration order before prompt rendering; unknown, duplicate, or unrepresentable partial result sets fail with `invalid_tool_history`. Canonical input Items retain client order. Input Item IDs are preserved when supplied and generated otherwise; duplicate IDs fail.
 
-System and developer message Items retain their positions in the input array. Top-level
-`instructions` is represented as a leading developer turn for the current request; target-specific
-role lowering occurs only in the Qwen family frontend.
+System and developer message Items retain their positions in the input array. Top-level `instructions` is represented as a leading developer turn for the current request; target-specific role lowering occurs only in the Qwen family frontend.
 
-An `input_text`, `input_image`, or tool-result part may carry
-`prompt_cache_breakpoint:{"mode":"explicit"}`. Write selection follows
-[OpenAI prompt caching](#openai-prompt-caching); boundaries affect reuse opportunities, not prompt
-identity or output semantics. String message status/phase metadata is accepted but has no Qwen
-prompt representation.
+An `input_text`, `input_image`, or tool-result part may carry `prompt_cache_breakpoint:{"mode":"explicit"}`. Write selection follows [OpenAI prompt caching](#openai-prompt-caching); boundaries affect reuse opportunities, not prompt identity or output semantics. String message status/phase metadata is accepted but has no Qwen prompt representation.
 
-`input_file`, `input_audio`, image `file_id`, non-`auto` image detail, reasoning metadata without raw
-reasoning text, partial tool Items, and other Item/content types are not supported. HTTP media URLs
-stored in a response chain are fetched again when that chain is continued; use data URIs when the
-historical media bytes must be immutable.
+`input_file`, `input_audio`, image `file_id`, non-`auto` image detail, reasoning metadata without raw reasoning text, partial tool Items, and other Item/content types are not supported. HTTP media URLs stored in a response chain are fetched again when that chain is continued; use data URIs when the historical media bytes must be immutable.
 
 ### Function tools
 
-Responses function definitions may be declared directly rather than inside Chat Completions'
-nested `function` object:
+Responses function definitions may be declared directly rather than inside Chat Completions' nested `function` object:
 
 ```json
 {
@@ -634,33 +416,21 @@ They may also be grouped in a Responses namespace:
 }
 ```
 
-NInfer gives each namespace/function pair a distinct internal Engine identity and restores the
-separate `namespace` and `name` fields in aggregate output, SSE events, and replayed Items. The same
-function name may therefore appear in different namespaces. Namespace members remain ordinary
-client-executed functions; this does not add a remote MCP executor.
+NInfer gives each namespace/function pair a distinct internal Engine identity and restores the separate `namespace` and `name` fields in aggregate output, SSE events, and replayed Items. The same function name may therefore appear in different namespaces. Namespace members remain ordinary client-executed functions; this does not add a remote MCP executor.
 
-NInfer renders these definitions in the Qwen prompt and parses model output into separate
-`function_call` output Items. Each output has a protocol Item `id` (`fc_...`) and a distinct
-`call_id` (`call_...`). The client executes the function and sends a `function_call_output` Item in
-a later request. Selection and strict argument enforcement follow the common tool contract above.
+NInfer renders these definitions in the Qwen prompt and parses model output into separate `function_call` output Items. Each output has a protocol Item `id` (`fc_...`) and a distinct `call_id` (`call_...`). The client executes the function and sends a `function_call_output` Item in a later request. Selection and strict argument enforcement follow the common tool contract above.
 
-Hosted tools, remote MCP tools, custom free-form tools, deferred loading, output schemas, and
-caller restrictions that exclude direct invocation remain unsupported.
+Hosted tools, remote MCP tools, custom free-form tools, deferred loading, output schemas, and caller restrictions that exclude direct invocation remain unsupported.
 
 ### Response object and usage
 
-A terminal wire response has `object: "response"`, one of `completed`, `incomplete`, or
-`cancelled` in `status`, and a typed `output` array. NInfer may emit:
+A terminal wire response has `object: "response"`, one of `completed`, `incomplete`, or `cancelled` in `status`, and a typed `output` array. NInfer may emit:
 
 - a `reasoning` Item containing raw `reasoning_text` and an empty summary;
 - an assistant `message` containing an `output_text` part;
 - one or more `function_call` Items.
 
-Ordinary model/string stops produce `completed`. Output-token or context-capacity exhaustion
-produces `incomplete` with `incomplete_details.reason: "max_output_tokens"`. Errors accepted after
-an SSE response has started produce `response.failed`; validation and preparation errors remain
-normal HTTP error responses. `completed_at` is populated only for completed Responses. A
-reasoning-only incomplete result contains no invented empty assistant message.
+Ordinary model/string stops produce `completed`. Output-token or context-capacity exhaustion produces `incomplete` with `incomplete_details.reason: "max_output_tokens"`. Errors accepted after an SSE response has started produce `response.failed`; validation and preparation errors remain normal HTTP error responses. `completed_at` is populated only for completed Responses. A reasoning-only incomplete result contains no invented empty assistant message.
 
 Usage is checkpoint-native:
 
@@ -674,16 +444,11 @@ Usage is checkpoint-native:
 }
 ```
 
-`input_tokens` includes the chat template and expanded media tokens. `cached_tokens` is the exact
-checkpoint-proven prompt prefix reused by Engine. `output_tokens` is the count of accepted generated token
-IDs, including a withheld stop token when applicable. `reasoning_tokens` is counted in the Qwen
-output decoder while accepted tokens are still in the reasoning channel; it is not estimated by
-re-tokenizing decoded text.
+`input_tokens` includes the chat template and expanded media tokens. `cached_tokens` is the exact checkpoint-proven prompt prefix reused by Engine. `output_tokens` is the count of accepted generated token IDs, including a withheld stop token when applicable. `reasoning_tokens` is counted in the Qwen output decoder while accepted tokens are still in the reasoning channel; it is not estimated by re-tokenizing decoded text.
 
 ### Responses streaming
 
-Set `stream:true` for semantic Server-Sent Events. Every frame uses both the SSE event name and a
-matching JSON `type`, and every JSON event has a monotonically increasing `sequence_number`:
+Set `stream:true` for semantic Server-Sent Events. Every frame uses both the SSE event name and a matching JSON `type`, and every JSON event has a monotonically increasing `sequence_number`:
 
 ```text
 event: response.output_text.delta
@@ -699,35 +464,17 @@ The normal lifecycle is:
 4. matching `*.done`, `response.content_part.done`, and `response.output_item.done` events;
 5. exactly one `response.completed`, `response.incomplete`, or `response.failed` terminal event.
 
-Function arguments use `response.function_call_arguments.delta` and `.done`. IDs, output indices,
-and content indices remain stable, and concatenated deltas equal the terminal Item. Responses SSE
-does not emit the Chat Completions `[DONE]` sentinel. With tools enabled, ordinary answer text still
-streams immediately; only an ambiguous `<tool_call>` suffix or the structured tool region is held.
-On the unconstrained route, malformed tool markup is flushed back as ordinary text without losing bytes.
+Function arguments use `response.function_call_arguments.delta` and `.done`. IDs, output indices, and content indices remain stable, and concatenated deltas equal the terminal Item. Responses SSE does not emit the Chat Completions `[DONE]` sentinel. With tools enabled, ordinary answer text still streams immediately; only an ambiguous `<tool_call>` suffix or the structured tool region is held. On the unconstrained route, malformed tool markup is flushed back as ordinary text without losing bytes.
 
 ### Local response state and resources
 
-`store` defaults to `true`. Stored Responses live only in this server process and are bounded by an
-LRU store. They are lost on restart and are not OpenAI's durable cloud retention service.
+`store` defaults to `true`. Stored Responses live only in this server process and are bounded by an LRU store. They are lost on restart and are not OpenAI's durable cloud retention service.
 
-`previous_response_id` reconstructs the complete stored input/output Item history before the new
-input. The current `instructions` value is placed first but is not saved into the continuation
-context, matching the Responses rule that previous top-level instructions do not carry forward.
-Function definitions are request configuration rather than conversation Items and must be sent
-again on tool-result turns. The reconstructed prompt follows the ordinary Engine path, so compatible
-checkpoint reuse applies naturally.
+`previous_response_id` reconstructs the complete stored input/output Item history before the new input. The current `instructions` value is placed first but is not saved into the continuation context, matching the Responses rule that previous top-level instructions do not carry forward. Function definitions are request configuration rather than conversation Items and must be sent again on tool-result turns. The reconstructed prompt follows the ordinary Engine path, so compatible checkpoint reuse applies naturally.
 
-A stored Response also retains its resolved `preserve_thinking` value. A child which omits the
-field inherits the parent value. An explicit different value creates a new semantic branch; prompt
-rendering and identity still determine reuse. Changing the boolean alone never invalidates an exact
-checkpoint already proved compatible by the model runtime.
+A stored Response also retains its resolved `preserve_thinking` value. A child which omits the field inherits the parent value. An explicit different value creates a new semantic branch; prompt rendering and identity still determine reuse. Changing the boolean alone never invalidates an exact checkpoint already proved compatible by the model runtime.
 
-For Engine-local reuse, a stored root Response receives one bounded session key derived from its
-response ID, and every `previous_response_id` child inherits that key. `store:false` roots remain
-anonymous; a `store:false` child may read its inherited session checkpoint but does not replace the
-stored chain's latest endpoint. Response-store eviction or deletion removes the HTTP object, not an
-independently retained Engine checkpoint; the latter remains bounded by the Engine's own retention
-and pressure policy. No session key or cache marker is added to the HTTP schema.
+For Engine-local reuse, a stored root Response receives one bounded session key derived from its response ID, and every `previous_response_id` child inherits that key. `store:false` roots remain anonymous; a `store:false` child may read its inherited session checkpoint but does not replace the stored chain's latest endpoint. Response-store eviction or deletion removes the HTTP object, not an independently retained Engine checkpoint; the latter remains bounded by the Engine's own retention and pressure policy. No session key or cache marker is added to the HTTP schema.
 
 Resource behavior:
 
@@ -739,18 +486,11 @@ Resource behavior:
 | `POST /v1/responses/{id}/cancel` | explicitly fails because background execution is unsupported |
 | `POST /v1/responses/compact` | explicitly fails with `compaction_not_supported` |
 
-`store:false` Responses cannot be retrieved or used as `previous_response_id`. LRU eviction and
-explicit deletion also make an ID unavailable. A single Response larger than the configured store
-capacity fails with `response_store_capacity_exceeded` rather than silently pretending it was
-stored.
+`store:false` Responses cannot be retrieved or used as `previous_response_id`. LRU eviction and explicit deletion also make an ID unavailable. A single Response larger than the configured store capacity fails with `response_store_capacity_exceeded` rather than silently pretending it was stored.
 
 ### Responses input token count
 
-`POST /v1/responses/input_tokens` uses the same prompt path as Create and does not run generation.
-It accepts `model`, `input`, `instructions`, `previous_response_id`, reasoning, function tools and
-tool choice, supported text/truncation values, and the `preserve_thinking` extension. Parent lookup,
-call-ID normalization, template rendering, and media expansion are therefore identical to the
-corresponding Create request:
+`POST /v1/responses/input_tokens` uses the same prompt path as Create and does not run generation. It accepts `model`, `input`, `instructions`, `previous_response_id`, reasoning, function tools and tool choice, supported text/truncation values, and the `preserve_thinking` extension. Parent lookup, call-ID normalization, template rendering, and media expansion are therefore identical to the corresponding Create request:
 
 ```bash
 curl http://127.0.0.1:8080/v1/responses/input_tokens \
@@ -762,10 +502,7 @@ curl http://127.0.0.1:8080/v1/responses/input_tokens \
 {"object":"response.input_tokens","input_tokens":11}
 ```
 
-Unsupported Create fields include Conversations, prompt templates, context management, hosted
-moderation, non-empty `include`, background execution, compaction,
-files/audio, and OpenAI-hosted/MCP/custom tools. These are compatibility boundaries, not silently
-accepted placeholders.
+Unsupported Create fields include Conversations, prompt templates, context management, hosted moderation, non-empty `include`, background execution, compaction, files/audio, and OpenAI-hosted/MCP/custom tools. These are compatibility boundaries, not silently accepted placeholders.
 
 ## Anthropic Messages
 
@@ -781,78 +518,25 @@ curl http://127.0.0.1:8080/v1/messages \
   }'
 ```
 
-The endpoint accepts top-level System text, ordered User/Assistant/System history, text and image
-blocks, Thinking history, tool-use history, tool results, user-defined tools, aggregate responses,
-and Anthropic SSE. Consecutive User or Assistant messages are joined without adding separators.
-Mid-conversation System messages retain their input position. A final text-only Assistant message
-is an Assistant prefill: generation continues its existing text instead of opening another turn.
-Assistant prefill cannot contain media, Thinking, or tool calls and cannot start with Thinking
-enabled.
+The endpoint accepts top-level System text, ordered User/Assistant/System history, text and image blocks, Thinking history, tool-use history, tool results, user-defined tools, aggregate responses, and Anthropic SSE. Consecutive User or Assistant messages are joined without adding separators. Mid-conversation System messages retain their input position. A final text-only Assistant message is an Assistant prefill: generation continues its existing text instead of opening another turn. Assistant prefill cannot contain media, Thinking, or tool calls and cannot start with Thinking enabled.
 
-Claude Code may place its attribution metadata in the first block of a top-level System array. If
-that block is a text block beginning exactly with `x-anthropic-billing-header:`, NInfer consumes the
-whole block before token counting, prompt preparation, and cache identity construction. The rule is
-positional: a string-form System value, a later array block, or an inline System message with the
-same text remains ordinary prompt content. A `cache_control` marker attached to the consumed block
-is consumed with it rather than moved to adjacent content.
+Claude Code may place its attribution metadata in the first block of a top-level System array. If that block is a text block beginning exactly with `x-anthropic-billing-header:`, NInfer consumes the whole block before token counting, prompt preparation, and cache identity construction. The rule is positional: a string-form System value, a later array block, or an inline System message with the same text remains ordinary prompt content. A `cache_control` marker attached to the consumed block is consumed with it rather than moved to adjacent content.
 
-`max_tokens` is optional for local clients and otherwise uses `--default-max-tokens`; a positive
-value is the complete output budget. `max_tokens:0` is rejected because NInfer does not expose a
-completed zero-output cache-prewarm lifecycle. `temperature`, `top_p`, `top_k`, and
-`stop_sequences` enter Engine execution. A matched custom stop is returned as
-`stop_reason:"stop_sequence"` together with the actual `stop_sequence`; context exhaustion returns
-`model_context_window_exceeded`.
+`max_tokens` is optional for local clients and otherwise uses `--default-max-tokens`; a positive value is the complete output budget. `max_tokens:0` is rejected because NInfer does not expose a completed zero-output cache-prewarm lifecycle. `temperature`, `top_p`, `top_k`, and `stop_sequences` enter Engine execution. A matched custom stop is returned as `stop_reason:"stop_sequence"` together with the actual `stop_sequence`; context exhaustion returns `model_context_window_exceeded`.
 
-Thinking supports `disabled`, `adaptive`, and `enabled`. Enabled Thinking requires
-`budget_tokens >= 1024` and less than `max_tokens`, and that budget is passed to Engine. Visible
-Thinking is returned with an opaque compatibility signature; SSE emits its `signature_delta`
-before closing the block. Request lowering reconstructs the local prompt from the visible
-`thinking` text and treats `signature` as non-semantic transport metadata, so retained history
-remains usable across serve restarts.
-`display:"omitted"` is rejected because NInfer cannot provide Anthropic's
-encrypted hidden-reasoning restore semantics. `preserve_thinking` remains a NInfer extension for
-closed-turn reasoning history. `output_config.effort` passes its protocol-validated value to the
-selected template. `output_config.format` accepts JSON Schema output as described above.
+Thinking supports `disabled`, `adaptive`, and `enabled`. Enabled Thinking requires `budget_tokens >= 1024` and less than `max_tokens`, and that budget is passed to Engine. Visible Thinking is returned with an opaque compatibility signature; SSE emits its `signature_delta` before closing the block. Request lowering reconstructs the local prompt from the visible `thinking` text and treats `signature` as non-semantic transport metadata, so retained history remains usable across serve restarts. `display:"omitted"` is rejected because NInfer cannot provide Anthropic's encrypted hidden-reasoning restore semantics. `preserve_thinking` remains a NInfer extension for closed-turn reasoning history. `output_config.effort` passes its protocol-validated value to the selected template. `output_config.format` accepts JSON Schema output as described above.
 
-User-defined tools support `name`, `description`, object `input_schema`, `input_examples`, and
-`strict`. `tool_choice` accepts `auto`, `none`, `any`, or named `tool`; `disable_parallel_tool_use`
-enforces a single-call limit. See the common tool contract above for schema and framing details.
-Deferred tools, tools that exclude direct model calls, Anthropic-provided/server tools, toolsets,
-MCP, and containers remain unsupported. `tool_result` preserves text/image order and marks
-`is_error:true` explicitly in the model prompt. For a visible Assistant tool-use turn, the next
-User turn must provide exactly one leading result for every declared ID; valid results are matched
-by ID and normalized to call order. A history that begins with results remains valid as a truncated
-or imported conversation.
+User-defined tools support `name`, `description`, object `input_schema`, `input_examples`, and `strict`. `tool_choice` accepts `auto`, `none`, `any`, or named `tool`; `disable_parallel_tool_use` enforces a single-call limit. See the common tool contract above for schema and framing details. Deferred tools, tools that exclude direct model calls, Anthropic-provided/server tools, toolsets, MCP, and containers remain unsupported. `tool_result` preserves text/image order and marks `is_error:true` explicitly in the model prompt. For a visible Assistant tool-use turn, the next User turn must provide exactly one leading result for every declared ID; valid results are matched by ID and normalized to call order. A history that begins with results remains valid as a truncated or imported conversation.
 
-Block-level ephemeral `cache_control` on tools and supported System/User/Assistant/tool-history
-blocks creates explicit shared-prefix candidates. At most four distinct block-level breakpoints are
-accepted. Request-level `cache_control` targets the last cacheable block: it merges with an explicit
-breakpoint at the same target and TTL, conflicts at the same target with a different TTL, and needs
-an available fifth slot when four different explicit targets already exist. TTL must be `5m` or
-`1h`; it is a protocol hint, not a wall-clock residency guarantee.
+Block-level ephemeral `cache_control` on tools and supported System/User/Assistant/tool-history blocks creates explicit shared-prefix candidates. At most four distinct block-level breakpoints are accepted. Request-level `cache_control` targets the last cacheable block: it merges with an explicit breakpoint at the same target and TTL, conflicts at the same target with a different TTL, and needs an available fifth slot when four different explicit targets already exist. TTL must be `5m` or `1h`; it is a protocol hint, not a wall-clock residency guarantee.
 
-NInfer maps representable boundaries to exact prompt frontiers and ignores a legal but
-unrepresentable advisory boundary without changing the prompt. Reuse still requires exact rendered
-identity and can read an existing owner without another `cache_control`. Aggregate usage reports
-verified reused tokens in `cache_read_input_tokens` and leaves cache creation unknown. Streaming
-emits `message_start` after Engine admission commits the prefix selection and before
-transfer/prefill output, so its uncached/cache-read split is already exact; terminal cumulative
-usage matches the aggregate response.
+NInfer maps representable boundaries to exact prompt frontiers and ignores a legal but unrepresentable advisory boundary without changing the prompt. Reuse still requires exact rendered identity and can read an existing owner without another `cache_control`. Aggregate usage reports verified reused tokens in `cache_read_input_tokens` and leaves cache creation unknown. Streaming emits `message_start` after Engine admission commits the prefix selection and before transfer/prefill output, so its uncached/cache-read split is already exact; terminal cumulative usage matches the aggregate response.
 
-Documents, Search Results, Files, Structured Outputs, server-tool results, container uploads, and
-other execution-dependent blocks are rejected with the missing capability identified. Metadata,
-service tier, inference geography, protocol-version/beta headers, cache TTL, and unknown advisory
-fields do not block an otherwise executable request. The request `model` is any non-empty local
-proxy label and is echoed in the response; it does not select the resident artifact.
+Documents, Search Results, Files, Structured Outputs, server-tool results, container uploads, and other execution-dependent blocks are rejected with the missing capability identified. Metadata, service tier, inference geography, protocol-version/beta headers, cache TTL, and unknown advisory fields do not block an otherwise executable request. The request `model` is any non-empty local proxy label and is echoed in the response; it does not select the resident artifact.
 
-Every Messages response carries a `request-id` header; error bodies also carry `request_id` and use
-Anthropic error categories. Local admission overload maps to HTTP 529 and queue/media timeouts to
-HTTP 504. Streaming owns the full Anthropic block lifecycle for Thinking, text, and tool use.
+Every Messages response carries a `request-id` header; error bodies also carry `request_id` and use Anthropic error categories. Local admission overload maps to HTTP 529 and queue/media timeouts to HTTP 504. Streaming owns the full Anthropic block lifecycle for Thinking, text, and tool use.
 
-`POST /v1/messages/count_tokens` uses the artifact's tokenizer, chat template, and media expansion
-without generation. It shares the same prompt normalization, tools, Thinking mode, Assistant
-prefill, media processing, and cache-marker interpretation as Messages; output-only sampling and
-streaming fields do not affect the count:
+`POST /v1/messages/count_tokens` uses the artifact's tokenizer, the active chat template, and media expansion without generation. It shares the same prompt normalization, tools, Thinking mode, Assistant prefill, media processing, and cache-marker interpretation as Messages; output-only sampling and streaming fields do not affect the count:
 
 ```bash
 curl http://127.0.0.1:8080/v1/messages/count_tokens \
@@ -865,8 +549,7 @@ curl http://127.0.0.1:8080/v1/messages/count_tokens \
 
 ## Authentication and CORS
 
-Pass `--api-key VALUE` to require the same value as an OpenAI bearer token or Anthropic
-`x-api-key` header. `GET /health` and CORS preflight requests remain unauthenticated.
+Pass `--api-key VALUE` to require the same value as an OpenAI bearer token or Anthropic `x-api-key` header. `GET /health` and CORS preflight requests remain unauthenticated.
 
 ```bash
 curl http://127.0.0.1:8080/v1/models \
@@ -885,8 +568,8 @@ The table lists executable defaults. The startup example selects a long-context 
 | `--port N` | listen port | `8080` |
 | `--api-key KEY` | required bearer or `x-api-key` value | unset |
 | `--model-id ID` | override the public OpenAI model alias | artifact `metadata.name`, or architecture name |
-| `--max-context N` | logical context ceiling of each sequence | `8192` |
-| `--kv-capacity N\|auto` | shared Main Text KV capacity; `auto` maximizes resident-model KV, or reserves one context with CPU expert offload; omitted means `--max-context` | `8192` |
+| `--max-context N` | logical context ceiling of each sequence; when omitted and the default does not fit in free VRAM, startup retries at `32768`, then `16384`, logs the reduction and reports the reduced limit in `/v1/models`; an explicit value is never lowered | `65536` |
+| `--kv-capacity N\|auto` | explicit shared Main Text KV capacity, or maximize it from remaining GPU memory; omitted means `--max-context` | `65536` |
 | `--max-concurrency N` | resident execution lanes; valid range `1..8` | `1` |
 | `--max-pending-requests N` | additional requests allowed to wait for admission | `16` |
 | `--pending-timeout-ms N` | maximum preparation-plus-admission wait | `30000` |
@@ -902,17 +585,18 @@ The table lists executable defaults. The startup example selects a long-context 
 | `--request-log-jsonl FILE` | append full-precision server/request records | disabled |
 | `--response-store-max-records N` | maximum locally retained Responses objects | `1024` |
 | `--response-store-max-mib N` | total local Response envelope/Item/context budget | `256` |
-| `--kv-dtype bf16\|int8\|fp8\|nvfp4\|k8v4` | KV-cache storage | `bf16` |
-| `--spec mtp\|dflash\|dflash2` | speculative backend | off |
-| `--draft-tokens N` | MTP `1..5`; DFlash/DFlash2 `1..15` | unset |
-| `--lm-head-draft` | optimized proposal head | off |
+| `--kv-dtype bf16\|int8\|fp8\|nvfp4\|k8v4` | KV-cache storage | `int8` on Turing builds, `bf16` otherwise |
+| `--spec none\|mtp\|dflash\|dflash2` | speculative backend | `mtp` |
+| `--draft-tokens N` | MTP `1..5`; DFlash/DFlash2 `1..15` (DFlash needs it explicitly) | `3` |
+| `--lm-head-draft` / `--no-lm-head-draft` | force the optimized or the full proposal head | automatic: optimized when the artifact has one |
 | `--default-max-tokens N` | output limit when omitted by a request | `8192` |
 | `--default-thinking-budget N` | positive thinking cap inherited by thinking-enabled requests | unset |
 | `--vision` | enable media input and load Vision GPU allocations | off |
+| `--vision-max-item-tokens N` | with `--vision`, largest single image or video item in merged tokens (`256..16384`); larger media is downscaled, or rejected under `oversized_image: error`; a smaller value shrinks the Vision workspace | `16384` |
 | `--no-cuda-graph` | disable CUDA Graph decode | graphs on |
 | `--no-prefix-reuse` | disable compatible-prefix caching | prefix reuse on |
 | `--device-state-slots N` | extra Device StateImages beyond `max-concurrency` | `max-concurrency` |
-| `--host-context-mib N` | RTX 5090 pinned Host budget for StateImages, KV and pause snapshots, including in-flight destinations; DGX Spark keeps this capacity at zero | `8192 MiB + 8 native StateImages` on RTX 5090; `0` on DGX Spark |
+| `--host-context-mib N` | shared pinned Host budget for StateImages, KV and pause snapshots, including in-flight destinations | `2048 MiB + 8 native StateImages` (Turing builds; `8192 MiB` on RTX 5090; `0` on DGX Spark, which keeps this capacity at zero); on Turing builds the default is halved, down to `256 MiB`, when the available RAM is too small for it, and the reduction is logged; an explicit value is never changed |
 | `--no-thinking` | disable thinking by default | thinking on |
 | `--preserve-thinking` | preserve closed-turn assistant reasoning by default | off |
 | `--cors` | permissive browser CORS headers | off |
@@ -925,45 +609,19 @@ The table lists executable defaults. The startup example selects a long-context 
 | `--seed N` | fixed seed when a request omits one | fresh random seed per request |
 | `--greedy` | force exact argmax for all requests | off |
 
-Context-cost coefficients resolve once at startup from generic defaults, matching compiled values,
-and optional transfer or prefill entries from `--context-cost-presets FILE`. Prefill entries match
-the hardware and a signature derived from the actual Text/Vision configuration, bindings and Uses.
-A new representation without a matching measurement uses generic prefill coefficients. A malformed
-file aborts startup; the operational context-cost record and JSONL `server_start` identify the
-selected source.
+Context-cost coefficients resolve once at startup from generic defaults, matching compiled values, and optional transfer or prefill entries from `--context-cost-presets FILE`. Prefill entries match the hardware and a signature derived from the actual Text/Vision configuration, bindings and Uses. A new representation without a matching measurement uses generic prefill coefficients. A malformed file aborts startup; the operational context-cost record and JSONL `server_start` identify the selected source.
 
-Engine selects sampling defaults from the loaded architecture and the request's resolved thinking mode.
-Qwen3.6-27B and Qwen3.8-27B use `1.0/0.95/20/0/0` for
-temperature/top-p/top-k/min-p/presence penalty in thinking mode and `0.7/0.80/20/0/1.5` in
-non-thinking mode. Qwen3.6-35B-A3B differs only in its thinking presence penalty, which is `1.5`.
-Frequency penalty is `0` for all registered presets. Process flags override registered values,
-request fields override process flags, and `--greedy` finally forces temperature `0`.
+Engine selects sampling defaults from the loaded architecture and the request's resolved thinking mode. Qwen3.6-27B and Qwen3.8-27B use `1.0/0.95/20/0/0` for temperature/top-p/top-k/min-p/presence penalty in thinking mode and `0.7/0.80/20/0/1.5` in non-thinking mode. Qwen3.6-35B-A3B differs only in its thinking presence penalty, which is `1.5`. Frequency penalty is `0` for all registered presets. Process flags override registered values, request fields override process flags, and `--greedy` finally forces temperature `0`.
 
-For `C=--max-concurrency` and `H=--device-state-slots`, total Device StateImage capacity is `C+H`.
-Host state and Main/Backend KV share one startup-fixed byte budget; this is context storage, not a
-limit on total process RAM. `--host-context-mib 0` disables Host context backing.
-`--no-prefix-reuse` disables cross-request history reads and writes; pause/replay recovery remains
-available, and the capacity flags may still be specified.
+For `C=--max-concurrency` and `H=--device-state-slots`, total Device StateImage capacity is `C+H`. Host state and Main/Backend KV share one startup-fixed byte budget; this is context storage, not a limit on total process RAM. `--host-context-mib 0` disables Host context backing. `--no-prefix-reuse` disables cross-request history reads and writes; pause/replay recovery remains available, and the capacity flags may still be specified.
 
-Run `./build/rtx5090-release/apps/ninfer-serve --help` for the exact option contract.
+Run `./build/turing-release/apps/ninfer-serve --help` for the exact option contract.
 
-Serve writes human-readable operational records to stderr using
-`YYYY-MM-DD HH:MM:SS.mmm  LEVEL  message`. Normal output covers material startup milestones,
-readiness, request lifecycle, fixed-interval throughput, and shutdown; `--log-level debug` exposes
-internal startup and resource-planning detail. A terminal may use one transient line during startup,
-but Serve throughput is always a persistent record. Redirected stderr contains no terminal control
-sequences. Pretty values use readable units and rounded rates; use the independent request JSONL for
-complete fields and full precision. Operational records never contain prompts, generated text,
-request bodies, credentials, or arbitrary client error messages.
-If a tool marker is returned to text because its structure or tool identity cannot be represented,
-Serve emits one warning with only the failure classification, never the generated markup.
+Serve writes human-readable operational records to stderr using `YYYY-MM-DD HH:MM:SS.mmm  LEVEL  message`. Normal output covers material startup milestones, readiness, request lifecycle, fixed-interval throughput, and shutdown; `--log-level debug` exposes internal startup and resource-planning detail. A terminal may use one transient line during startup, but Serve throughput is always a persistent record. Redirected stderr contains no terminal control sequences. Pretty values use readable units and rounded rates; use the independent request JSONL for complete fields and full precision. Operational records never contain prompts, generated text, request bodies, credentials, or arbitrary client error messages. If a tool marker is returned to text because its structure or tool identity cannot be represented, Serve emits one warning with only the failure classification, never the generated markup.
 
 ## Live metrics
 
-`GET /metrics` serves Prometheus text format 0.0.4 on the same port. It follows the server's
-API-key authentication and works independently of `--request-log-jsonl` and
-`--log-stats-interval-ms`. Engine failure leaves the endpoint readable with
-`ninfer_engine_ready 0`. Counters start after startup warmup and reset when the server restarts.
+`GET /metrics` serves Prometheus text format 0.0.4 on the same port. It follows the server's API-key authentication and works independently of `--request-log-jsonl` and `--log-stats-interval-ms`. Engine failure leaves the endpoint readable with `ninfer_engine_ready 0`. Counters start after startup warmup and reset when the server restarts.
 
 ```bash
 curl http://127.0.0.1:8080/metrics
@@ -989,8 +647,7 @@ curl http://127.0.0.1:8080/metrics
 | `ninfer_time_to_first_token_seconds` | Histogram updated once at the first committed token, including preparation, queueing and binding |
 | `ninfer_request_duration_seconds`, `ninfer_request_queue_seconds` | Histograms for settled generation outcomes, including cancellation; exceptional failures have separate counts |
 
-Histograms expose `_bucket`, `_sum` and `_count`. Metrics have bounded labels; they do not retain
-request IDs or request text. Rates are calculated by the consumer, for example:
+Histograms expose `_bucket`, `_sum` and `_count`. Metrics have bounded labels; they do not retain request IDs or request text. Rates are calculated by the consumer, for example:
 
 ```promql
 rate(ninfer_generation_tokens_total[1m])
@@ -999,16 +656,11 @@ rate(ninfer_spec_decode_accepted_tokens_total[1m])
 / rate(ninfer_spec_decode_draft_tokens_total[1m])
 ```
 
-The handler copies published snapshots and formats them outside the Engine worker. Scraping does
-not reset counters or initiate device work. Detailed per-request records remain available through
-the JSONL log. Monitoring tools with engine-specific metric names need an NInfer adapter.
+The handler copies published snapshots and formats them outside the Engine worker. Scraping does not reset counters or initiate device work. Detailed per-request records remain available through the JSONL log. Monitoring tools with engine-specific metric names need an NInfer adapter.
 
 ## Structured request log
 
-`--request-log-jsonl FILE` enables the machine-readable measurement log. The server opens `FILE`
-in append mode and flushes every event, so successive model or MTP blocks may share one campaign
-file. The parent directory must already exist. Failure to open the file aborts startup; the log path
-is also rejected if it resolves to the model artifact.
+`--request-log-jsonl FILE` enables the machine-readable measurement log. The server opens `FILE` in append mode and flushes every event, so successive model or MTP blocks may share one campaign file. The parent directory must already exist. Failure to open the file aborts startup; the log path is also rejected if it resolves to the model artifact.
 
 Every line is one `ninfer_serve_request_log` schema-v29 JSON object. All events carry
 `timestamp_unix_ms` and a process-unique `server_instance_id`; request IDs are monotonic only within

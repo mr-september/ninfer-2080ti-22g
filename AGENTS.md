@@ -68,7 +68,8 @@ The [documentation map](docs/README.md) routes to detailed contracts;
 
 Use Python 3.11 via `/home/neroued/miniconda3/envs/py311/bin/python` explicitly; use `python3` only
 after selecting the maintainer environment or checking its version.
-The usual local model is `out/qwen3_8_27b_nvfp4.ninfer`. Select artifacts by explicit path, never glob order,
+The usual local model on this fork's machine is
+`E:/AI_Models/LLM/neroued/Qwen3.8-27B-NInfer/qwen3_8_27b.ninfer` (v3, `groupwise-int`; `/mnt/e/...` from WSL). Select artifacts by explicit path, never glob order,
 modification time, or unqualified “latest”. Source checkpoints and large artifacts are prerequisites;
 download or regenerate them only when that work is in scope.
 

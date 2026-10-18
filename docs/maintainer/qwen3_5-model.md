@@ -286,8 +286,10 @@ Those columns replace matching placeholder embeddings. Vision has no autoregress
 
 Frontend admission uses aggregate media bytes, pixels, patch/token budgets and Engine context
 capacity. The aggregate limit is 131,072 raw patches / 32,768 merged tokens; a single tower item
-uses at most 16,384 merged tokens, additionally bounded by context. Program executes items
-sequentially and reuses their output handoff after scattering the previous item.
+uses at most `--vision-max-item-tokens` merged tokens (default and maximum 16,384), additionally
+bounded by context. The processor tightens its image and video pixel limits to `1,024` and `2,048`
+pixels per item token, so the resize rule keeps every item within that extent and the Vision
+workspace is sized for it. Program executes items sequentially and reuses their output handoff after scattering the previous item.
 
 The prepared prompt stores axis-major `[3,T]` positions in temporal, height, width order:
 
