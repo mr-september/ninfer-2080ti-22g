@@ -29,7 +29,9 @@ struct PreparedResources {
     std::uint64_t owned_value_bytes = 0;
 };
 
-enum class HostAccess { CpuOnly, CudaTransfer };
+// CudaTransfer: Host weights that CUDA copies from. CudaInPlace: a CUDA weight whose bytes stay in
+// registered Host memory and are read through the device alias (requested with a CUDA device).
+enum class HostAccess { CpuOnly, CudaTransfer, CudaInPlace };
 
 struct PlacementRequest {
     ObjectHandle object;
@@ -54,6 +56,8 @@ struct MaterializationPlan {
     // Host placements are relative to their respective registered/ordinary regions.
     std::vector<TensorPlacement> ordinary_host_objects;
     std::vector<TensorPlacement> registered_host_objects;
+    // Registered Host objects that also bind as CUDA weights through the device alias.
+    std::vector<ObjectHandle> in_place_objects;
     PreparedResources resources;
 };
 

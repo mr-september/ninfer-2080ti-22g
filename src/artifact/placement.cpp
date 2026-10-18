@@ -36,7 +36,7 @@ MaterializationPlan plan_materialization(const Reader& reader,
     out.object_count = reader.directory().objects.size();
     out.resources    = std::move(resources);
     std::vector<bool> host(out.object_count), registered(out.object_count),
-        device(out.object_count);
+        device(out.object_count), in_place(out.object_count);
     bool has_device = false;
     for (const auto& request : requests) {
         (void)reader.geometry(request.object);
@@ -48,12 +48,18 @@ MaterializationPlan plan_materialization(const Reader& reader,
         } else {
             if (request.device.type() != DeviceType::CUDA ||
                 (has_device && request.device != out.device) ||
-                request.host_access != HostAccess::CpuOnly) {
+                request.host_access == HostAccess::CudaTransfer) {
                 throw ArtifactError("materialization requires one CUDA device");
             }
-            out.device                      = request.device;
-            has_device                      = true;
-            device.at(request.object.index) = true;
+            out.device = request.device;
+            has_device = true;
+            if (request.host_access == HostAccess::CudaInPlace) {
+                host.at(request.object.index)       = true;
+                registered.at(request.object.index) = true;
+                in_place.at(request.object.index)   = true;
+            } else {
+                device.at(request.object.index) = true;
+            }
         }
     }
     LayoutBuilder host_layout, registered_layout, device_layout;
@@ -67,6 +73,7 @@ MaterializationPlan plan_materialization(const Reader& reader,
             auto& placements =
                 registered[i] ? out.registered_host_objects : out.ordinary_host_objects;
             placements.push_back({handle, plan_host_tensor_region(layout, reader, handle)});
+            if (in_place[i]) { out.in_place_objects.push_back(handle); }
             out.host_alignment =
                 std::max({out.host_alignment, static_cast<std::size_t>(g.alignment),
                           static_cast<std::size_t>(kPayloadAlignment)});

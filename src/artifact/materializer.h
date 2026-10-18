@@ -26,6 +26,8 @@ struct MaterializationStats {
     std::uint64_t registered_host_bytes = 0; // Subset of host_capacity_bytes.
     std::size_t device_object_count     = 0;
     std::size_t host_object_count       = 0; // CPU tensors and retained resources.
+    std::size_t in_place_object_count   = 0; // CUDA weights read in place from Host memory.
+    std::uint64_t in_place_host_bytes   = 0; // Their payload bytes.
     // I/O, CPU copies and upload completion; excludes backing allocation and pinning.
     double upload_seconds            = 0;
     double host_registration_seconds = 0;
@@ -42,6 +44,9 @@ public:
 
     [[nodiscard]] const WeightParent& device_parent(ObjectHandle handle) const;
     [[nodiscard]] const WeightParent& host_parent(ObjectHandle handle) const;
+    // CUDA view of a registered Host object placed with HostAccess::CudaInPlace.
+    [[nodiscard]] const WeightParent& mapped_parent(ObjectHandle handle) const;
+    [[nodiscard]] bool has_mapped(ObjectHandle handle) const noexcept;
     [[nodiscard]] std::span<const std::byte> host_bytes(ObjectHandle handle) const;
     [[nodiscard]] bool has_device(ObjectHandle handle) const noexcept;
     // Empty for an ordinary Host parent. Registration uses materialize's execution device.
@@ -59,6 +64,7 @@ private:
         std::vector<float> weight_divisors;
         std::optional<WeightParent> device;
         std::optional<WeightParent> host;
+        std::optional<WeightParent> mapped;
     };
 
     HostBuffer host_storage_;

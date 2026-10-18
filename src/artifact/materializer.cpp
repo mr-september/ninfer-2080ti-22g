@@ -224,6 +224,15 @@ std::span<const std::byte> MaterializedArtifact::host_bytes(ObjectHandle handle)
     throw ArtifactError("object has no retained Host bytes");
 }
 
+const WeightParent& MaterializedArtifact::mapped_parent(ObjectHandle handle) const {
+    if (!has_mapped(handle)) { throw ArtifactError("object has no in-place Host weight backing"); }
+    return *objects_[handle.index].mapped;
+}
+
+bool MaterializedArtifact::has_mapped(ObjectHandle handle) const noexcept {
+    return handle.index < objects_.size() && objects_[handle.index].mapped.has_value();
+}
+
 bool MaterializedArtifact::has_device(ObjectHandle handle) const noexcept {
     return handle.index < objects_.size() && objects_[handle.index].device.has_value();
 }
@@ -320,6 +329,16 @@ MaterializedArtifact materialize(const Reader& reader, MaterializationPlan&& pla
     place(plan.ordinary_host_objects, out.host_storage_.span().subspan(plan.registered_host_bytes),
           false);
     place(plan.device_objects, out.device_storage_.span(), true);
+    for (const ObjectHandle handle : plan.in_place_objects) {
+        const auto view = out.host_transfer_view(handle);
+        if (!view.device_address) { throw ArtifactError("in-place Host weight is not registered"); }
+        const auto& parent = out.host_parent(handle);
+        out.objects_[handle.index].mapped =
+            WeightParent{parent.geometry, execution->device(),
+                         static_cast<const std::byte*>(view.device_address), {}};
+        ++out.stats_.in_place_object_count;
+        out.stats_.in_place_host_bytes += parent.geometry.bytes;
+    }
     std::vector<CopyRange> ranges;
     for (std::size_t i = 0; i < out.objects_.size(); ++i) {
         auto& object = out.objects_[i];
@@ -452,6 +471,7 @@ MaterializedArtifact materialize(const Reader& reader, MaterializationPlan&& pla
         validate_divisors(object.weight_divisors, reader.directory().tensor({i}).id);
         if (object.host) { object.host->weight_divisors = object.weight_divisors; }
         if (object.device) { object.device->weight_divisors = object.weight_divisors; }
+        if (object.mapped) { object.mapped->weight_divisors = object.weight_divisors; }
     }
     out.stats_.h2d_bytes = uploaded_bytes;
     out.stats_.upload_seconds =
