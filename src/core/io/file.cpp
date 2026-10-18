@@ -104,44 +104,26 @@ void ReadOnlyFile::read_exact(std::uint64_t offset, std::span<std::byte> destina
     }
 }
 
-void validate_direct_read(FileView file, std::uint64_t offset, std::span<std::byte> destination) {
-    if (file.descriptor < 0 || file.mode != ReadMode::Direct ||
-        !std::has_single_bit(file.memory_alignment) ||
-        !std::has_single_bit(file.offset_alignment) || offset % file.offset_alignment ||
-        destination.size() % file.offset_alignment ||
-        (!destination.empty() &&
-         (!destination.data() ||
-          reinterpret_cast<std::uintptr_t>(destination.data()) % file.memory_alignment)) ||
-        destination.size() > static_cast<std::size_t>(std::numeric_limits<ssize_t>::max()))
-        throw std::invalid_argument("invalid direct read range or alignment");
-    (void)position(offset);
-}
-
 std::size_t ReadOnlyFile::read_direct(std::uint64_t offset,
                                       std::span<std::byte> destination) const {
     validate_direct_read(view_, offset, destination);
     if (destination.empty()) return 0;
-    ssize_t n;
-    do {
-        n = ::pread(view_.descriptor, destination.data(), destination.size(), position(offset));
-    } while (n < 0 && errno == EINTR);
-    if (n < 0) fail(path_, "direct pread");
-    return static_cast<std::size_t>(n);
-}
-
-DirectReadWindow direct_read_window(FileView file, std::uint64_t offset, std::size_t bytes) {
-    if (file.descriptor < 0 || file.mode != ReadMode::Direct || !bytes ||
-        !std::has_single_bit(file.offset_alignment) || offset > file.bytes ||
-        bytes > file.bytes - offset)
-        throw std::invalid_argument("invalid direct read window");
-    const auto alignment = file.offset_alignment;
-    const auto prefix    = offset % alignment;
-    if (bytes > std::numeric_limits<std::size_t>::max() - prefix - (alignment - 1))
-        throw std::overflow_error("direct read window size overflow");
-    const auto required = bytes + prefix;
-    const auto count    = (required + alignment - 1) / alignment * alignment;
-    (void)position(offset - prefix);
-    return {offset - prefix, count, prefix, required};
+    // A short read is legal (network and virtualized file systems cap each transfer); continue until
+    // the request is filled or the file ends. Direct I/O keeps short reads block-aligned, so the
+    // continuation stays aligned.
+    std::size_t total = 0;
+    while (total < destination.size()) {
+        const auto n = ::pread(view_.descriptor, destination.data() + total,
+                               destination.size() - total, position(offset + total));
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            fail(path_, "direct pread");
+        }
+        if (n == 0) break;
+        total += static_cast<std::size_t>(n);
+        if (total % view_.offset_alignment != 0) break; // end of file inside a block
+    }
+    return total;
 }
 
 } // namespace ninfer::io

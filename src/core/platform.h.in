@@ -1,13 +1,22 @@
 #pragma once
 
+#cmakedefine01 NINFER_TARGET_TURING
 #cmakedefine01 NINFER_TARGET_RTX5090
 #cmakedefine01 NINFER_TARGET_SPARK
 
 // Capabilities belong to each target; consumers should use the capability they need.
-#if NINFER_TARGET_RTX5090
+// NINFER_HOST_MAPPED_EMBEDDING: the token embedding stays in page-locked host memory and kernels
+// read its rows over PCIe, trading a few microseconds per step for device memory.
+#if NINFER_TARGET_TURING
+#    define NINFER_SHARED_PHYSICAL_MEMORY 0
+#    define NINFER_EXPERT_OFFLOAD 0
+#    define NINFER_HOST_MAPPED_EMBEDDING 1
+#elif NINFER_TARGET_RTX5090
 #    define NINFER_SHARED_PHYSICAL_MEMORY 0
 #    define NINFER_EXPERT_OFFLOAD 1
+#    define NINFER_HOST_MAPPED_EMBEDDING 0
 #elif NINFER_TARGET_SPARK
 #    define NINFER_SHARED_PHYSICAL_MEMORY 1
 #    define NINFER_EXPERT_OFFLOAD 0
+#    define NINFER_HOST_MAPPED_EMBEDDING 0
 #endif

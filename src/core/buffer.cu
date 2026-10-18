@@ -1,5 +1,6 @@
 #include "core/buffer.h"
 #include "core/device.h"
+#include "ninfer/memory_errors.h"
 
 #include <cstdio>
 #include <stdexcept>
@@ -140,7 +141,15 @@ void DeviceBuffer::copy_to_host(void* destination, std::size_t count, std::size_
 }
 
 PinnedHostBuffer::PinnedHostBuffer(std::size_t bytes) : bytes_(bytes) {
-    if (bytes != 0) { check(cudaMallocHost(&data_, bytes), "cudaMallocHost"); }
+    if (bytes == 0) return;
+    const cudaError_t error = cudaMallocHost(&data_, bytes);
+    // A large page-locked request the OS cannot satisfy fails with cudaErrorMemoryAllocation, or on
+    // some Windows drivers with cudaErrorAlreadyMapped; both mean "cannot pin this much now".
+    if (error == cudaErrorMemoryAllocation || error == cudaErrorAlreadyMapped) {
+        (void)cudaGetLastError();
+        throw HostMemoryError(std::string("cudaMallocHost: ") + cudaGetErrorString(error), bytes);
+    }
+    check(error, "cudaMallocHost");
 }
 
 PinnedHostBuffer::~PinnedHostBuffer() { release_pinned(data_); }

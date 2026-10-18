@@ -760,7 +760,7 @@ LogicalKVPageHandle& KVHistoryStore::directory_slot(Directory& root, std::uint32
     for (;;) {
         if (!*node)
             *node = std::make_shared<DirectoryNode>();
-        else if (!node->unique())
+        else if (node->use_count() != 1)
             *node = std::make_shared<DirectoryNode>(**node);
         if (width == kChunkPages) return (*node)->pages[index];
         width /= 2;

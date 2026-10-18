@@ -152,8 +152,17 @@ void CudaHostCopyBatch::submit(CudaExecutionView execution) const {
     cudaMemcpyAttributes attributes{};
     attributes.srcAccessOrder = cudaMemcpySrcAccessOrderStream;
     std::size_t first         = 0;
+#if CUDART_VERSION >= 13000
     check_copy(cudaMemcpyBatchAsync(destinations_.data(), sources_.data(), sizes_.data(), count_,
                                     &attributes, &first, 1, execution.stream()));
+#else
+    // CUDA 12.x reports the failing copy index through an extra out-parameter.
+    std::size_t failed = 0;
+    check_copy(cudaMemcpyBatchAsync(const_cast<void**>(destinations_.data()),
+                                    const_cast<void**>(sources_.data()),
+                                    const_cast<std::size_t*>(sizes_.data()), count_, &attributes,
+                                    &first, 1, &failed, execution.stream()));
+#endif
 }
 
 } // namespace ninfer
