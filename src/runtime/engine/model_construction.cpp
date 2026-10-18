@@ -53,6 +53,10 @@ void validate_options(const EngineOptions& options) {
         throw std::invalid_argument(
             "Engine media_live_bytes must be nonzero when Vision is enabled");
     }
+    if (options.enable_vision && (options.vision_max_item_tokens < kMinimumVisionItemTokens ||
+                                  options.vision_max_item_tokens > kMaximumVisionItemTokens)) {
+        throw std::invalid_argument("Engine vision_max_item_tokens must be in [256,16384]");
+    }
     if (options.media_preprocess_threads > 64) {
         throw std::invalid_argument("Engine media_preprocess_threads must be in [0,64]");
     }
@@ -120,6 +124,13 @@ ConstructedModel construct_model(EngineOptions& options, DeviceContext& device) 
     StartupMemoryBudget budget(initial, limit, headroom, host_reservation);
     StartupPhaseScope inspect(options.startup_observer, StartupPhase::ArtifactInspect);
     artifact::Reader reader(options.artifact_path);
+    if (options.speculative.proposal_head == ProposalHead::Auto) {
+        const bool available = options.purpose == EnginePurpose::Generation &&
+                               options.speculative.backend != SpeculativeBackend::None &&
+                               reader.directory().component("text").proposal.has_value();
+        options.speculative.proposal_head =
+            available ? ProposalHead::Optimized : ProposalHead::Full;
+    }
     inspect.complete();
     switch (models::resolve_architecture(reader.directory())) {
     case models::Architecture::Qwen4Exp: {

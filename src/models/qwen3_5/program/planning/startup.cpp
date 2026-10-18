@@ -7,6 +7,7 @@
 #include "models/qwen3_5/program/planning/startup.h"
 #include "models/common/qwen/vision/vision.h"
 #include "models/qwen3_5/execution/workspace.h"
+#include "core/arch_traits.cuh"
 #include "core/device.h"
 #include "ninfer/ops/gated_delta_net.h"
 #include "ninfer/ops/candidate_selector.h"
@@ -706,7 +707,7 @@ WorkspacePlan build_workspace_plan(const SequencePlanImpl& plan) {
     out.capacity = out.general_capacity;
     if (plan.features.vision) {
         const std::uint32_t merged = static_cast<std::uint32_t>(
-            std::min<std::uint64_t>(plan.capacity, qwen::kMaximumVisionItemTokens));
+            std::min<std::uint64_t>(plan.capacity, plan.vision_max_item_tokens));
         out.vision   = qwen::VisionContext::plan_workspace(*profile.config.vision, *profile.vision,
                                                            merged, out.general_capacity);
         out.capacity = std::max(out.capacity, out.vision->capacity_bytes);
@@ -789,8 +790,12 @@ void validate_target_options(const execution::ModelProfile& profile, DeviceConte
         }
         break;
     }
-    if (device.compute_capability() != 120) {
-        throw std::invalid_argument("Qwen3.5 family runtime requires compute capability 12.0");
+    if (device.compute_capability() != core::CurrentArchTraits::compute_capability) {
+        throw std::invalid_argument(
+            std::string("Qwen3.5 family runtime was built for ") +
+            core::CurrentArchTraits::name + " and requires compute capability " +
+            std::to_string(core::CurrentArchTraits::compute_capability / 10) + "." +
+            std::to_string(core::CurrentArchTraits::compute_capability % 10));
     }
 }
 
@@ -813,6 +818,7 @@ std::unique_ptr<SequencePlanImpl> build_sequence_candidate(const SequencePlannin
     impl->speculative_backend  = inputs.speculative_backend;
     impl->proposal_head        = inputs.proposal_head;
     impl->features             = inputs.features;
+    impl->vision_max_item_tokens = inputs.vision_max_item_tokens;
     impl->use_cuda_graph       = inputs.use_cuda_graph;
     impl->causal_scoring       = inputs.causal_scoring;
     impl->multiprocessor_count = inputs.multiprocessor_count;
@@ -820,9 +826,9 @@ std::unique_ptr<SequencePlanImpl> build_sequence_candidate(const SequencePlannin
     impl->kv_storage           = inputs.kv_storage;
     impl->persistent           = persistent_layout(*impl);
     if (!impl->context_cache.host_capacity_bytes) {
-        // Default Host capacity covers 8 GiB of KV bytes plus eight complete StateImages.
+        // Default Host capacity covers kDefaultHostKvBytes of KV plus eight complete StateImages.
         impl->context_cache.host_capacity_bytes =
-            checked_add(8ULL * 1024 * 1024 * 1024,
+            checked_add(kDefaultHostKvBytes,
                         checked_mul(8, impl->persistent.state_images.images.image_stride,
                                     "Host context state default overflow"),
                         "Host context default overflow");
@@ -857,6 +863,7 @@ make_sequence_planner_impl(std::shared_ptr<const execution::ModelProfile> profil
         .kv_storage           = options.kv_cache,
         .proposal_head        = options.speculative.proposal_head,
         .features             = models::load_options(options),
+        .vision_max_item_tokens = options.vision_max_item_tokens,
         .use_cuda_graph       = options.use_cuda_graph,
         .causal_scoring       = options.purpose == EnginePurpose::CausalScoring,
         .multiprocessor_count = device.multiprocessor_count(),

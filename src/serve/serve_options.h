@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ninfer/types.h"
+#include "product/defaults.h"
 #include "product/logging/logging.h"
 
 #include <cstddef>
@@ -23,13 +24,17 @@ struct ServeOptions {
     bool help_requested = false;
     std::string artifact_path;
     std::filesystem::path chat_template_path;
+    bool artifact_chat_template = false;
     std::string host = "127.0.0.1";
     int port         = 8080;
     std::string api_key;                          // empty => no auth
     std::optional<std::string> model_id_override; // unset => artifact metadata.name
     std::string request_log_jsonl;                // empty => structured request logging disabled
-    std::uint32_t max_context          = 8192;
-    KvCapacityPolicy kv_capacity       = KvCapacityPolicy::explicit_capacity(8192);
+    std::uint32_t max_context          = product::kDefaultServeMaxContext;
+    bool max_context_explicit          = false; // --max-context was given; never lowered to fit
+    bool kv_capacity_explicit          = false; // --kv-capacity was given
+    KvCapacityPolicy kv_capacity =
+        KvCapacityPolicy::explicit_capacity(product::kDefaultServeMaxContext);
     std::uint32_t max_concurrency      = 1;
     std::uint32_t max_pending_requests = 16;
     std::uint32_t pending_timeout_ms   = 30000;
@@ -43,10 +48,11 @@ struct ServeOptions {
     std::size_t response_store_max_records = kDefaultResponseStoreRecords;
     std::size_t response_store_max_bytes   = kDefaultResponseStoreBytes;
     int device                             = 0;
-    KvCacheStorage kv_cache                = KvCacheStorage::BFloat16;
-    SpeculativeOptions speculative;
+    KvCacheStorage kv_cache                = product::default_kv_cache();
+    SpeculativeOptions speculative         = product::default_speculative();
     ContextCacheOptions context_cache;
     bool enable_vision      = false;
+    std::uint32_t vision_max_item_tokens = kMaximumVisionItemTokens;
     bool use_cuda_graph     = true;
     bool allow_prefix_reuse = true;
     std::optional<bool> enable_thinking;

@@ -9,6 +9,7 @@
 namespace ninfer::product {
 
 [[nodiscard]] inline SpeculativeBackend parse_speculative_backend(std::string_view value) {
+    if (value == "none") { return SpeculativeBackend::None; }
     if (value == "mtp") { return SpeculativeBackend::Mtp; }
     if (value == "dflash") { return SpeculativeBackend::DFlash; }
     if (value == "dflash2") { return SpeculativeBackend::DFlash2; }
@@ -27,6 +28,27 @@ namespace ninfer::product {
         return "dflash2";
     }
     return "unknown";
+}
+
+inline void validate_speculative_cli_options(const SpeculativeOptions& options);
+
+// Settles the speculative options after every flag is parsed. The executables start from
+// default_speculative() (MTP, 3 draft tokens, Auto proposal head), so "--spec none" clears the
+// window and DFlash needs its own explicit --draft-tokens.
+inline void finalize_speculative_cli_options(SpeculativeOptions& options,
+                                             bool draft_tokens_explicit) {
+    if (options.backend == SpeculativeBackend::None) {
+        if (draft_tokens_explicit) {
+            throw std::invalid_argument("--draft-tokens requires --spec mtp|dflash|dflash2");
+        }
+        options.draft_tokens = 0;
+        if (options.proposal_head == ProposalHead::Auto) {
+            options.proposal_head = ProposalHead::Full;
+        }
+    } else if (options.backend != SpeculativeBackend::Mtp && !draft_tokens_explicit) {
+        throw std::invalid_argument("--spec dflash|dflash2 requires --draft-tokens");
+    }
+    validate_speculative_cli_options(options);
 }
 
 inline void validate_speculative_cli_options(const SpeculativeOptions& options) {

@@ -8,6 +8,9 @@
 #include "runtime/engine/causal_score_core.h"
 #include "runtime/engine/engine_core.h"
 #include "runtime/engine/model_construction.h"
+#if defined(NINFER_SM75_RANGE_PROBE)
+#include "ops/common/range_probe.h"
+#endif
 
 #include <algorithm>
 #include <limits>
@@ -183,6 +186,9 @@ public:
 
     ~Impl() noexcept {
         device.bind_to_current_thread_noexcept();
+#if defined(NINFER_SM75_RANGE_PROBE)
+        ops::print_range_probe();
+#endif
         core.emplace<std::monostate>();
         try {
             device.synchronize();

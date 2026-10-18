@@ -7,6 +7,7 @@
 #include <limits>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 
 namespace ninfer::cli {
 namespace {
@@ -85,26 +86,31 @@ std::string usage_text(const char* argv0) {
            "       [--max-context N] [--kv-capacity N|auto] [--prefill-chunk N] [--max-new "
            "N]\n"
            "       [--device N]\n"
-           "       [--kv-dtype bf16|int8|fp8|nvfp4|k8v4] [--spec mtp|dflash|dflash2 --draft-tokens "
-           "N]\n"
-           "       [--lm-head-draft]\n"
+           "       [--kv-dtype bf16|int8|fp8|nvfp4|k8v4]\n"
+           "       [--spec none|mtp|dflash|dflash2] [--draft-tokens N]\n"
+           "       [--lm-head-draft | --no-lm-head-draft]\n"
            "       [--temperature F] [--top-p F] [--top-k N] [--min-p F]\n"
            "       [--presence-penalty F] [--frequency-penalty F] [--seed N] [--greedy]\n"
            "       [--stop-token-id N]... [--stop <text>]... [--reasoning-stop <text>]...\n"
-           "       [--chat-template FILE]\n"
+           "       [--chat-template FILE | --artifact-chat-template]\n"
            "       [--grammar-file FILE | --json-object | --json-schema-file FILE |\n"
            "        --regex PATTERN | --choice TEXT ...]\n"
            "       [--raw-output] [--print-token-ids] [--no-thinking] [--thinking-budget N]\n"
            "       [--reasoning-effort none|minimal|low|medium|high|xhigh|max] [--vision]\n"
+           "       [--vision-max-item-tokens N]\n"
            "       [--no-cuda-graph]\n"
            "       [--log-level trace|debug|info|warning|error|critical|off]\n"
-           "\n"
+           "\n" +
+           ninfer::product::defaults_help(ninfer::product::kDefaultCliMaxContext, "") +
            "Streams answer content to stdout and reasoning plus diagnostics to stderr.\n"
            "Structured message content accepts text, image/image_url, and video/video_url parts;\n"
            "media sources may be local paths, HTTP(S) URLs, or base64 data URIs.\n"
            "--vision enables image/video input and loads the fixed Vision GPU allocations.\n"
            "--prefill-chunk requires a positive multiple of 128; defaults to 4096 for Qwen4Exp "
            "or CPU expert offload, otherwise 1024.\n"
+           "--vision-max-item-tokens N (256..16384, default 16384) bounds one image or video "
+           "item;\n"
+           "larger media is downscaled, and a smaller N shrinks the Vision workspace.\n"
            "--thinking-budget caps model-origin thinking tokens; inserted control tokens count "
            "toward --max-new.\n"
            "Startup uses " +
@@ -124,6 +130,7 @@ Options parse_options(int argc, char** argv) {
     if (argc < 2) { throw std::invalid_argument(".ninfer model path is required"); }
     options.artifact_path     = argv[1];
     bool kv_capacity_explicit = false;
+    bool draft_tokens_explicit = false;
 
     for (int i = 2; i < argc; ++i) {
         const std::string_view arg(argv[i]);
@@ -136,6 +143,8 @@ Options parse_options(int argc, char** argv) {
             options.prompt = value(arg);
         } else if (arg == "--chat-template") {
             options.chat_template_path = value(arg);
+        } else if (arg == "--artifact-chat-template") {
+            options.artifact_chat_template = true;
         } else if (arg == "--grammar-file") {
             options.grammar_path = value(arg);
         } else if (arg == "--json-object") {
@@ -151,10 +160,12 @@ Options parse_options(int argc, char** argv) {
         } else if (arg == "--max-new") {
             options.max_new = parse_u32(value(arg), "max-new");
         } else if (arg == "--max-context") {
-            options.max_context = parse_u32(value(arg), "max-context");
+            options.max_context          = parse_u32(value(arg), "max-context");
+            options.max_context_explicit = true;
         } else if (arg == "--kv-capacity") {
             options.kv_capacity  = parse_kv_capacity(value(arg));
             kv_capacity_explicit = true;
+            options.kv_capacity_explicit = true;
         } else if (arg == "--prefill-chunk") {
             options.prefill_chunk = parse_u32(value(arg), "prefill-chunk");
         } else if (arg == "--device") {
@@ -165,8 +176,11 @@ Options parse_options(int argc, char** argv) {
             options.speculative.backend = product::parse_speculative_backend(value(arg));
         } else if (arg == "--draft-tokens") {
             options.speculative.draft_tokens = parse_u32(value(arg), "draft-tokens");
+            draft_tokens_explicit            = true;
         } else if (arg == "--lm-head-draft") {
             options.speculative.proposal_head = ProposalHead::Optimized;
+        } else if (arg == "--no-lm-head-draft") {
+            options.speculative.proposal_head = ProposalHead::Full;
         } else if (arg == "--raw-output") {
             options.raw_output = true;
         } else if (arg == "--print-token-ids") {
@@ -179,6 +193,12 @@ Options parse_options(int argc, char** argv) {
             options.reasoning_effort = parse_reasoning_effort(value(arg));
         } else if (arg == "--vision") {
             options.enable_vision = true;
+        } else if (arg == "--vision-max-item-tokens") {
+            options.vision_max_item_tokens = parse_u32(value(arg), "vision-max-item-tokens");
+            if (options.vision_max_item_tokens < kMinimumVisionItemTokens ||
+                options.vision_max_item_tokens > kMaximumVisionItemTokens) {
+                throw std::invalid_argument("--vision-max-item-tokens must be in [256,16384]");
+            }
         } else if (arg == "--no-cuda-graph") {
             options.use_cuda_graph = false;
         } else if (arg == "--stop-token-id") {
@@ -245,7 +265,7 @@ Options parse_options(int argc, char** argv) {
         options.kv_capacity.explicit_tokens < options.max_context) {
         throw std::invalid_argument("--kv-capacity must be at least --max-context");
     }
-    product::validate_speculative_cli_options(options.speculative);
+    product::finalize_speculative_cli_options(options.speculative, draft_tokens_explicit);
     if (options.enable_thinking == false && options.reasoning_effort &&
         *options.reasoning_effort != ReasoningEffort::None) {
         throw std::invalid_argument("--reasoning-effort cannot be combined with --no-thinking");
@@ -255,6 +275,8 @@ Options parse_options(int argc, char** argv) {
         throw std::invalid_argument("--thinking-budget cannot be combined with --no-thinking");
     }
     if (options.greedy) { options.sampling.temperature = 0.0F; }
+    product::validate_chat_template_selection(options.chat_template_path,
+                                              options.artifact_chat_template);
     return options;
 }
 

@@ -50,6 +50,8 @@ public:
     void http_failure(std::string_view endpoint, const RequestFailure& failure,
                       std::string_view request_id = {}) const;
     void engine_capacity(const GenerationService& service) const;
+    void context_reduced(std::uint32_t requested, std::uint32_t fitted) const;
+    void host_context_reduced(std::size_t default_bytes, std::size_t fitted_bytes) const;
     void warmup_started() const;
     void warmup_complete(double seconds) const;
     void warmup_failure(double seconds, std::string_view detail) const;

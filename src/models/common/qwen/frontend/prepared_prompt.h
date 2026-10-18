@@ -24,9 +24,6 @@ inline constexpr std::uint64_t kRawPatchesPerVisionToken  = 4;
 inline constexpr std::uint64_t kMaximumPromptVisionTokens = 32'768;
 inline constexpr std::uint64_t kMaximumPromptVisionRawPatches =
     kMaximumPromptVisionTokens * kRawPatchesPerVisionToken;
-inline constexpr std::uint64_t kMaximumVisionItemTokens = 16'384;
-inline constexpr std::uint64_t kMaximumVisionItemRawPatches =
-    kMaximumVisionItemTokens * kRawPatchesPerVisionToken;
 
 struct PreparedMediaPayload {
     // Exact row-major BF16 input consumed by the Vision patch projection.

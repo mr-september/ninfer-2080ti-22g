@@ -435,6 +435,20 @@ void OperationalLog::http_failure(std::string_view endpoint, const RequestFailur
     write({.severity = failure_severity(failure.classification), .message = out.str()});
 }
 
+void OperationalLog::context_reduced(std::uint32_t requested, std::uint32_t fitted) const {
+    logger_->warn("max-context reduced to {} to fit free VRAM (requested {}; pass --max-context to "
+                  "choose one)",
+                  fitted, requested);
+}
+
+void OperationalLog::host_context_reduced(std::size_t default_bytes,
+                                          std::size_t fitted_bytes) const {
+    logger_->warn("host context reduced to {} to fit free RAM (default about {}; pass "
+                  "--host-context-mib to choose one)",
+                  product::format_pretty_bytes(fitted_bytes),
+                  product::format_pretty_bytes(default_bytes));
+}
+
 void OperationalLog::engine_capacity(const GenerationService& service) const {
     const ninfer::MemorySummary memory            = service.memory_summary();
     const ninfer::EngineOptions& engine           = service.engine_options();

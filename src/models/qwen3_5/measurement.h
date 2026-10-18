@@ -5,7 +5,7 @@
 #include <string>
 
 namespace ninfer::models::moe {
-struct Plan;
+class Plan;
 }
 
 namespace ninfer::models::qwen3_5 {

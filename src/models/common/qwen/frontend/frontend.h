@@ -16,9 +16,12 @@ namespace ninfer::models::qwen {
 
 struct FrontendOptions {
     std::filesystem::path chat_template_path;
+    std::string chat_template_source;
+    std::string chat_template_source_name;
     std::size_t grammar_cache_bytes        = 256ULL * 1024 * 1024;
     bool vision_enabled                    = true;
     std::uint32_t max_context              = 2'048;
+    std::uint32_t vision_max_item_tokens   = kMaximumVisionItemTokens;
     std::size_t media_cache_bytes          = kDefaultMediaCacheBytes;
     std::size_t media_live_bytes           = kDefaultMediaLiveBytes;
     std::uint32_t media_preprocess_threads = 0;

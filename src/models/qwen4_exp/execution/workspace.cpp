@@ -125,7 +125,7 @@ WorkspacePlan plan_workspace(const ModelProfile& p, const EngineOptions& o, std:
     if (p.vision) {
         out.vision = qwen::VisionContext::plan_workspace(
             *p.config.vision, *p.vision,
-            std::min<std::uint64_t>(o.max_context, qwen::kMaximumVisionItemTokens),
+            std::min<std::uint64_t>(o.max_context, kMaximumVisionItemTokens),
             out.general_bytes);
         out.bytes = out.vision->capacity_bytes;
     }

@@ -198,7 +198,8 @@ void validate_tokenizer_config(const FrontendResources& resources) {
 }
 
 fi::CompiledChatTemplate compile_chat_template(const FrontendResources& resources,
-                                               const std::filesystem::path& override_path) {
+                                               const FrontendOptions& options) {
+    const std::filesystem::path& override_path = options.chat_template_path;
     validate_tokenizer_config(resources);
     nlohmann::ordered_json tokens = nlohmann::ordered_json::object();
     const auto config             = nlohmann::ordered_json::parse(resources.tokenizer_config_json);
@@ -215,6 +216,11 @@ fi::CompiledChatTemplate compile_chat_template(const FrontendResources& resource
         tokens["additional_special_tokens"] = config["additional_special_tokens"];
     std::string source(resources.chat_template_jinja);
     std::string name = "artifact:chat_template.jinja";
+    if (override_path.empty() && !options.chat_template_source.empty()) {
+        source = options.chat_template_source;
+        name   = options.chat_template_source_name.empty() ? "chat_template.jinja"
+                                                           : options.chat_template_source_name;
+    }
     if (!override_path.empty()) {
         name = override_path.string();
         std::ifstream file(override_path, std::ios::binary | std::ios::ate);
@@ -512,7 +518,7 @@ class Frontend::Impl {
 public:
     Impl(const FrontendResources& resources, FrontendOptions options,
          ModelSamplingDefaults sampling_defaults)
-        : chat_template(compile_chat_template(resources, options.chat_template_path)),
+        : chat_template(compile_chat_template(resources, options)),
           tokenizer(resources.tokenizer),
           processor(options.vision_enabled ? processor_options(resources) : fi::ProcessorOptions{}),
           vision_enabled(options.vision_enabled), max_context(options.max_context) {
@@ -523,6 +529,7 @@ public:
             std::min<std::uint64_t>(options.max_context, kMaximumPromptVisionTokens);
         processor.max_vision_tokens = vision_tokens;
         processor.max_raw_patches   = vision_tokens * kRawPatchesPerVisionToken;
+        processor.max_item_tokens   = options.vision_max_item_tokens;
         if (vision_enabled) {
             const std::uint64_t minimum_live =
                 processor.max_raw_patches * kPreparedVisionPatchFeatures * sizeof(std::uint16_t);

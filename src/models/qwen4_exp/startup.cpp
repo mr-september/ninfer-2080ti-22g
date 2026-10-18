@@ -50,9 +50,12 @@ qwen::Frontend Startup::frontend(const Model& model, const EngineOptions& o) con
     preset.min_p       = generation.value("min_p", 0.0F);
     return qwen::make_frontend(model.resources(),
                                {.chat_template_path       = o.chat_template_path,
+                                .chat_template_source     = o.chat_template_source,
+                                .chat_template_source_name = o.chat_template_source_name,
                                 .grammar_cache_bytes      = o.grammar_cache_bytes,
                                 .vision_enabled           = o.enable_vision,
                                 .max_context              = o.max_context,
+                                .vision_max_item_tokens   = o.vision_max_item_tokens,
                                 .media_cache_bytes        = o.media_cache_bytes,
                                 .media_live_bytes         = o.media_live_bytes,
                                 .media_preprocess_threads = o.media_preprocess_threads},

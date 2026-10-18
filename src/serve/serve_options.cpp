@@ -1,6 +1,7 @@
 #include "serve/serve_options.h"
 #include "product/speculative_options.h"
 
+#include <array>
 #include <cerrno>
 #include <cstdint>
 #include <cstdlib>
@@ -8,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace ninfer::serve {
 namespace {
@@ -75,17 +77,28 @@ std::size_t parse_host_context_mib(const char* text) {
     if (fraction.size() > 20) {
         throw std::invalid_argument("--host-context-mib must resolve to a whole number of bytes");
     }
-    unsigned __int128 numerator = 0;
-    unsigned __int128 divisor   = 1;
-    for (const char character : fraction) {
-        numerator = numerator * 10 + static_cast<unsigned int>(character - '0');
-        divisor *= 10;
+    // fraction / 10^n * 2^20: double the decimal fraction twenty times, collecting the integer
+    // carry of each doubling as the next binary digit. The remainder must vanish.
+    std::array<std::uint8_t, 20> digits{};
+    for (std::size_t i = 0; i < fraction.size(); ++i) {
+        digits[i] = static_cast<std::uint8_t>(fraction[i] - '0');
     }
-    numerator *= bytes_per_mib;
-    if (numerator % divisor != 0) {
-        throw std::invalid_argument("--host-context-mib must resolve to a whole number of bytes");
+    std::size_t fractional_bytes = 0;
+    for (int bit = 0; bit < 20; ++bit) {
+        unsigned carry = 0;
+        for (std::size_t i = fraction.size(); i-- > 0;) {
+            const unsigned doubled = digits[i] * 2U + carry;
+            digits[i]              = static_cast<std::uint8_t>(doubled % 10U);
+            carry                  = doubled / 10U;
+        }
+        fractional_bytes = fractional_bytes * 2U + carry;
     }
-    const std::size_t fractional_bytes = static_cast<std::size_t>(numerator / divisor);
+    for (std::size_t i = 0; i < fraction.size(); ++i) {
+        if (digits[i] != 0) {
+            throw std::invalid_argument(
+                "--host-context-mib must resolve to a whole number of bytes");
+        }
+    }
     const std::size_t whole_bytes      = whole_mib * bytes_per_mib;
     if (fractional_bytes > maximum - whole_bytes) {
         throw std::invalid_argument("--host-context-mib is out of range");
@@ -124,10 +137,12 @@ std::string serve_usage_text(const char* argv0) {
            "[--device-state-slots N] [--host-context-mib N] "
            "[--request-log-jsonl FILE] "
            "[--response-store-max-records N] [--response-store-max-mib N] "
-           "[--kv-dtype bf16|int8|fp8|nvfp4|k8v4] [--spec mtp|dflash|dflash2 --draft-tokens N] "
+           "[--kv-dtype bf16|int8|fp8|nvfp4|k8v4] [--spec none|mtp|dflash|dflash2] [--draft-tokens "
+           "N] "
            "[--default-max-tokens N] [--default-thinking-budget N] "
-           "[--vision] [--no-cuda-graph] [--no-prefix-reuse] "
-           "[--chat-template FILE] [--lm-head-draft] [--no-thinking] [--preserve-thinking] "
+           "[--vision] [--vision-max-item-tokens N] [--no-cuda-graph] [--no-prefix-reuse] "
+           "[--chat-template FILE | --artifact-chat-template] [--lm-head-draft|--no-lm-head-draft] "
+           "[--no-thinking] [--preserve-thinking] "
            "[--cors] "
            "[--temperature F] [--top-p F] [--top-k N] [--min-p F] [--presence-penalty F] "
            "[--frequency-penalty F] [--seed N] [--greedy]\n"
@@ -148,13 +163,18 @@ std::string serve_usage_text(const char* argv0) {
            "       --vision enables media and loads the fixed Vision GPU allocations\n"
            "       --prefill-chunk requires a positive multiple of 128; defaults to 4096 for "
            "Qwen4Exp or CPU expert offload, otherwise 1024\n"
+           "       --vision-max-item-tokens bounds one image/video item in [256,16384] (default "
+           "16384);\n"
+           "       larger media is downscaled, and a smaller value shrinks the Vision workspace\n"
            "       startup uses " +
            std::to_string(kDefaultKvCapacityHeadroomBytes / (1024ULL * 1024ULL)) +
            " MiB of planning headroom; DGX Spark Vision additionally reserves live media capacity\n"
            "       --no-prefix-reuse disables cross-request history; request pause/replay "
-           "resources remain available\n"
-           "       context defaults: device-state=max-concurrency; RTX 5090 Host budget is "
-           "8192 MiB plus eight native StateImages; DGX Spark uses Device context storage\n"
+           "resources remain available\n" +
+           product::defaults_help(product::kDefaultServeMaxContext, "       ") +
+           "       context defaults: device-state=max-concurrency; Host budget is resolved from " +
+           std::to_string(kDefaultHostKvBytes >> 20) +
+           " MiB plus eight native StateImages\n"
            "       --device-state-slots is extra capacity beyond active lanes; "
            "--host-context-mib bounds RTX 5090 Host State/KV and in-flight storage in MiB\n"
            "       --host-context-mib accepts decimal MiB values that resolve to whole bytes\n"
@@ -181,6 +201,7 @@ ServeOptions parse_serve_options(int argc, char** argv) {
     }
     bool default_max_tokens_explicit = false;
     bool kv_capacity_explicit        = false;
+    bool draft_tokens_explicit       = false;
     if (argc >= 2 && (std::string(argv[1]) == "--help" || std::string(argv[1]) == "-h")) {
         options.help_requested = true;
         return options;
@@ -207,9 +228,11 @@ ServeOptions parse_serve_options(int argc, char** argv) {
         } else if (arg == "--max-context") {
             options.max_context = static_cast<std::uint32_t>(
                 parse_nonnegative_int(require_value("--max-context"), "max-context"));
+            options.max_context_explicit = true;
         } else if (arg == "--kv-capacity") {
             options.kv_capacity  = parse_kv_capacity(require_value("--kv-capacity"));
             kv_capacity_explicit = true;
+            options.kv_capacity_explicit = true;
         } else if (arg == "--max-concurrency") {
             options.max_concurrency = static_cast<std::uint32_t>(
                 parse_nonnegative_int(require_value("--max-concurrency"), "max-concurrency"));
@@ -296,6 +319,7 @@ ServeOptions parse_serve_options(int argc, char** argv) {
         } else if (arg == "--draft-tokens") {
             options.speculative.draft_tokens = static_cast<std::uint32_t>(
                 parse_nonnegative_int(require_value("--draft-tokens"), "draft-tokens"));
+            draft_tokens_explicit = true;
         } else if (arg == "--default-max-tokens") {
             options.default_max_tokens =
                 parse_nonnegative_int(require_value("--default-max-tokens"), "default-max-tokens");
@@ -309,14 +333,25 @@ ServeOptions parse_serve_options(int argc, char** argv) {
             options.default_thinking_budget = static_cast<std::uint32_t>(budget);
         } else if (arg == "--vision") {
             options.enable_vision = true;
+        } else if (arg == "--vision-max-item-tokens") {
+            const std::uint64_t tokens =
+                parse_u64(require_value("--vision-max-item-tokens"), "vision-max-item-tokens");
+            if (tokens < kMinimumVisionItemTokens || tokens > kMaximumVisionItemTokens) {
+                throw std::invalid_argument("--vision-max-item-tokens must be in [256,16384]");
+            }
+            options.vision_max_item_tokens = static_cast<std::uint32_t>(tokens);
         } else if (arg == "--no-cuda-graph") {
             options.use_cuda_graph = false;
         } else if (arg == "--no-prefix-reuse") {
             options.allow_prefix_reuse = false;
         } else if (arg == "--lm-head-draft") {
             options.speculative.proposal_head = ProposalHead::Optimized;
+        } else if (arg == "--no-lm-head-draft") {
+            options.speculative.proposal_head = ProposalHead::Full;
         } else if (arg == "--chat-template") {
             options.chat_template_path = require_value("--chat-template");
+        } else if (arg == "--artifact-chat-template") {
+            options.artifact_chat_template = true;
         } else if (arg == "--no-thinking") {
             options.enable_thinking = false;
         } else if (arg == "--preserve-thinking") {
@@ -379,7 +414,9 @@ ServeOptions parse_serve_options(int argc, char** argv) {
     if (options.prefill_chunk % 128 != 0) {
         throw std::invalid_argument("--prefill-chunk must be a positive multiple of 128");
     }
-    product::validate_speculative_cli_options(options.speculative);
+    product::finalize_speculative_cli_options(options.speculative, draft_tokens_explicit);
+    product::validate_chat_template_selection(options.chat_template_path,
+                                              options.artifact_chat_template);
     if (default_max_tokens_explicit) {
         if (options.default_max_tokens <= 0) {
             throw std::invalid_argument("--default-max-tokens must be positive");

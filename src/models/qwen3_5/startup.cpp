@@ -83,9 +83,12 @@ std::unique_ptr<Model> Startup::materialize(DeviceContext& device, WeightPlaceme
 qwen::Frontend Startup::frontend(const Model& model, const EngineOptions& options) const {
     return qwen::make_frontend(model.resources(),
                                {.chat_template_path       = options.chat_template_path,
+                                .chat_template_source     = options.chat_template_source,
+                                .chat_template_source_name = options.chat_template_source_name,
                                 .grammar_cache_bytes      = options.grammar_cache_bytes,
                                 .vision_enabled           = options.enable_vision,
                                 .max_context              = options.max_context,
+                                .vision_max_item_tokens   = options.vision_max_item_tokens,
                                 .media_cache_bytes        = options.media_cache_bytes,
                                 .media_live_bytes         = options.media_live_bytes,
                                 .media_preprocess_threads = options.media_preprocess_threads},

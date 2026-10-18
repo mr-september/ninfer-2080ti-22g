@@ -1,3 +1,4 @@
+#include "core/os.h"
 #include "product/logging/logging.h"
 #include "product/logging/startup_log.h"
 #include "serve/generation_service.h"
@@ -28,6 +29,7 @@ void handle_signal(int) {
 } // namespace
 
 int main(int argc, char** argv) {
+    ninfer::os::init_console();
     ninfer::serve::ServeOptions options;
     try {
         options = ninfer::serve::parse_serve_options(argc, argv);
@@ -62,6 +64,14 @@ int main(int argc, char** argv) {
 
         ninfer::serve::GenerationService service(options, startup_log.observer());
         startup_log.engine_ready(service.load_summary());
+        if (service.options().max_context != options.max_context) {
+            operational_log.context_reduced(options.max_context, service.options().max_context);
+        }
+        if (service.host_context_default_bytes() != 0) {
+            operational_log.host_context_reduced(
+                service.host_context_default_bytes(),
+                *service.engine_options().context_cache.host_capacity_bytes);
+        }
         operational_log.engine_capacity(service);
 
         using Clock                            = std::chrono::steady_clock;

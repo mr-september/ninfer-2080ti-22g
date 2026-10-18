@@ -1,7 +1,9 @@
+#include "core/os.h"
 #include "corpus.h"
 #include "evaluation.h"
 
 #include "ninfer/engine.h"
+#include "product/defaults.h"
 #include "product/logging/logging.h"
 #include "product/logging/pretty_format.h"
 #include "product/logging/startup_log.h"
@@ -47,7 +49,7 @@ struct Options {
     std::uint32_t context               = 4096;
     std::uint32_t stride                = 2048;
     int device                          = 0;
-    ninfer::KvCacheStorage kv           = ninfer::KvCacheStorage::Fp8E4M3Row256;
+    ninfer::KvCacheStorage kv           = ninfer::product::default_perplexity_kv_cache();
     bool quick                          = false;
     ninfer::product::LogLevel log_level = ninfer::product::LogLevel::Info;
 };
@@ -163,7 +165,7 @@ std::string safe_component(std::string_view value) {
 std::string timestamp() {
     const std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::tm utc{};
-    gmtime_r(&now, &utc);
+    (void)ninfer::os::utc_time(now, utc);
     std::ostringstream out;
     out << std::put_time(&utc, "%Y%m%d-%H%M%S");
     return out.str();
@@ -435,6 +437,7 @@ int run(const Options& options, const std::shared_ptr<spdlog::logger>& logger,
 } // namespace
 
 int main(int argc, char** argv) {
+    ninfer::os::init_console();
     Options options;
     try {
         options = parse_options(argc, argv);

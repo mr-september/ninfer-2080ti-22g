@@ -5,8 +5,7 @@
 
 #include <spdlog/logger.h>
 
-#include <sys/ioctl.h>
-#include <unistd.h>
+#include "core/os.h"
 
 #include <algorithm>
 #include <array>
@@ -77,9 +76,7 @@ PhasePresentation phase_presentation(StartupPhase phase) noexcept {
 }
 
 std::size_t terminal_columns() noexcept {
-    winsize size{};
-    if (::ioctl(STDERR_FILENO, TIOCGWINSZ, &size) == 0 && size.ws_col != 0) { return size.ws_col; }
-    return 120;
+    return os::stderr_columns(120);
 }
 
 std::string progress_bar(double ratio, std::size_t width) {
@@ -290,6 +287,16 @@ void StartupLogRenderer::engine_ready(const LoadSummary& load) {
     impl_->logger->info("engine ready | {} | total {} | weights {} | CUDA sync {}",
                         format_pretty_text(load.model_name), format_pretty_duration(total_seconds),
                         format_pretty_bytes(load.host_to_device_bytes), load.cuda_sync_mode);
+    if (load.pinned_object_count != 0) {
+        impl_->logger->info("host weights | {} pinned in {}", format_pretty_bytes(load.pinned_host_bytes),
+                            format_pretty_count(load.pinned_object_count));
+    }
+    if (load.pinned_fallback_count != 0) {
+        impl_->logger->warn(
+            "pinned host memory unavailable | {} parameter(s), such as the token embedding, were "
+            "placed in device memory instead; close memory-hungry programs to free RAM",
+            format_pretty_count(load.pinned_fallback_count));
+    }
     impl_->logger->debug(
         "load detail | architecture {} | artifact read {} | H2D {} | staging peak {} | device "
         "objects {} | host objects {}",

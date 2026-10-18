@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -20,6 +21,10 @@ using TokenId = std::int32_t;
 inline constexpr std::uint32_t kMaximumConcurrency               = 8;
 inline constexpr std::size_t kMaximumContextCacheSessionKeyBytes = 256;
 inline constexpr std::size_t kMaximumExplicitPromptCacheMarkers  = 4;
+// Single-item Vision extent in merged tokens: the model's native image geometry limit (4096^2 px)
+// is the upper bound; Engine options may lower it to shrink the Vision workspace.
+inline constexpr std::uint32_t kMaximumVisionItemTokens = 16'384;
+inline constexpr std::uint32_t kMinimumVisionItemTokens = 256;
 // Aggregate encoded image/video payload retained by one prompt, independent of item count.
 inline constexpr std::size_t kMaximumPromptMediaBytes = 256ULL << 20;
 inline constexpr std::size_t kDefaultMediaCacheBytes  = 1ULL << 30;
@@ -64,6 +69,10 @@ struct KvCapacityPolicy {
 enum class ProposalHead : std::uint8_t {
     Full,
     Optimized,
+    // Optimized when speculation is enabled and the artifact carries a proposal head, otherwise
+    // Full. The Engine resolves it once the artifact is open; Engine::options() reports the
+    // resolved value.
+    Auto,
 };
 
 enum class SpeculativeBackend : std::uint8_t {
@@ -123,14 +132,23 @@ struct StartupObserver {
     std::function<void(const StartupEvent& event)> callback;
 };
 
+// Host KV budget of the default context cache. Turing builds target desktops that share RAM with
+// other programs, so they pin less by default; --host-context-mib raises it.
+#if defined(NINFER_SM75)
+inline constexpr std::size_t kDefaultHostKvBytes = 2ULL * 1024 * 1024 * 1024;
+#else
+inline constexpr std::size_t kDefaultHostKvBytes = 8ULL * 1024 * 1024 * 1024;
+#endif
+
 struct ContextCacheOptions {
     // Controls cross-request history reads and writes. Request pause/replay resources remain
     // available when history is disabled.
     bool enabled = true;
     // Extra Device StateImage slots beyond max_concurrency. Defaults to max_concurrency.
     std::optional<std::uint32_t> device_state_slots;
-    // Shared Host quota for StateImages, KV, pause snapshots and in-flight destinations.
-    // RTX 5090 defaults to 8 GiB plus eight model StateImages; DGX Spark resolves this to zero.
+    // Shared Host quota for StateImages, KV, pause snapshots and in-flight destinations. Native
+    // startup defaults to kDefaultHostKvBytes plus eight Host StateImages using the model's actual
+    // layout. The memory is page-locked, so it must be free RAM when the process starts.
     // This does not bound total process RAM.
     // Engine::options() returns both resolved capacities after construction.
     std::optional<std::size_t> host_capacity_bytes;
@@ -154,7 +172,11 @@ struct MoeOptions {
 
 struct EngineOptions {
     std::filesystem::path artifact_path;
+    // Prompt template, in order of precedence: the file at chat_template_path, then
+    // chat_template_source (named chat_template_source_name in diagnostics), then the artifact's.
     std::filesystem::path chat_template_path;
+    std::string chat_template_source;
+    std::string chat_template_source_name;
     std::size_t grammar_cache_bytes    = 256ULL * 1024 * 1024;
     EnginePurpose purpose              = EnginePurpose::Generation;
     int device                         = 0;
@@ -173,6 +195,9 @@ struct EngineOptions {
     // Zero selects a bounded worker count from the detected host concurrency.
     std::uint32_t media_preprocess_threads = 0;
     bool enable_vision                     = false;
+    // Largest single image or video item in merged tokens. It sizes the Vision workspace and
+    // bounds media geometry: larger media is downscaled to fit. Valid in [256, 16384].
+    std::uint32_t vision_max_item_tokens = kMaximumVisionItemTokens;
     bool use_cuda_graph                    = true;
     ContextCacheOptions context_cache;
     ContextCostOptions context_cost;
@@ -1149,6 +1174,11 @@ struct LoadSummary {
     std::uint64_t peak_staging_bytes   = 0;
     std::size_t device_object_count    = 0;
     std::size_t host_object_count      = 0;
+    // Weights read in place from page-locked host memory (the token embedding on Turing), and the
+    // parameters that wanted it but fell back to device memory when pinning failed.
+    std::size_t pinned_object_count    = 0;
+    std::uint64_t pinned_host_bytes    = 0;
+    std::size_t pinned_fallback_count  = 0;
     ContextCostSummary context_cost;
 };
 

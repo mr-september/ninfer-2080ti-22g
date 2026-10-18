@@ -1,3 +1,4 @@
+#include "core/platform.h"
 #include "models/qwen3_5/load.h"
 
 #include "artifact/reader.h"
@@ -163,9 +164,12 @@ Placement describe_placement(const Data& data, Device cuda, Device expert_device
     if (data.weights.mtp) place(data.weights.mtp->layer);
     std::vector<artifact::PlacementRequest> requests;
     for (std::size_t i = 0; i < data.pending.size(); ++i) {
+        const bool in_place =
+            NINFER_HOST_MAPPED_EMBEDDING != 0 && i == data.weights.text.token_embedding.index;
         for (const auto& part : data.pending[i].reference.binding.parts) {
             requests.push_back({part.object, out.weights[i],
                                 out.weights[i] == Device::cpu() ? artifact::HostAccess::CudaTransfer
+                                : in_place                      ? artifact::HostAccess::CudaInPlace
                                                                 : artifact::HostAccess::CpuOnly});
         }
     }

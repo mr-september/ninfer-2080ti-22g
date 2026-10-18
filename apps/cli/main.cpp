@@ -1,4 +1,6 @@
+#include "core/os.h"
 #include "options.h"
+#include "product/context_fit.h"
 #include "product/logging/logging.h"
 #include "product/logging/pretty_format.h"
 #include "product/logging/startup_log.h"
@@ -13,6 +15,7 @@
 #include <iterator>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -256,6 +259,7 @@ void print_generation_summary(const ninfer::GenerationResult& result,
 } // namespace
 
 int main(int argc, char** argv) {
+    ninfer::os::init_console();
     ninfer::cli::Options cli;
     try {
         cli = ninfer::cli::parse_options(argc, argv);
@@ -311,7 +315,8 @@ int main(int argc, char** argv) {
 
         ninfer::EngineOptions engine_options;
         engine_options.artifact_path      = cli.artifact_path;
-        engine_options.chat_template_path = cli.chat_template_path;
+        ninfer::product::select_chat_template(engine_options, cli.chat_template_path,
+                                      cli.artifact_chat_template);
         engine_options.device             = cli.device;
         engine_options.max_context        = cli.max_context;
         engine_options.kv_capacity        = cli.kv_capacity;
@@ -319,6 +324,7 @@ int main(int argc, char** argv) {
         engine_options.kv_cache           = cli.kv_cache;
         engine_options.speculative        = cli.speculative;
         engine_options.enable_vision      = cli.enable_vision;
+        engine_options.vision_max_item_tokens = cli.vision_max_item_tokens;
         engine_options.use_cuda_graph     = cli.use_cuda_graph;
         // One CLI invocation owns exactly one request and needs neither history nor pause
         // storage, so select those resource capacities explicitly.
@@ -327,7 +333,15 @@ int main(int argc, char** argv) {
         engine_options.context_cache.host_capacity_bytes = 0;
         engine_options.startup_observer                  = startup_log.observer();
 
-        ninfer::Engine engine(std::move(engine_options));
+        const std::uint32_t requested_context = engine_options.max_context;
+        const auto engine_owner               = ninfer::product::start_fitting_context(
+            engine_options.max_context, engine_options.kv_capacity, cli.max_context_explicit,
+            cli.kv_capacity_explicit, [&] { return std::make_unique<ninfer::Engine>(engine_options); });
+        ninfer::Engine& engine = *engine_owner;
+        if (engine_options.max_context != requested_context) {
+            std::cerr << "max-context reduced to " << engine_options.max_context
+                      << " to fit free VRAM (pass --max-context to choose one)\n";
+        }
         startup_log.engine_ready(engine.load_summary());
         engine.reset_memory_peaks();
 

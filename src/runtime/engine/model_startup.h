@@ -7,6 +7,7 @@
 #include "artifact/formats.h"
 #include "models/registry.h"
 #include "core/startup.h"
+#include "ninfer/memory_errors.h"
 
 #include <algorithm>
 #include <chrono>
@@ -49,7 +50,7 @@ calibrate_plan(const Setup& setup, ModelInstance<typename Setup::Types>& instanc
         auto next = setup.plan(device, options, candidate.placement, available - graph_bytes);
         if (!next) return std::nullopt;
         const auto next_key = setup.graph_plan(probe_options, next->preparation);
-        if (next_key == key) return CalibratedPlan{std::move(*next), graph};
+        if (next_key == key) return CalibratedPlan<typename Setup::ExecutionPlan>{std::move(*next), graph};
         const bool revisited = std::any_of(measured.begin(), measured.end(),
                                            [&](const auto& item) { return item.plan == next_key; });
         if (revisited && candidate.sequence.device_reservation_bytes() <= available - graph_bytes) {
@@ -65,7 +66,7 @@ calibrate_plan(const Setup& setup, ModelInstance<typename Setup::Types>& instanc
                 } else
                     high = middle - 1;
             }
-            return CalibratedPlan{std::move(candidate), graph};
+            return CalibratedPlan<typename Setup::ExecutionPlan>{std::move(candidate), graph};
         }
         candidate = std::move(*next);
     }
@@ -227,7 +228,7 @@ build_model(const artifact::Reader& reader, EngineOptions& options, DeviceContex
     };
     auto candidate = choose(budget.available(device_memory_snapshot(device.device())));
     if (!candidate)
-        throw std::invalid_argument(
+        throw DeviceMemoryError(
             "Device budget cannot hold model weights and required execution resources");
     binding.complete();
     std::unique_ptr<ModelInstance<typename Setup::Types>> instance;
@@ -264,11 +265,11 @@ build_model(const artifact::Reader& reader, EngineOptions& options, DeviceContex
         instance.reset();
         device.synchronize();
         if (++selected == choices.size() || preparation_attempts == 2)
-            throw std::invalid_argument(
+            throw DeviceMemoryError(
                 "Device budget cannot hold the calibrated runtime and requested KV capacity");
         candidate = choose(budget.available(device_memory_snapshot(device.device())));
         if (!candidate)
-            throw std::invalid_argument("Device budget cannot hold model execution resources");
+            throw DeviceMemoryError("Device budget cannot hold model execution resources");
     }
     instance->kv_capacity_resolution.available_after_weights_bytes = available_after_weights;
     instance->kv_capacity_resolution.available_after_startup_bytes =
@@ -295,6 +296,8 @@ build_model(const artifact::Reader& reader, EngineOptions& options, DeviceContex
         std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
     summary.device_object_count = stats.device_object_count;
     summary.host_object_count   = stats.host_object_count;
+    summary.pinned_object_count = stats.in_place_object_count;
+    summary.pinned_host_bytes   = stats.in_place_host_bytes;
     summary.context_cost        = std::move(context_cost.summary);
     return {std::move(instance), std::move(summary), std::move(context_cost.model)};
 }

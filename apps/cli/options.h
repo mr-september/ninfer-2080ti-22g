@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ninfer/types.h"
+#include "product/defaults.h"
 #include "product/logging/logging.h"
 
 #include <cstdint>
@@ -16,6 +17,7 @@ struct Options {
 
     std::filesystem::path artifact_path;
     std::filesystem::path chat_template_path;
+    bool artifact_chat_template = false;
     std::filesystem::path grammar_path;
     std::filesystem::path json_schema_path;
     std::optional<std::string> regex;
@@ -25,14 +27,18 @@ struct Options {
     std::filesystem::path messages_path;
 
     std::uint32_t max_new        = 128;
-    std::uint32_t max_context    = 2048;
-    KvCapacityPolicy kv_capacity = KvCapacityPolicy::explicit_capacity(2048);
+    std::uint32_t max_context    = product::kDefaultCliMaxContext;
+    bool max_context_explicit    = false; // --max-context was given; never lowered to fit
+    bool kv_capacity_explicit    = false; // --kv-capacity was given
+    KvCapacityPolicy kv_capacity =
+        KvCapacityPolicy::explicit_capacity(product::kDefaultCliMaxContext);
     std::uint32_t prefill_chunk  = 0;
     int device                   = 0;
 
-    KvCacheStorage kv_cache = KvCacheStorage::BFloat16;
-    SpeculativeOptions speculative;
+    KvCacheStorage kv_cache        = product::default_kv_cache();
+    SpeculativeOptions speculative = product::default_speculative();
     bool enable_vision  = false;
+    std::uint32_t vision_max_item_tokens = kMaximumVisionItemTokens;
     bool use_cuda_graph = true;
 
     bool raw_output      = false;

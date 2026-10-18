@@ -7,6 +7,9 @@
 #if defined(__linux__)
 #    include <netinet/tcp.h>
 #    include <sys/socket.h>
+#elif defined(_WIN32)
+#    include <winsock2.h>
+#    include <ws2tcpip.h>
 #endif
 
 #include <stdexcept>
@@ -31,15 +34,20 @@ private:
     TaskPool pool_;
 };
 
+#if defined(__linux__) || defined(_WIN32)
+constexpr int kKeepAliveIdleSeconds     = 10;
+constexpr int kKeepAliveIntervalSeconds = 3;
+constexpr int kKeepAliveProbeCount      = 3;
+#endif
 #if defined(__linux__)
-constexpr int kKeepAliveIdleSeconds                = 10;
-constexpr int kKeepAliveIntervalSeconds            = 3;
-constexpr int kKeepAliveProbeCount                 = 3;
 constexpr unsigned int kTcpUserTimeoutMilliseconds = 15000;
+#endif
 
+#if defined(__linux__) || defined(_WIN32)
 template <class T>
 void set_socket_option(socket_t socket, int level, int option, const T& value) noexcept {
-    (void)::setsockopt(socket, level, option, &value, sizeof(value));
+    (void)::setsockopt(socket, level, option, reinterpret_cast<const char*>(&value),
+                       static_cast<int>(sizeof(value)));
 }
 #endif
 
@@ -107,12 +115,14 @@ bool SseTransport::poll(Clock::time_point now) {
 
 void configure_http_server_socket(socket_t socket) noexcept {
     httplib::default_socket_options(socket);
-#if defined(__linux__)
+#if defined(__linux__) || defined(_WIN32)
     const int enabled = 1;
     set_socket_option(socket, SOL_SOCKET, SO_KEEPALIVE, enabled);
     set_socket_option(socket, IPPROTO_TCP, TCP_KEEPIDLE, kKeepAliveIdleSeconds);
     set_socket_option(socket, IPPROTO_TCP, TCP_KEEPINTVL, kKeepAliveIntervalSeconds);
     set_socket_option(socket, IPPROTO_TCP, TCP_KEEPCNT, kKeepAliveProbeCount);
+#endif
+#if defined(__linux__)
     set_socket_option(socket, IPPROTO_TCP, TCP_USER_TIMEOUT, kTcpUserTimeoutMilliseconds);
 #endif
 }
