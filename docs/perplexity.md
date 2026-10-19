@@ -40,6 +40,28 @@ report is `report.json` under `profiles/perplexity/` unless `--output` supplies 
 For KV-format comparisons, the recommended long-context profile is the full corpus with
 `--context 65536 --stride 32768` and without `--quick`.
 
+## Compare two builds token by token
+
+`ninfer-logit-compare` scores fixed token sequences through the same `CausalScoring` Engine path, so
+two builds can be compared at the log-probability level where greedy text only shows the first flip.
+It renders one user message (optionally after one system message) from a `--messages` file with the
+default chat template and thinking enabled, checks the rendered token count against
+`Engine::count_tokens`, and prints one JSON object: the log-probability of each `--candidates` first
+token (comma-separated texts, each one token) after the prompt, and the log-probabilities of the
+`--ids` continuation given the prompt.
+
+```bash
+./build/turing-release/apps/ninfer-logit-compare models/qwen3_8_27b.ninfer \
+  --messages examples/cli/messages/long_decode_aime26_30.json \
+  --candidates We,Let --ids "1596 1144 310" --context 8192 --kv-dtype bf16
+```
+
+Take the ids from `ninfer --greedy --print-token-ids` of one build, score them with both builds'
+binaries, and compare the two `continuation_logprobs` arrays. `--kv-dtype` accepts `bf16` and `int8`.
+The final logits are BF16, so log-probabilities move in whole logit steps (0.125 at magnitude 16 to
+32); judge differences in steps, not in absolute nats. The rule used to accept the Turing port is in
+"Port onto upstream dev" in [turing-port.md](turing-port.md).
+
 ## Metric
 
 For a stream `x[0..N)`, every token after `x[0]` is scored exactly once. A window `[b,e)` with target
