@@ -149,7 +149,7 @@ const char* name_of(Launch launch) {
 
 std::vector<float> read_output(const DeviceBuffer& buffer, std::size_t elements) {
     std::vector<std::uint16_t> raw(elements);
-    CUDA_CHECK(cudaMemcpy(raw.data(), buffer.p, elements * sizeof(std::uint16_t),
+    CUDA_CHECK(cudaMemcpy(raw.data(), buffer.data(), elements * sizeof(std::uint16_t),
                           cudaMemcpyDeviceToHost));
     std::vector<float> values(elements);
     for (std::size_t i = 0; i < elements; ++i) {
@@ -184,10 +184,12 @@ int main(int argc, char** argv) {
     // columns it was asked for, and that must not corrupt a neighbouring buffer.
     const std::size_t x_elements   = static_cast<std::size_t>(options.k) * max_t;
     const std::size_t out_elements = static_cast<std::size_t>(options.n) * (max_t + 256);
-    DeviceBuffer x(x_elements * 2);
-    DeviceBuffer out(out_elements * 2);
-    DeviceBuffer reference(out_elements * 2);
-    CUDA_CHECK(bench::fixture::fill_values(static_cast<__nv_bfloat16*>(x.p), x_elements, 101U,
+    const Device device = ninfer::bench::device_context().device();
+    const CudaExecutionView cuda = ninfer::bench::device_context().execution_view(stream);
+    DeviceBuffer x(device, x_elements * 2);
+    DeviceBuffer out(device, out_elements * 2);
+    DeviceBuffer reference(device, out_elements * 2);
+    CUDA_CHECK(bench::fixture::fill_values(static_cast<__nv_bfloat16*>(x.data()), x_elements, 101U,
                                            -0.5F, 0.5F, stream));
     CUDA_CHECK(cudaStreamSynchronize(stream));
 
@@ -207,12 +209,12 @@ int main(int argc, char** argv) {
     std::vector<std::int32_t> tokens = options.tokens;
     std::sort(tokens.begin(), tokens.end());
     for (const std::int32_t t : tokens) {
-        Tensor activation(x.p, DType::BF16, {options.k, t});
-        Tensor output(out.p, DType::BF16, {options.n, t});
-        Tensor reference_output(reference.p, DType::BF16, {options.n, t});
+        Tensor activation(x.data(), device, DType::BF16, {options.k, t});
+        Tensor output(out.data(), device, DType::BF16, {options.n, t});
+        Tensor reference_output(reference.data(), device, DType::BF16, {options.n, t});
 
         const Launch production = production_launch(options.qtype, options.n, options.k, t);
-        CUDA_CHECK(cudaMemsetAsync(reference.p, 0, reference.bytes, stream));
+        CUDA_CHECK(cudaMemsetAsync(reference.data(), 0, reference.size(), stream));
         production(activation, packed.weight, reference_output, stream);
         CUDA_CHECK(cudaStreamSynchronize(stream));
         const std::size_t elements = static_cast<std::size_t>(options.n) * t;
@@ -227,7 +229,7 @@ int main(int argc, char** argv) {
             if (candidate.format != options.qtype) { continue; }
             std::string reason;
             try {
-                CUDA_CHECK(cudaMemsetAsync(out.p, 0, out.bytes, stream));
+                CUDA_CHECK(cudaMemsetAsync(out.data(), 0, out.size(), stream));
                 candidate.launch(activation, packed.weight, output, stream);
                 CUDA_CHECK(cudaStreamSynchronize(stream));
                 CUDA_CHECK(cudaGetLastError());
@@ -256,11 +258,11 @@ int main(int argc, char** argv) {
                 continue;
             }
             bench::TimedGraph graph;
-            graph.capture(stream, [&](cudaStream_t s) {
-                candidate.launch(activation, packed.weight, output, s);
+            graph.capture(cuda, [&](CudaExecutionView c) {
+                candidate.launch(activation, packed.weight, output, c.stream());
             });
             const bench::ColdTiming timing =
-                bench::measure_cold_graph(graph, flush, stream, options.warmup, options.repeat);
+                bench::measure_cold_graph(graph, flush, cuda, options.warmup, options.repeat);
             legal.push_back({&candidate, timing.median_us});
         }
         if (legal.empty()) {
