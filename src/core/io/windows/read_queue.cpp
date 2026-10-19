@@ -61,7 +61,6 @@ struct DirectReadQueue::Impl {
             if (error == ERROR_HANDLE_EOF) error = ERROR_SUCCESS; // A zero-byte read at EOF.
         }
         slot.busy = false;
-        --pending;
         return {slot.request.tag, slot.request.buffer_index, static_cast<std::uint32_t>(bytes),
                 static_cast<int>(error)};
     }
@@ -171,7 +170,6 @@ ReadAdmission DirectReadQueue::try_enqueue(DirectRead request) {
         // An issue failure is an ordinary failed completion; no packet will arrive for it.
         p.ready.push_back({request.tag, request.buffer_index, 0,
                            static_cast<int>(::GetLastError())});
-        --p.pending;
         return ReadAdmission::Accepted;
     }
     slot.busy = true;
@@ -188,6 +186,7 @@ std::size_t DirectReadQueue::poll(std::span<ReadCompletion> output) {
         if (p.ready.empty()) break;
         output[count++] = p.ready.front();
         p.ready.pop_front();
+        --p.pending; // A request stays outstanding until poll delivers its completion.
     }
     return count;
 }
