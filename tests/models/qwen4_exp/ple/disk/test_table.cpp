@@ -5,6 +5,10 @@
 #include <cstring>
 #include <iostream>
 #include <memory>
+#if defined(_WIN32)
+#include <fcntl.h>
+#include <io.h>
+#endif
 
 namespace {
 template <class T>
@@ -94,6 +98,11 @@ void run(const char* path) {
 
 int main(int argc, char** argv) {
     if (argc != 2) return 1;
+#if defined(_WIN32)
+    // The protocol is binary; text mode would translate 0x0A to CRLF and stop reading at 0x1A.
+    (void)::_setmode(::_fileno(stdin), _O_BINARY);
+    (void)::_setmode(::_fileno(stdout), _O_BINARY);
+#endif
     try {
         run(argv[1]);
     } catch (const std::exception& e) {

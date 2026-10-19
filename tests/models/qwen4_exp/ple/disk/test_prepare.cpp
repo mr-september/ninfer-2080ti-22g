@@ -11,6 +11,10 @@
 #include <chrono>
 #include <iostream>
 #include <thread>
+#if defined(_WIN32)
+#include <fcntl.h>
+#include <io.h>
+#endif
 
 namespace {
 using namespace ninfer;
@@ -389,6 +393,11 @@ extern "C" cudaError_t CUDARTAPI cudaEventRecord(cudaEvent_t event, cudaStream_t
 }
 
 int main(int argc, char** argv) {
+#if defined(_WIN32)
+    // The protocol is binary; text mode would translate 0x0A to CRLF and stop reading at 0x1A.
+    (void)::_setmode(::_fileno(stdin), _O_BINARY);
+    (void)::_setmode(::_fileno(stdout), _O_BINARY);
+#endif
     try {
         if (argc != 3) throw std::invalid_argument("expected ARTIFACT --host|--gpu|--failure");
         const std::string_view mode = argv[2];
