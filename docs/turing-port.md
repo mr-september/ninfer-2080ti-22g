@@ -314,9 +314,12 @@ Verification on this machine (RTX 2080 Ti 22 GB, native Windows, CUDA 12.9, Visu
 
 | Check | Pre-port | Port | Note |
 |---|---|---|---|
-| Perplexity, 20 237 tokens of this repository's docs, BF16 KV, context 2048 stride 1024 | 5.171412 | 5.169092 | -0.045%, same corpus and flags |
+| Perplexity, protocol A: 20 237 tokens of this repository's docs (a one-off text, not kept), BF16 KV, context 2048 stride 1024. Not comparable with the next row | 5.171412 | 5.169092 | -0.045%, same corpus and flags |
+| Perplexity, protocol B: `ninfer-perplexity --corpus eval/corpora/perplexity-1m/manifest.json --quick --kv-dtype int8` (261,223 scored tokens, context 4096 stride 2048), final series tree (2026-10-19, after the read-queue fix) | 4.794641 | 4.796799 | +0.045% overall; pass limit set before the run was 0.1% |
 | Decode, greedy, INT8 KV, context 4096, 128 new tokens, tok/s, three interleaved rounds | 25.0 / 24.7 / 24.6 | 24.5 / 24.9 / 24.7 | mean 24.77 against 24.70 (-0.3%), inside the round-to-round spread |
 | Default launch (65 536 context, explicit KV) | starts, 18.0 GiB planned | starts, 18.9 GiB planned | the port plans 1 GiB of KV headroom by default (upstream's policy), the old build 0 B |
+
+Protocol B per domain (pre-port / port): chinese_reference 6.750531 / 6.767452 (+0.25%), english_long_form 7.179776 / 7.178341 (-0.02%), english_reference 6.458972 / 6.454913 (-0.06%), ninfer_code 1.673260 / 1.673458 (+0.01%). The 0.1% limit applies to the overall figure; the Chinese domain alone moved by more. Quote 5.169092 only with protocol A and 4.7968 only with protocol B.
 
 `ninfer_bench`, the Phase 2 procedure (INT8 KV, CUDA Graph decode, MTP depth 3 with the optimized head for the MTP row), pre-port build `bench_final_new` against the port, interleaved in one session, two rounds (round 1 / round 2):
 
