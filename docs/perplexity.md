@@ -58,8 +58,8 @@ token (comma-separated texts, each one token) after the prompt, and the log-prob
 
 Take the ids from `ninfer --greedy --print-token-ids` of one build, score them with both builds'
 binaries, and compare the two `continuation_logprobs` arrays. `--kv-dtype` accepts `bf16` and `int8`.
-The final logits are BF16, so log-probabilities move in whole logit steps (0.125 at magnitude 16 to
-32); judge differences in steps, not in absolute nats. The rule used to accept the Turing port is in
+The final logits are BF16, so a logit moves in whole steps (0.125 at magnitude 16 to
+32) and a top-2 gap is best judged in steps, not in nats. The rule used to accept the Turing port is in
 "Port onto upstream dev" in [turing-port.md](turing-port.md).
 
 ## Metric
