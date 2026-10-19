@@ -2,6 +2,10 @@
 
 This fork builds NInfer for NVIDIA Turing (RTX 2080 Ti 22 GB, `CMAKE_CUDA_ARCHITECTURES=75`) through the `NINFER_TARGET=turing` build target of the upstream engine. The engine, the Qwen3.5-family runtime, frontend, serving and scheduling are unchanged; only the CUDA layer differs. This page records what differs and why. The `turing` target follows upstream by compiling its `rtx5090` source trees with `NINFER_SM75` defined.
 
+## Status of this tree
+
+`master` is the Turing port rebased onto upstream `dev` `438ae67c` (merge `7923b62f` keeps the earlier fork history). Everything on this page marked "previous base" was measured before that port, on the fork's earlier sources, and its absolute figures are not current; [Current performance](#current-performance) and [Test status](#test-status-on-this-machine-native-windows-sm_75) are. The port's own gate results, including the greedy-output difference and how it was accepted, are under [Port onto upstream dev](#port-onto-upstream-dev-2026-10-18).
+
 ## Supported surface
 
 | Area | sm_75 |
@@ -28,7 +32,7 @@ Unsupported formats are not stubbed one symbol at a time inside upstream sources
 
 `tests/ops/test_mma_shim.cu` checks every tensor-core wrapper against naive math in the PTX fragment layouts; run it first when touching `ops/common/mma.cuh`.
 
-## Prefill tiles and token embedding (measured on one RTX 2080 Ti 22 GB)
+## Prefill tiles and token embedding (previous base, one RTX 2080 Ti 22 GB)
 
 **Prefill tiles.** About 95% of prefill time is the dequantizing GEMMs. Upstream sizes their tiles for the RTX 5090 (two `cp.async` stages, about 46 KB of shared memory), which on Turing leaves one 4-warp CTA per SM: profiled at 9.8% tensor-pipe and 11% issue-slot utilization, stalled on global loads with no `cp.async` to hide them. Single-stage tiles use about 27 KB, so two CTAs share each SM and one tile's MMA overlaps the other's decode and loads. Applied under `NINFER_SM75` only (the other architectures keep upstream's tables): Q5 plain and residual-add (`linear_add`) projections, Q4 plain projections, the folded Q4 gate/up SwiGLU (`MmaPairC128W8S1B2`), and the grouped GDN and attention input projections. Routes were chosen per shape by timing every instance across 128 to 2048 tokens.
 
@@ -40,11 +44,11 @@ Unsupported formats are not stubbed one symbol at a time inside upstream sources
 | Q4 gate/up folded with SwiGLU | 21.7 ms | 13.2 ms |
 | GDN grouped input projection | 12.1 ms | 6.8 ms |
 
-End to end, native Windows, greedy, MTP off (prefill tokens/s): 122-token prompt 201 to 247, 8k prompt 253 to 479, 64k prompt about 205 to 372. Kernels at 5 to 8 tokens (MTP depths 4 and 5) were already within about 10% of the best candidate, so draft depth 3 stays the default: a 5-token step costs about 1.4x a 4-token step because the cheap SIMT kernels stop at 4 tokens.
+End-to-end prefill of the current tree is in [Current performance](#current-performance). Kernels at 5 to 8 tokens (MTP depths 4 and 5) were already within about 10% of the best candidate, so draft depth 3 stays the default: a 5-token step costs about 1.4x a 4-token step because the cheap SIMT kernels stop at 4 tokens.
 
 **Token embedding.** The embedding is gathered one row per token, so it lives in pinned host memory that kernels read over PCIe (`Residency::PinnedHost`): 1.26 GiB less device memory, output byte-identical, no measurable decode change. If page-locked memory is unavailable (a host short of free RAM), the binder falls back to device residency at bind time. Effect: a 64k-token prompt now fits with MTP (it did not before); the largest context that starts is about 97k to 99k with MTP (it moves with how much VRAM the desktop and other programs hold) and between 110k and 125k without it.
 
-**Output head format.** Re-encoding `text/output_head` from Q8 to Q6 (`python -m tools.artifact.requantize_tensor SRC OUT --object text/output_head --format q6_g64_fp16`, about 6 minutes) is nearly free in quality and saves memory but not time. Fixed-corpus perplexity, quick set, 4096 context, INT8 KV: overall 4.7944 to 4.7950 (+0.014%); Chinese +0.023%, long-form English +0.035%, English reference +0.001%, code -0.002%. The artifact is 341 MiB smaller and planned device memory drops 0.4 GiB, but decode is not faster (23.5 against 23.8 tok/s): the saved bandwidth is spent unpacking Q6.
+**Output head format.** Re-encoding `text/output_head` from Q8 to Q6 (`python -m tools.artifact.requantize_tensor SRC OUT --object text/output_head --format q6_g64_fp16`, about 6 minutes) is nearly free in quality and saves memory but not time. Perplexity protocol B (fixed corpus, quick set, 4096 context, INT8 KV), previous base: overall 4.7944 to 4.7950 (+0.014%); Chinese +0.023%, long-form English +0.035%, English reference +0.001%, code -0.002%. The artifact is 341 MiB smaller and planned device memory drops 0.4 GiB, but decode is not faster (23.5 against 23.8 tok/s): the saved bandwidth is spent unpacking Q6.
 
 **Not done: a keep-list output head.** Dropping rarely used rows from the main output head (and gathering logits back to the full vocabulary) would save about 0.6 GiB and a few percent of decode bandwidth. The repository's own frequency ranking shows the cost: its top 131,072 tokens (the proposal-head list) cover 99.1 to 99.4% of real tokens overall, 99.6% for English, 99.2 to 99.5% for Chinese and code, and only 97.5 to 98.2% for other languages, so up to a few percent of tokens could never be generated. With the embedding already on the host and a Q6 head available, that trade was not taken.
 
@@ -59,7 +63,7 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTUR
 cmake --build build -j
 ```
 
-CUDA 12.8+ is enough (no 13.x-only features are used). The Q8 split-K translation units are slow to compile for sm_75 (minutes each); a cold build of the release preset took 10.6 minutes on 16 logical cores (native Windows, warm vcpkg cache). `ninja -t deps | grep '#deps 0,'` finds objects whose header dependencies were lost by an interrupted build; delete those objects, otherwise header edits silently do not rebuild them.
+CUDA 12.8+ is enough (no 13.x-only features are used). The Q8 split-K translation units are slow to compile for sm_75 (minutes each); a cold build of the release preset took 10.6 minutes on 16 logical cores at full parallelism (native Windows, warm vcpkg cache, measured on the previous base; the default parallelism can run nvcc out of memory on a machine with little free RAM, so cap it with `CMAKE_BUILD_PARALLEL_LEVEL=4` or `-j4`). `ninja -t deps | grep '#deps 0,'` finds objects whose header dependencies were lost by an interrupted build; delete those objects, otherwise header edits silently do not rebuild them.
 
 ## Native Windows build
 
@@ -80,7 +84,7 @@ Windows-specific runtime cautions: keep the artifact on NTFS; the card is in WDD
 
 ### Native Windows versus WSL2
 
-Same machine, same 2080 Ti 22 GB, Qwen3.8-27B `groupwise-int`, INT8 KV, greedy, MTP off, runs interleaved and gated on an otherwise idle GPU (another program intermittently used this card, which invalidated some runs; those were discarded). Each environment used its own build and its own copy of the artifact.
+Measured on the previous base (2026-10-16) and not repeated since. Same machine, same 2080 Ti 22 GB, Qwen3.8-27B `groupwise-int`, INT8 KV, greedy, MTP off, runs interleaved and gated on an otherwise idle GPU (another program intermittently used this card, which invalidated some runs; those were discarded). Each environment used its own build and its own copy of the artifact.
 
 | Prompt | Metric | Native Windows | WSL2 |
 |---|---|---|---|
@@ -98,24 +102,25 @@ The former `--chat-style sharp-v22.1` option is now the vendored Sharp v22.5.0 J
 ./build/turing-release/apps/ninfer model.ninfer --artifact-chat-template --prompt "..."
 ```
 
-## Measured on one RTX 2080 Ti 22 GB
+## Current performance
 
-Qwen3.8-27B `groupwise-int`, INT8 KV, greedy, long warmups (the GPU clock ramps).
+Measured 2026-10-19 on the release tree (`master`, built with `scriptsuild.ps1`; the benchmark executable comes from the same sources built with `scriptsuild.ps1 -Dev`). One RTX 2080 Ti 22 GB (SM clock 1350 MHz idle, 2.3 GiB of VRAM held by the desktop), native Windows 11, driver 610.88, CUDA 12.9, MSVC 14.44, Qwen3.8-27B `groupwise-int` (`qwen3_8_27b.ninfer`, 18.2 GB), INT8 KV, CUDA Graph decode, `ninfer_bench` on the repository token corpus (`bench/fixtures/bench_corpus.ids`, random token ids). Each command takes `--weights M`.
 
-| Metric | Result |
-|---|---|
-| decode, no MTP | 24-29 tok/s |
-| decode, MTP3 | 38-44 tok/s |
-| prefill (end to end), 122 / 8k / 64k-token prompts | 247 / 479 / 372 tok/s |
-| prefill GEMM, Q4 34816x5120, T=512/2048 | 12.4 / 12.6 TFLOPS |
-| prefill GEMM, Q5 5120x6144, T=512/2048 | 11.2 / 11.5 TFLOPS |
-| prefill GEMM, Q8 5120x6144, T=512/2048 | 18.1 / 19.1 TFLOPS |
+| Run | Options | Prefill (tok/s) | Decode (tok/s) |
+|---|---|---|---|
+| bench-short | `-p 512 -n 256 -r 3 --warmup 1 --kv-dtype int8 --max-ctx 16384` | pp512 615.99 +- 0.70 | tg256 27.03 +- 0.11 (MTP off) |
+| bench-mtp | bench-short plus `--spec mtp --draft-tokens 3 --lm-head-draft` | pp512 594.56 +- 4.31 | tg256 29.58 +- 0.05, acceptance 0.377 |
+| bench-long | `-p 8192,65536 -n 32 -r 2 --warmup 2 --kv-dtype int8 --max-ctx 70000` | pp8192 568.63 +- 7.59, pp65536 457.51 +- 7.26 | tg32 25.91 +- 0.01 (MTP off, `--max-ctx 70000`) |
 
-Single-prompt greedy comparisons are noisy for MTP (near-tie flips change the acceptance rate); compare decode with MTP off. The 35B-A3B and DFlash routes build and pass the op tests but were not run end to end here (no local artifact).
+The corpus is random token ids, so MTP acceptance and the MTP decode figure are far below real text. On real prompts (`ninfer`, `examples/cli/messages`, `--greedy --max-new 256 --no-thinking`, default flags against `--spec none`), decode was 47.5 against 26.3 tok/s for `scenario_code_python` and 28.8 against 26.0 tok/s for `scenario_story_en_mystery`. Through `ninfer-serve` (one request, 174-token prompt, thinking on, MTP) the first token arrived in 0.71 s and decode ran at 40.0 tok/s with 62% of drafted tokens accepted.
 
-## Roadmap baseline (2026-10-17, commit `4bedd2e5`)
+Memory at the default configuration (64k-token context, MTP): 15.4 GiB of weights on the device (14.7 GiB without MTP), a 2.60 GiB runtime (64k INT8 KV, workspace and graphs), 1.26 GiB of embedding table and 0.8 to 3.2 GiB of host context pinned in RAM (the server halves the default host context when free RAM is short). The 22 GiB card had 1.97 GiB left with the desktop running.
 
-Reference numbers for the performance items in `docs/plans/fork-roadmap.md`, measured with the product `ninfer_bench` (Windows, MSVC 19.44, CUDA 12.9, driver 610.88, RTX 2080 Ti 22 GB, Qwen3.8-27B `groupwise-int`, INT8 KV, CUDA Graph decode, the repository's token-id corpus). The desktop was running (about 2.6 GiB of VRAM held by other programs, 0% GPU utilization, idle SM clock 1350 MHz before each run); each run starts with the warmup repetitions shown.
+Session-to-session variation is several percent (the 8k prefill figure was 612 tok/s in an earlier session and 568.6 here; a same-session comparison against the pre-port build gave 566 and 568), so compare only runs taken in one session. Perplexity (`ninfer-perplexity`, protocol B: `--corpus eval/corpora/perplexity-1m/manifest.json --quick --kv-dtype int8`, 261,223 scored tokens): overall 4.796799, the same to the last digit on the release tree and on the dev tree.
+
+## Baseline before the tuning (2026-10-17, previous base)
+
+Reference numbers for the kernel tuning described below (the labels P1 to P7 and C1 in the headings name those items), measured on the previous base with the product `ninfer_bench` (Windows, MSVC 19.44, CUDA 12.9, driver 610.88, RTX 2080 Ti 22 GB, Qwen3.8-27B `groupwise-int`, INT8 KV, CUDA Graph decode, the repository's token-id corpus). The desktop was running (about 2.6 GiB of VRAM held by other programs, 0% GPU utilization, idle SM clock 1350 MHz before each run); each run starts with the warmup repetitions shown.
 
 | Run | Command (after `--weights M`) | Result (mean, sample sd over repetitions) |
 |---|---|---|
@@ -126,7 +131,7 @@ Reference numbers for the performance items in `docs/plans/fork-roadmap.md`, mea
 
 Exception: in the `bench-long` run the two measured pp8192 repetitions were 26.0 and 512.8 tok/s. The first was a transient of unknown cause (not reproduced in the rerun, where all four repetitions were within 0.4 tok/s), so the rerun is the pp8192 baseline and `bench-long` needs at least two warmups to be trusted at 8k. The benchmark corpus is random token ids, so MTP acceptance (0.371) and the MTP decode figure are far below the 38-44 tok/s seen on real text and are only comparable with each other.
 
-## FP16 activation range (roadmap C1)
+## FP16 activation range (C1)
 
 On Turing every BF16 operand is converted to FP16 before the tensor core, and values beyond +-65504 saturate. The debug build option `NINFER_SM75_RANGE_PROBE` (`cmake --preset turing-windows -B build-probe -DNINFER_SM75_RANGE_PROBE=ON`, sm_75 only) records the largest magnitude that reaches that conversion in any kernel, and how many elements exceed 16384, 32768 and 65504; `ninfer`, `ninfer-perplexity` and the benchmarks print one `range probe | ...` line when the Engine shuts down. It is a global maximum over all call sites and kernels, which bounds every individual site.
 
@@ -138,9 +143,9 @@ Measured on Qwen3.8-27B `groupwise-int`, INT8 KV, 2026-10-17:
 | one 65,536-token window of long-form English (`--text pg19/00.txt --context 65536`) | 438.0 | 0 | 0 |
 | short chat prompt, 64 greedy tokens | 304.0 | 0 | 0 |
 
-Every maximum is below 16384, so there is at least 4x headroom to the threshold the roadmap set (and more than 100x to the FP16 limit), nothing was clamped, and no pre-scaling is added. This covers these corpora and prompts; the SwiGLU output feeding the Q5 down projection, the site the roadmap singled out, is included in the global maximum. Decode at 1 to 4 tokens uses FP32 SIMT, so the two paths agree on these inputs. The ppl-quick result of the probe build (overall 4.794356) equals the production build's.
+Every maximum is below 16384, so there is at least 4x headroom to the 16384 threshold set for this check (and more than 100x to the FP16 limit), nothing was clamped, and no pre-scaling is added. This covers these corpora and prompts; the SwiGLU output feeding the Q5 down projection, the site most at risk, is included in the global maximum. Decode at 1 to 4 tokens uses FP32 SIMT, so the two paths agree on these inputs. The ppl-quick result of the probe build (overall 4.794356) equals the production build's.
 
-## Route sweep tool (roadmap P1)
+## Route sweep tool (P1)
 
 `ninfer_turing_route_sweep` (`bench/ops/turing_route_sweep.cu`, built only for sm_75 with `NINFER_BUILD_BENCHMARKS=ON`) forces every Q4/Q5/Q6/Q8 launcher of one shape, drops the ones that throw or whose output differs from the production route's by more than 5% of the output RMS, times the rest with cold-cache CUDA Graph replay, and prints the ranking per token count plus a `TokenRoute` table to paste into the shape selector. The candidate list comes from the `q*_launch.h` headers at configure time. It includes private `ops/linear` headers, so it is a fork-only developer tool and not part of any product or CI target.
 
@@ -148,9 +153,9 @@ Every maximum is below 16384, so there is at least 4x headroom to the threshold 
 ./build/turing-windows-dev/bench/ninfer_turing_route_sweep --qtype q5 --n 5120 --k 17408 --t 1,2,3,4,1024 --top 8
 ```
 
-First result (Q5 `n5120_k17408`, the MLP down projection, T=1024, three runs within 0.2%): the production route `launch_q5_a16_mma_r64_t128_a1` takes 8.41 ms (21.7 TFLOPS); `launch_q5_a16_mma_r128_t64_s1_a1` takes 8.04 ms (22.7 TFLOPS), 4.6% faster. Of the 32 Q5 launchers, 22 were legal at that shape and 10 were rejected.
+First result (previous base, Q5 `n5120_k17408`, the MLP down projection, T=1024, three runs within 0.2%): the production route `launch_q5_a16_mma_r64_t128_a1` took 8.41 ms (21.7 TFLOPS) and `launch_q5_a16_mma_r128_t64_s1_a1` 8.04 ms (22.7 TFLOPS), 4.6% faster; that result drove the route table. Current tree (2026-10-19, same command with `--t 1024`): the production route ranks first at 5.58 ms (32.7 TFLOPS), ahead of `launch_q5_a16_mma_r128_t64_s1_a1` at 8.10 ms; of the 32 Q5 launchers, 22 were legal at that shape and 10 were rejected.
 
-## Decode kernel breakdown and the first P2 change (roadmap P2)
+## Decode kernel breakdown and the first P2 change (P2)
 
 One decode step is 37.6 ms (Nsight Systems, CUDA Graph nodes traced, MTP off, 103 steps): kernel time equals step time. The card's sustained read ceiling, measured with `tools/hbm_bandwidth_probe.cu` built for sm_75, is 584.2 GB/s (94.8% of the 616 GB/s peak). Per step before the change:
 
@@ -182,7 +187,7 @@ Remaining decode headroom, by the table above: the K=17408 and K=6144 `linear_ad
 
 **Decode is power-capped.** While decoding, the card sits at its 250 W cap (`clocks_throttle_reasons.active` = software power cap, 0x4): measured over 75 busy samples, SM clock 1455-1635 MHz (mean 1511), power 237-252 W (mean 246), memory clock fixed at 7000 MHz, temperature at most 44 C. Short micro-benchmarks draw less power and run faster, which is why the in-situ kernels run slower than the same kernels in isolation (the K=17408 `linear_add` kernel is about 115 us alone and 130-135 us inside decode). Gains from kernels that issue fewer ALU instructions per weight byte may therefore be larger in decode than in isolation, but load-width or occupancy changes alone are not expected to close the gap.
 
-## INT8-KV attention tile 64x32 (roadmap P3)
+## INT8-KV attention tile 64x32 (P3)
 
 `Int8KvTiledInstance` (`src/ops/softmax_attention/dense/causal_cache/int8/instances.h`) on Turing changes from `<32, 32, 128>` to `<64, 32, 128>`. The 64x32 tile stages 55,296 bytes of shared memory (54 KiB, under the 64 KiB limit; 64x64 would need 92 KiB), uses 16 warps per CTA instead of 8, and reuses each Q tile over twice as many query rows.
 
@@ -197,7 +202,7 @@ Measured interleaved in one session (`ninfer_bench`, INT8 KV, MTP off, `--max-ct
 
 Checks: the attention, KV-cache and sliding-window tests pass (`ninfer_softmax_attention_test`, `ninfer_kv_cache_test`, `ninfer_kv_cache_append_test`, `ninfer_sliding_window_attention_test`, `ninfer_causal_conv1d_silu_test`). `ppl-quick` (INT8 KV, 4096 context) with the new tile against the baseline 4.794356: overall 4.794641 (+0.006%); Chinese 6.750531 against 6.746396 (+0.061%), long-form English 7.179776 against 7.178846 (+0.013%), English reference 6.458972 against 6.461225 (-0.035%), code 1.673260 against 1.673525 (-0.016%). The tile shape changes the order in which key blocks are merged, so bit-identical output is not expected; the overall change is within the 0.05% limit and the Chinese domain alone is slightly above it, with the other domains moving the other way.
 
-## Converting sliced-K activations once (roadmap P4): tried, regressed, not kept
+## Converting sliced-K activations once (P4): tried, regressed, not kept
 
 The sliced-K kernels (T of about 5 to 160) stage BF16 activations raw and convert each B fragment to FP16 inside every MMA (`mma_integer_weights`), once per row tile. The change tried for Q5 (`q5_a16_sliced_k_mma.cuh`): stage the activations with `stage_activation_operand_zfill`, which converts BF16 to FP16 once while writing shared memory, and call `mma_operands` (FP16 MMA on Turing) in the loop. The Q5 linear, `linear_add`, `linear_pair`, `attn_input_proj` and GDN-input op tests all passed with it.
 
@@ -209,9 +214,9 @@ Measured interleaved in one session (`ninfer_bench`, INT8 KV, `--spec mtp --draf
 | MTP-5 tg256 (tok/s) | 22.17, 22.18, 22.19 | 21.21, 21.22, 21.07 (-4.4%) |
 | acceptance | 0.231 | 0.231 |
 
-The decode step at MTP depth 5 (T=6) is consistently 4.4% slower, so the roadmap's gate ("`bench-mtp` with `--draft-tokens 5` not worse") fails and the change was reverted. A likely cause is that Turing's emulated `cp.async` is an ordinary load followed by a store: converting in between lengthens that dependent chain once per staged vector, while for the 16-row blocks used at these token counts the per-MMA conversions it removes were not more numerous than the staged conversions it adds. The other kernels named in the roadmap (Q4, Q6, Q8, grouped Q8, `linear_topk`) were not changed.
+The decode step at MTP depth 5 (T=6) is consistently 4.4% slower, so the gate for this change ("`bench-mtp` with `--draft-tokens 5` not worse") fails and the change was reverted. A likely cause is that Turing's emulated `cp.async` is an ordinary load followed by a store: converting in between lengthens that dependent chain once per staged vector, while for the 16-row blocks used at these token counts the per-MMA conversions it removes were not more numerous than the staged conversions it adds. The other kernels considered (Q4, Q6, Q8, grouped Q8, `linear_topk`) were not changed.
 
-## Register-prefetch pipelining of the prefill GEMMs (roadmap P5)
+## Register-prefetch pipelining of the prefill GEMMs (P5)
 
 Prefill is almost entirely three dequantizing GEMM kernels. Nsight Systems on a 4096-token prefill (INT8 KV, MTP off, kernel time 98% of the total): `q5_a16_mma_kernel` (MLP down and output projections through `linear_add`, 37.8%), `q4_linear_swiglu_mma_split_half_pair_kernel` (MLP gate/up, 37.0%) and `rowsplit_grouped_mma_kernel` (GDN and attention input projections, 18.6%).
 
@@ -236,7 +241,7 @@ End to end, interleaved in one session (`ninfer_bench`, INT8 KV, MTP off; pp512:
 | 8192, round 1 / 2 | 523.27 / 519.91 | 579.16 / 577.37 | +10.7% / +11.1% |
 | 65536, round 1 / 2 | 435.36 / 432.50 | 471.06 / 470.62 | +8.2% / +8.8% |
 
-Checks: `ninfer_linear_q5_a16_test` and `ninfer_linear_add_q5_a16_test` pass; greedy text of `long_decode_aime26_01.json` (341-token prompt, which runs through the changed route) is byte-identical before and after (only the load order changed). This is the Q5 family only (37.8% of prefill); the roadmap's whole-item gate (8k prefill +15%) needs the Q4 SwiGLU and grouped-projection kernels as well.
+Checks: `ninfer_linear_q5_a16_test` and `ninfer_linear_add_q5_a16_test` pass; greedy text of `long_decode_aime26_01.json` (341-token prompt, which runs through the changed route) is byte-identical before and after (only the load order changed). This is the Q5 family only (37.8% of prefill); the gate for the whole change (8k prefill +15%) needs the Q4 SwiGLU and grouped-projection kernels as well.
 
 **Same change in the folded Q4 gate/up SwiGLU kernel** (`q4_linear_swiglu_gemm_mma.cuh`, the single-stage `TuringPrefillCfg`): the next tile's activation vectors, code vectors and scale words are loaded into registers before the MMAs and stored after them. Interleaved in one session against the build with only the Q5 change (same method as above, two rounds, before then after; greedy text identical, `ninfer_linear_swiglu_q4_a16_test` passes):
 
@@ -256,9 +261,9 @@ This kernel (37% of prefill) gains less than the Q5 one because it does more ALU
 | 8192, round 1 / 2 | 605.51 / 598.40 | 612.40 / 609.18 | +1.1% / +1.8% |
 | 65536, round 1 / 2 | 487.14 / 483.58 | 491.71 / 491.05 | +0.9% / +1.5% |
 
-**P5 total.** Each step was measured against the build before it, in its own session; the sessions drift by a few percent, so the steps are not additive on paper. Whole-item numbers in the first session's terms (before any P5 change: pp512 497.8 / 494.4, pp8192 523.3 / 519.9, pp65536 435.4 / 432.5): after all three kernel families, a later session measured pp8192 612.40 and 609.18 against a same-session predecessor, so the 8k prefill is about 17% above the pre-P5 build (523.3 to 612.4 and 519.9 to 609.2: +17.0% and +17.2%), which meets the roadmap gate (8k prefill +15%). Remaining kernels in the roadmap's list (Q4 and Q6 and Q8 plain MMA, `linear_pair`, the attention and GDN gating projections) were not changed: none of them is more than a few percent of prefill time.
+**P5 total.** Each step was measured against the build before it, in its own session; the sessions drift by a few percent, so the steps are not additive on paper. Whole-item numbers in the first session's terms (before any P5 change: pp512 497.8 / 494.4, pp8192 523.3 / 519.9, pp65536 435.4 / 432.5): after all three kernel families, a later session measured pp8192 612.40 and 609.18 against a same-session predecessor, so the 8k prefill is about 17% above the pre-P5 build (523.3 to 612.4 and 519.9 to 609.2: +17.0% and +17.2%), which meets the gate (8k prefill +15%). Remaining kernels in the planned list (Q4 and Q6 and Q8 plain MMA, `linear_pair`, the attention and GDN gating projections) were not changed: none of them is more than a few percent of prefill time.
 
-## Output head Q6 against Q8, re-measured (roadmap P6)
+## Output head Q6 against Q8, re-measured (P6)
 
 The earlier conclusion that a Q6 head saves memory but not time (23.5 against 23.8 tok/s) sat inside the session noise. Re-measured with five interleaved rounds, the Q8 artifact (`qwen3_8_27b.ninfer`) against a copy with `text/output_head` re-encoded to `q6_g64_fp16` (`python -m tools.artifact.requantize_tensor ... --object text/output_head --format q6_g64_fp16`, 17,853,160,360 bytes, 341 MiB smaller; about 17 minutes on the CPU here), same binary, `-p 512 -n 256 -r 3 --warmup 1 --kv-dtype int8 --max-ctx 16384`, MTP off:
 
@@ -275,16 +280,13 @@ pp512 is the same within noise (about 613 to 615 tok/s for both). Planned device
 
 ## Test status on this machine (native Windows, sm_75)
 
-`ctest --preset turing-windows-dev` after the roadmap's Phase 0 to 2 changes: 131 tests, 5 fail, 13 real-model tests report "Skipped" (they need artifacts or environment variables that are not set up), the rest pass. The five failures:
+`ctest --test-dir build/turing-windows-dev` on `master` (2026-10-19, `PYTHONUTF8=1`): 138 tests, 0 failed, 25 skipped. The skips are the FP8, NVFP4 and K8V4 cases (their routes are stubs on Turing) and the real-model tests, which need `NINFER_TEST_ARTIFACT` and were not run here. The Python-driven tests (chat templates, the schema oracles, the PLE disk tests) need Python 3.10 or newer with `jinja2` and `jsonschema`; on Windows set `PYTHONUTF8=1` first, because they pipe UTF-8 text to child processes through the console code page otherwise. `ninfer_device_sync_empty_test` is registered only outside Windows (CTest on Windows drops an environment entry with an empty value).
 
-- `ninfer_chat_templates_test`, `ninfer_json_schema_oracle_test`, `ninfer_qwen3_5_tool_schema_oracle_test`: the Python oracles pipe UTF-8 text to a child process through the Windows ANSI code page (`UnicodeEncodeError: 'charmap' codec can't encode characters`). They pass with `PYTHONUTF8=1` in the environment.
-- `ninfer_device_sync_empty_test` ("invalid sync setting did not fail before CUDA initialization") and `ninfer_gdn_gating_proj_test` (`qwen3_6_27b T=4097 g: reduction criterion failed at index 122 actual=-2.20374 reference=-2.20374`): both fail identically at the fork's commit before this roadmap (`a97bbc8d`, built in a separate worktree), so neither comes from the Phase 0 to 2 changes. The empty-value failure is a CTest-on-Windows limitation, resolved below by registering the test only outside Windows; `ninfer_gdn_gating_proj_test` is not investigated here.
+## Fusing small decode projections (P7): measured ceiling, not pursued
 
-## Fusing small decode projections (roadmap P7): measured ceiling, not pursued
+Per decode step (Nsight Systems, CUDA Graph nodes traced, MTP off, 103 steps, after the P2 change): 711 kernel launches and 37.23 ms of kernel time. The kernels whose average duration is under 20 us (norms, RoPE, GDN gating and its small recurrent update, SiLU-mul, the causal-convolution and attention-merge helpers: 18 kinds) account for 390 launches and 2.00 ms per step, 5.4% of kernel time. None of them is a projection: the projections are all among the 321 launches that take 20 us or more (35.2 ms), and the small ones proposed for fusing are already fused (`attn_input_proj` carries Q, gate, K and V; `gdn_input_proj` carries the Q4 query/key and Q5 value/z sides; the gating projection is fused with the GDN norm). The gap between the kernel time and the step time (37.2 ms against 1/26.4 s = 37.9 ms) is about 0.7 ms, so the missing PDL costs under 2% of a step. Even a fusion that removed every small kernel would be bounded by about 7%, and a realistic one (folding norms and gating into their neighbours) by 1 to 2%, at the cost of new kernels whose numerics must be requalified. Since the item is optional and its ceiling is that small next to the changes already made, it was not implemented.
 
-Per decode step (Nsight Systems, CUDA Graph nodes traced, MTP off, 103 steps, after the P2 change): 711 kernel launches and 37.23 ms of kernel time. The kernels whose average duration is under 20 us (norms, RoPE, GDN gating and its small recurrent update, SiLU-mul, the causal-convolution and attention-merge helpers: 18 kinds) account for 390 launches and 2.00 ms per step, 5.4% of kernel time. None of them is a projection: the projections are all among the 321 launches that take 20 us or more (35.2 ms), and the small ones the roadmap names are already fused (`attn_input_proj` carries Q, gate, K and V; `gdn_input_proj` carries the Q4 query/key and Q5 value/z sides; the gating projection is fused with the GDN norm). The gap between the kernel time and the step time (37.2 ms against 1/26.4 s = 37.9 ms) is about 0.7 ms, so the missing PDL costs under 2% of a step. Even a fusion that removed every small kernel would be bounded by about 7%, and a realistic one (folding norms and gating into their neighbours) by 1 to 2%, at the cost of new kernels whose numerics must be requalified. Since the item is optional and its ceiling is that small next to the changes already made, it was not implemented.
-
-## Roadmap Phase 2 result (2026-10-18)
+## Prefill tuning result (2026-10-18, previous base)
 
 `ninfer_bench`, INT8 KV, CUDA Graph decode, native Windows, RTX 2080 Ti, Qwen3.8-27B `groupwise-int`. The comparison is the build after the P2 decode change (but before P3 and P5) against the current build, interleaved in one session, two rounds each:
 
@@ -296,17 +298,17 @@ Per decode step (Nsight Systems, CUDA Graph nodes traced, MTP off, 103 steps, af
 | tg256, MTP off, tok/s | 27.08 / 26.99 | 27.02 / 27.07 | unchanged (no decode kernel changed after P2) |
 | tg256, MTP 3 draft tokens, tok/s | 29.96 / 29.91 | 29.97 / 29.95 | unchanged (acceptance 0.371 both) |
 
-`ppl-quick` (INT8 KV, 4096 context): overall 4.794641 on the current build, identical in every digit to the build after P3; the P5 kernels change only the order of loads. The scoring rate of that run went from 247.5 to 305.9 tok/s.
+Perplexity protocol B (INT8 KV, 4096 context): overall 4.794641 on the build after these changes, identical in every digit to the build after P3; the P5 kernels change only the order of loads. The scoring rate of that run went from 247.5 to 305.9 tok/s.
 
-Against the first measurements of the roadmap's morning baseline (different session, so the session-to-session drift of a few percent applies): pp512 494.9, pp8192 513.7 (rerun), pp65536 394.5, tg256 26.45, MTP-3 tg256 29.76 tok/s, i.e. prefill about 19 to 25% faster, decode about 2% faster (the interleaved P2 measurement of the decode change was +3.3%) and MTP decode within 1%.
+Against the first measurements of the baseline above (different session, so the session-to-session drift of a few percent applies): pp512 494.9, pp8192 513.7 (rerun), pp65536 394.5, tg256 26.45, MTP-3 tg256 29.76 tok/s, i.e. prefill about 19 to 25% faster, decode about 2% faster (the interleaved P2 measurement of the decode change was +3.3%) and MTP decode within 1%.
 
-What each roadmap item contributed: P2 (GDN T=1 Q5 launch) +3.3% decode; P3 (64x32 attention tile) +9% at 64k and +1 to 4% at 8k; P4 (convert activations once) tried and reverted, -4.4% at MTP depth 5; P5 (register prefetch in the Q5, Q4 SwiGLU and grouped input-projection kernels) +17% at 8k and +16% at 512 on its own; P6 (Q6 head) not recommended, -0.4% decode; P7 (fusing small kernels) not pursued, ceiling 1 to 2%. C1 (FP16 range) closed with no change needed.
+What each item contributed: P2 (GDN T=1 Q5 launch) +3.3% decode; P3 (64x32 attention tile) +9% at 64k and +1 to 4% at 8k; P4 (convert activations once) tried and reverted, -4.4% at MTP depth 5; P5 (register prefetch in the Q5, Q4 SwiGLU and grouped input-projection kernels) +17% at 8k and +16% at 512 on its own; P6 (Q6 head) not recommended, -0.4% decode; P7 (fusing small kernels) not pursued, ceiling 1 to 2%. C1 (FP16 range) closed with no change needed.
 
-## Docker image (roadmap U4)
+## Docker image
 
 Verified on this machine (Windows 11, Docker Desktop 28.3.2 with the WSL2 backend, 24 GB VM, driver 610.88): `docker build -t ninfer-fork .` took 19.3 minutes (the build stage compiles for sm_75, the CMake default; the runtime image is 3.17 GB) and `docker run -d --gpus all -v E:\AI_Models\LLM\neroued\Qwen3.8-27B-NInfer:/models -p 18095:8080 ninfer-fork` started `ninfer-serve /models/qwen3_8_27b.ninfer --host 0.0.0.0` with the default configuration (64k-token context, MTP, 3.15 GiB host context pinned in 3.7 s, 1.26 GiB pinned embedding). The default embedded chat template worked inside the container with no source tree. One chat completion through the published port returned the expected reply (171 prompt tokens, 27 output tokens, TTFT 688 ms, prefill 252 tok/s, decode 49 tok/s with MTP).
 
-## Port onto upstream dev (roadmap S1, 2026-10-18)
+## Port onto upstream dev (2026-10-18)
 
 The fork now lives on top of upstream's `dev` branch as the `turing` build target (`NINFER_TARGET=turing`, sources composed from the `rtx5090` trees with `NINFER_SM75` defined, native Windows through `turing-windows*` presets) instead of a layer re-applied on each sync. The port is the commit series on branch `s1-turing-port` (ten commits on upstream `438ae67c`): build and toolchain, Windows I/O layer, shared CUDA primitives, dequantizing kernels, route tables, throwing definitions for unbuilt routes, product layer, tests, benchmarks, docs.
 
@@ -337,7 +339,7 @@ Noise bound for decode: eight further interleaved pairs in one session (pre-port
 
 A first benchmark of the port showed prefill 8 to 16% slower (pp512 476 / 508, pp8192 499 / 520, pp65536 404 / 428 tok/s). A kernel-level profile of a 2048-token prefill showed 192 launches of the grouped input-projection kernel using the 5090 tile (about 11.7 ms each) where the pre-port build used the single-stage Turing tile (5.2 ms). Upstream now serves the GDN input projection through the split-projection shape `n4096_n12288_k5120`, not the plan the fork had patched; that shape now selects the Turing tile above 64 columns. After it, total kernel time of the profile is 7199 ms against 7243 ms before.
 
-Greedy identity, re-checked on eight fixed prompts (`examples/cli/messages`: long_decode_aime26_01/15/30, reasoning_jacobian_counterexample_3d, scenario_code_cuda/python/typescript, scenario_story_en_mystery; `--greedy --max-new 256 --spec none --kv-dtype bf16 --max-context 8192`, pre-port `build-windows` against the port): the generated text is byte-identical for three prompts (aime_01, aime_15, jacobian) and diverges for five: aime_30 at the first token ("We need" against "Let me"), the others after 324 to 1,614 characters. The divergence is deterministic and not caused by prefill chunking (the pre-port build gives the same text with `--prefill-chunk` 512, 1024 and 2048, and so does the port). Sampling the aime_30 first token 60 times at temperature 1 with the same seeds gives We 38 / Let 21 / I 1 on the pre-port build and We 21 / Let 38 / I 1 on the port, so on that prompt the two builds order the same two candidate tokens differently by roughly the size of their gap (both distributions are split close to 40/60). Perplexity (5.169092 against 5.171412) says the two builds compute the same function up to rounding. A search of upstream's log between the fork's old base and `dev` found no commit that changes the arithmetic of a route the Turing build compiles: the sampling and argmax change (`2e098d5b`), the GDN control and recurrence changes (`38ce3b49`, `22470b06`) and the 10240-wide rmsnorm (`569861a3`) are Spark-only or leave the result unchanged. What did change is the accumulation order of the Turing projections themselves: upstream moved the GDN input projection and the attention projections into the independent split-projection shapes (`90d25edd`, `4eb2c042`), which this port tiles differently from the pre-port grouped kernel. That is the likely cause, but it is a hypothesis: the divergence was not traced to a single kernel, and the roadmap's "explained by an upstream numerics change named in upstream's log" is not met. The logit-level comparison below measures the size of the difference instead.
+Greedy identity, re-checked on eight fixed prompts (`examples/cli/messages`: long_decode_aime26_01/15/30, reasoning_jacobian_counterexample_3d, scenario_code_cuda/python/typescript, scenario_story_en_mystery; `--greedy --max-new 256 --spec none --kv-dtype bf16 --max-context 8192`, pre-port `build-windows` against the port): the generated text is byte-identical for three prompts (aime_01, aime_15, jacobian) and diverges for five: aime_30 at the first token ("We need" against "Let me"), the others after 324 to 1,614 characters. The divergence is deterministic and not caused by prefill chunking (the pre-port build gives the same text with `--prefill-chunk` 512, 1024 and 2048, and so does the port). Sampling the aime_30 first token 60 times at temperature 1 with the same seeds gives We 38 / Let 21 / I 1 on the pre-port build and We 21 / Let 38 / I 1 on the port, so on that prompt the two builds order the same two candidate tokens differently by roughly the size of their gap (both distributions are split close to 40/60). Perplexity (5.169092 against 5.171412) says the two builds compute the same function up to rounding. A search of upstream's log between the fork's old base and `dev` found no commit that changes the arithmetic of a route the Turing build compiles: the sampling and argmax change (`2e098d5b`), the GDN control and recurrence changes (`38ce3b49`, `22470b06`) and the 10240-wide rmsnorm (`569861a3`) are Spark-only or leave the result unchanged. What did change is the accumulation order of the Turing projections themselves: upstream moved the GDN input projection and the attention projections into the independent split-projection shapes (`90d25edd`, `4eb2c042`), which this port tiles differently from the pre-port grouped kernel. That is the likely cause, but it is a hypothesis: the divergence was not traced to a single kernel, and no upstream commit that changes the arithmetic was found. The logit-level comparison below measures the size of the difference instead.
 
 **Logit-level comparison (2026-10-19).** Method: `ninfer-logit-compare` ([perplexity.md](perplexity.md#compare-two-builds-token-by-token)), the `CausalScoring` Engine path that `ninfer-perplexity` uses, BF16 KV, context 8192, the default chat template. The greedy ids of each build's own `ninfer --greedy --max-new 256 --spec none --print-token-ids` run were taken for the pre-port build, and those 256 tokens were scored on both builds after the rendered prompt (the rendered prompt length matched `Engine::count_tokens` on every prompt on both builds). Pre-port is master's `build-windows` (commit `bde50a4e`), the port is this series.
 
@@ -371,7 +373,7 @@ Over all 2,048 scored tokens (no truncation at the divergence) the pooled median
 Qualification:
 
 - Linear oracle suites (projection, split, add, pair, swiglu, topk) pass for every format Turing runs (BF16, Q4, Q5, Q6, Q8). The first port attempt failed them (Q8: 592 cases) because a bulk edit had also converted weight-code and scale copies to FP16 activation staging, and a perplexity of 6.66 against 5.17 was caught by the full-model check, not by greedy output on a short prompt.
-- `ctest` of the Ops configuration (80 tests): all pass. `ninfer_device_sync_empty_test` is now registered only outside Windows: CTest on Windows drops an environment entry with an empty value, so the test saw the variable unset and failed (it failed the same way at the pre-roadmap commit). Launching `ninfer_device_test --invalid-sync` with a genuinely empty `NINFER_CUDA_SYNC` through `subprocess` returns 0, so the engine rejects the empty value on Windows too; Linux and WSL2 run the registered test. FP8, NVFP4 and K8V4 cases are reported as skipped through the suite (a case whose route is a Turing stub counts as skipped, not failed).
+- `ctest` of the Ops configuration (80 tests): all pass. `ninfer_device_sync_empty_test` is now registered only outside Windows: CTest on Windows drops an environment entry with an empty value, so the test saw the variable unset and failed (it failed the same way on the previous base, before the Turing tuning). Launching `ninfer_device_test --invalid-sync` with a genuinely empty `NINFER_CUDA_SYNC` through `subprocess` returns 0, so the engine rejects the empty value on Windows too; Linux and WSL2 run the registered test. FP8, NVFP4 and K8V4 cases are reported as skipped through the suite (a case whose route is a Turing stub counts as skipped, not failed).
 - Product-layer tests (CLI and serve options, context fitting, KV capacity, frontend, vision workspace, request log, schemas, HTTP transport, loading, state image): all 25 registered tests pass (the real-model ones skip without their artifact variable) once the Qwen4Exp state test, which needs the sparse QSA attention that Turing does not build, is excluded on this target.
 - The new Windows read queue (I/O completion port) passes the shared behavioral test; the io_uring fault-injection part of that test stays Linux-only. The NF4 exact-table oracle passes once its binary stdio is set to binary mode.
 

@@ -1,7 +1,6 @@
 # NInfer CLI
 
-`build/turing-release/apps/ninfer` (`build	uring-windowspps
-infer.exe` on native Windows) runs one request against one v3 `.ninfer` artifact. Build NInfer and download an artifact using the [project README](../README.md) before following this guide.
+`build/turing-release/apps/ninfer` (`build\turing-windows\apps\ninfer.exe` on native Windows) runs one request against one v3 `.ninfer` artifact. Build NInfer and download an artifact using the [project README](../README.md) before following this guide.
 
 The examples use the Qwen3.8-27B `groupwise-int` artifact with this build's INT8 KV storage, which is the default on Turing, so no `--kv-dtype` flag is needed.
 
@@ -204,7 +203,7 @@ See [`examples/cli/`](../examples/cli/) for committed text, image, video, mixed-
 
 ## Speculative decoding
 
-Speculative decoding is disabled by default. Select MTP with one to five draft positions, or the
+Speculative decoding defaults to MTP with three draft positions and, when the artifact carries one, the optimized proposal head; `--spec none` turns it off. MTP takes one to five draft positions; the alternatives are the
 35B-A3B DFlash or Qwen3.8-27B DFlash2 backend with one to fifteen. Both masked-draft backends
 may be combined with `--vision`.
 `--lm-head-draft` selects the optimized proposal head when the architecture and artifact provide it,
@@ -237,7 +236,7 @@ Only one speculative backend can be enabled per Engine. The published [performan
 
 ## Common options
 
-The table lists executable defaults. The examples above select FP8 KV and MTP3 explicitly.
+The table lists the executable defaults of this build.
 
 | Option | Meaning | Default |
 |---|---|---:|

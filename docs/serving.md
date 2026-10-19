@@ -1,7 +1,6 @@
 # HTTP serving
 
-`build/turing-release/apps/ninfer-serve` (`build	uring-windowspps
-infer-serve.exe` on native Windows) loads one v3 `.ninfer` artifact and exposes OpenAI- and Anthropic-compatible HTTP endpoints over one resident NInfer Engine.
+`build/turing-release/apps/ninfer-serve` (`build\turing-windows\apps\ninfer-serve.exe` on native Windows) loads one v3 `.ninfer` artifact and exposes OpenAI- and Anthropic-compatible HTTP endpoints over one resident NInfer Engine.
 
 Qwen3.8-Flash-Next supports Text/Vision/MTP serving with segmented CUDA Graph decode.
 Add `--vision` for media and `--spec mtp --draft-tokens 3` for native MTP with the full head.
@@ -11,6 +10,14 @@ See the [CLI example](cli.md) for commands and the
 ## Start the server
 
 > **Turing fork.** The commands in this page are upstream's RTX 5090 forms (NVFP4 weights, FP8 KV). On a GeForce RTX 2080 Ti use the `groupwise-int` artifact and the defaults of this build: INT8 KV, 65,536-token context, MTP with three draft tokens and the optimized proposal head when the artifact has one. Drop `--kv-dtype fp8`, or write `--kv-dtype int8`; see the [README](../README.md#defaults).
+
+On a 2080 Ti the whole command is
+
+```bash
+./build/turing-release/apps/ninfer-serve models/qwen3_8_27b.ninfer
+```
+
+(`build\turing-windows\apps\ninfer-serve.exe` on native Windows, or `scripts\serve.ps1`). It listens on `127.0.0.1:8080` with one lane, a 65,536-token INT8 KV context, and MTP with three draft tokens and the optimized proposal head. The long-context example below is upstream's RTX 5090 form of the command and does not run on Turing.
 
 See [CUDA synchronization](cli.md#cuda-synchronization) for the shared `NINFER_CUDA_SYNC` setting.
 
@@ -52,7 +59,7 @@ HTTP alias override and does not select or alter model execution.
 Vision is disabled by default: its weights and Vision-specific unified-workspace extent are not
 allocated, and media requests and token-count requests fail with HTTP 400 `vision_disabled`. Add
 `--vision` when the server must accept image or video input. Speculative residency is likewise
-frozen by `--spec mtp|dflash|dflash2` and `--draft-tokens`; omitting `--spec` loads no speculative backend.
+frozen by `--spec mtp|dflash|dflash2` and `--draft-tokens`; omitting `--spec` selects MTP with three draft tokens, and `--spec none` loads no speculative backend.
 `--lm-head-draft` additionally loads the optimized proposal head. DFlash on 35B-A3B and DFlash2 on Qwen3.8-27B can be combined
 with `--vision`; each accelerates generated-text decode after multimodal prefill, while Vision encode
 and prefill remain outside speculative acceleration. A later request cannot enable a capability

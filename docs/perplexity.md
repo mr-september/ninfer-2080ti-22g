@@ -82,6 +82,17 @@ perplexity = exp(mean_nll)
 The first window scores `[1,min(context,N))`. Each later window advances by `stride` targets while
 retaining up to `context-stride` preceding tokens as local context. Streams never share history.
 
+## Reference values
+
+Two perplexity protocols have been used on this fork. A value from one is never comparable with a value from the other, so quote the protocol with the number.
+
+| Protocol | Setup | Result |
+|---|---|---|
+| B (the standard check) | `--corpus eval/corpora/perplexity-1m/manifest.json --quick --kv-dtype int8`, context 4096, stride 2048, 261,223 scored tokens | overall **4.796799** (chinese_reference 6.767452, english_long_form 7.178341, english_reference 6.454913, ninfer_code 1.673458); 4.794641 on the build before the port onto upstream `dev` |
+| A (retired) | a one-off text of 20,237 tokens of this repository's docs, BF16 KV, context 2048, stride 1024; the text was not kept, so the run cannot be repeated | 5.169092 on the port; 5.171412 before it |
+
+Both were measured on one RTX 2080 Ti 22 GB with Qwen3.8-27B `groupwise-int`. Protocol B was taken on `master` on 2026-10-19 and is identical, to the last digit, on the release and the development build; on Turing `ninfer-perplexity` defaults to INT8 KV.
+
 ## Comparing runs
 
 For a numerical comparison, keep the corpus, context, stride, and execution settings fixed except
