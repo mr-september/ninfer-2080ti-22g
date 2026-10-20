@@ -118,6 +118,28 @@ Memory at the default configuration (64k-token context, MTP): 15.4 GiB of weight
 
 Session-to-session variation is several percent (the 8k prefill figure was 612 tok/s in an earlier session and 568.6 here; a same-session comparison against the pre-port build gave 566 and 568), so compare only runs taken in one session. Perplexity (`ninfer-perplexity`, protocol B: `--corpus eval/corpora/perplexity-1m/manifest.json --quick --kv-dtype int8`, 261,223 scored tokens): overall 4.796799, the same to the last digit on the release tree and on the dev tree.
 
+### Performance model
+
+Derived from the figures above, not measured separately. Decode without MTP reads the 14.66 GiB (15.7 GB) of device weights once per token, so 27.0 tok/s is about 425 GB/s, roughly 69% of the card's 616 GB/s peak. Prefill at 616 tok/s (512 tokens) and 569 tok/s (8k) is about 33 and 31 TFLOPS of dense-equivalent throughput, taking two FLOPs per parameter per token for a 27-billion-parameter model.
+
+## Standard measurements and acceptance rules
+
+Use these commands unless a change calls for something else. `M` is the artifact path.
+
+| Name | Command | Reports |
+|---|---|---|
+| bench-short | `ninfer_bench --weights M -p 512 -n 256 -r 3 --warmup 1 --kv-dtype int8 --max-ctx 16384` | pp512, tg256 with MTP off |
+| bench-long | `ninfer_bench --weights M -p 8192,65536 -n 32 -r 2 --warmup 2 --kv-dtype int8 --max-ctx 70000` | long prefill with MTP off (two warmups: one warmup once gave a 26 tok/s outlier at 8k) |
+| bench-mtp | bench-short plus `--spec mtp --draft-tokens 3 --lm-head-draft` | decode with MTP (random-token corpus, so acceptance is low) |
+| ppl-quick | `ninfer-perplexity M --corpus eval/corpora/perplexity-1m/manifest.json --quick --kv-dtype int8` | protocol B perplexity, overall and per domain ([perplexity.md](perplexity.md#reference-values)) |
+| logit-compare | `ninfer M --messages examples/cli/messages/<file> --greedy --max-new 256 --spec none --kv-dtype bf16 --print-token-ids` on the baseline build, then score those ids with `ninfer-logit-compare` on both builds ([perplexity.md](perplexity.md#compare-two-builds-token-by-token)) | first-token candidate gap and per-token absolute log-probability differences |
+
+Rules that have held up:
+
+- Compare before and after in one session, interleaved, on an idle card. A gain smaller than the run-to-run spread counts as no change; session-to-session drift is several percent.
+- Use a tolerance gate only where the arithmetic is allowed to change. The tolerance gate used for the port onto upstream `dev`: log-probability limits set before measuring (median absolute difference <= 0.02, maximum <= 0.2) and no top-2 logit gap moving by more than 3 BF16 output steps (0.375 at magnitude 16 to 32). A change that must not alter the arithmetic (removing code, moving files) is gated on exact equality instead: `ninfer-logit-compare` bit-identical, protocol B perplexity unchanged, full CTest.
+- Perplexity and the op oracle suites, not greedy text, decide whether a port is numerically right: a wrong port once produced plausible text with perplexity 6.66 against 5.17.
+
 ## Baseline before the tuning (2026-10-17, previous base)
 
 Reference numbers for the kernel tuning described below (the labels P1 to P7 and C1 in the headings name those items), measured on the previous base with the product `ninfer_bench` (Windows, MSVC 19.44, CUDA 12.9, driver 610.88, RTX 2080 Ti 22 GB, Qwen3.8-27B `groupwise-int`, INT8 KV, CUDA Graph decode, the repository's token-id corpus). The desktop was running (about 2.6 GiB of VRAM held by other programs, 0% GPU utilization, idle SM clock 1350 MHz before each run); each run starts with the warmup repetitions shown.
@@ -398,3 +420,16 @@ Everything here was run on the sources of `master` after the port (`7923b62f`, p
 - **Linux / WSL2** (Ubuntu 24.04, GCC 13.3, CUDA 12.9.86, `cmake --preset turing-dev` at `4f4e6059`, built from the Windows drive): `ctest` 145 tests, all pass, 28 skipped (FP8/NVFP4/K8V4 cases and real-model tests). The four product executables built and `ninfer` answered a real prompt from the 27B artifact (decode 40.8 tok/s with MTP, prefill 303.6 tok/s). Nineteen benchmark targets did not compile in that distro, every one for the same reason: its CUDA install has no `cuda_profiler_api.h`; they build on Windows. The distro's filesystem damage described above is unchanged, so the kernel UAPI headers still come from `linux-libc-dev` (`apt-get download`, `dpkg -x`) on `CPATH`.
 - **Docker:** `git archive HEAD | docker build` built the image; `docker run --gpus all -v <models>:/models -p 18120:8080` started the server with the default configuration (15.4 GiB of weights, 3.15 GiB host context pinned in 4.4 s, engine ready in 2 min 14 s through the bind mount) and a chat request returned HTTP 200 (174 prompt and 88 output tokens, TTFT 729 ms, decode 40.1 tok/s, 60 of 87 drafted tokens accepted).
 - **Windows package:** the first package check failed: the executables need `cudart64_12.dll`, because the build links the shared CUDA runtime (upstream's CMake setting), and the zip did not ship it. `scripts\package.ps1` now copies it from the CUDA Toolkit. The zip, extracted into an empty directory and started with `serve.ps1` under a `PATH` of only `System32` and Windows PowerShell, answered a chat request with HTTP 200 (TTFT 670 ms). The download branch of `serve.ps1` (no model present) was not run.
+
+## Maintainer notes
+
+Facts and decisions that outlive any one change:
+
+- **Where Turing code lives.** The `turing` target (`NINFER_TARGET=turing`) composes upstream's `rtx5090` source trees with `NINFER_SM75` defined. Behaviour that exists only for Turing sits behind that macro, and the unsupported Blackwell-only routes are throwing definitions in `src/ops/unsupported/turing_unsupported.cpp`.
+- **Only sm_75 is supported.** The `turing` target requires `CMAKE_CUDA_ARCHITECTURES=75` (`cmake/NinferPlatform.cmake`). An Ampere (sm_86) build is not supported and was never tested: the upstream trees the target reuses contain TMA kernels (`cp.async.bulk.tensor` in `src/ops/common/cuda/pipeline.cuh` and others), which need sm_90, and the Turing builds avoid them through `NINFER_SM75` guards. Supporting another architecture means adding a no-TMA path under its own guard and a preset.
+- **FP16 range.** On Turing every BF16 operand becomes FP16 before a tensor-core GEMM at 5 or more tokens, so values beyond 65504 saturate. Measured maxima (see the FP16 range section) leave at least 4x headroom to 16384 and no pre-scaling exists. If a new model or workload reaches 16384 at some GEMM input, add an exact power-of-two pre-scale while staging and fold it back into the FP32 epilogue, then require perplexity not to get worse.
+- **Decode depth and MTP.** MTP depth is fixed at startup because the draft count shapes the captured CUDA graphs and round buffers (51 references), so an adaptive depth is a larger change than tuning; depth 3 is the default (best for code, 1 to 2 for prose).
+- **Output head.** A keep-list output head would make a few percent of tokens impossible to generate (see "Not done: a keep-list output head" above); a Q6 head saves memory but not time.
+- **Multi-GPU.** Pipeline parallelism across two GPUs stays a design note ([multi-gpu.md](multi-gpu.md)) until there is a concrete second card.
+- **Small inefficiencies left alone** (re-verify before acting): the BF16-KV attention kernel (`src/ops/softmax_attention/kernels/causal/bf16/grouped_mma.cuh`) converts the query fragment on every key tile; Turing's `cp_async` ignores `Cache::cg`, so streamed weights could use `ld.global.cg` to avoid filling L1; the SIMT TF32 emulation in `src/ops/common/cuda/mma.cuh` costs 32 shuffles per call in the GDN chunk recurrence but is under 5% of prefill.
+- **Lessons from the port onto upstream `dev`.** (1) A bulk regex over kernel files once converted weight and scale copies to FP16 activation staging; check each replacement site against the previous version with a whitespace-normalized diff. (2) Upstream moves routes between ops (the GDN input projection now runs through the split-projection shape), so profile a prefill kernel by kernel against the old build. (3) A missing pinned embedding made the default 64k context fail on a 22 GB card. (4) Verify on Linux and in Docker as well: the Windows front end accepted corrupted inline-assembly strings that GCC rejects, and Docker needed its shared libraries and short-read handling for bind mounts. (5) An intermittent test failure can be a real bug (the Windows read queue counted a read complete before `poll` delivered it); run a flaky test a hundred times and dump the data before blaming the test.
