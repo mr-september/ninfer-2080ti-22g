@@ -6,11 +6,7 @@
 
 namespace ninfer::ops::sample_detail {
 using RowSchedule = sampling_detail::TopKSchedule<256, 2, 256, 2, 25>;
-#if NINFER_TARGET_SPARK
-using ParallelSchedule = sampling_detail::TopKSchedule<128, 4, 128, 4, 25>;
-#else
 using ParallelSchedule = sampling_detail::TopKSchedule<256, 2, 256, 2, 25>;
-#endif
 
 inline constexpr int kMaxColumns = 16;
 

@@ -92,7 +92,7 @@ void launch_residual_add(const Tensor& y, Tensor& x, cudaStream_t stream) {
     const auto y_addr      = reinterpret_cast<std::uintptr_t>(y.data);
     const auto x_addr      = reinterpret_cast<std::uintptr_t>(x.data);
     if (((y_addr | x_addr) & (alignof(common::Bf16x8Pack) - 1)) == 0 && (n % 8) == 0) {
-        constexpr int max_grid   = NINFER_TARGET_SPARK ? 16384 : kMaxGrid;
+        constexpr int max_grid   = kMaxGrid;
         const std::int64_t packs = n / 8;
         const int grid           = static_cast<int>(std::min<std::int64_t>(
             max_grid,

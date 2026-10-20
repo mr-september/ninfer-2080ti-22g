@@ -58,12 +58,6 @@ void launch_columns(const Tensor& logits, const Tensor& target_ids, std::int32_t
 
 void target_logprobs_launch(const Tensor& logits, const Tensor& target_ids, std::int32_t valid_rows,
                             Tensor& output, cudaStream_t stream) {
-#if NINFER_TARGET_SPARK
-    if (logits.ne[0] == 248320 && valid_rows == 248077) {
-        launch_columns<1024, true>(logits, target_ids, valid_rows, output, stream);
-        return;
-    }
-#endif
     launch_columns<kTargetLogprobsBlock, false>(logits, target_ids, valid_rows, output, stream);
 }
 

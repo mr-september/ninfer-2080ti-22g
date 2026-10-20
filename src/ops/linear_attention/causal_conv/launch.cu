@@ -307,11 +307,6 @@ void launch_causal_conv(const Tensor& x, const Tensor& weight, const Tensor& sta
 void launch_causal_conv_split(const Tensor& x, const Tensor& weight, const Tensor& state_in,
                               Tensor& state_out, Tensor& out0, Tensor& out1, Tensor& out2,
                               CausalConvSplitGeometry geometry, cudaStream_t stream) {
-#if NINFER_TARGET_SPARK
-    if (geometry == CausalConvSplitGeometry::Rows2048x2048x6144 && x.ne[1] > 16)
-        return launch_causal_conv_split_10240(x, weight, state_in, state_out, out0, out1, out2,
-                                              stream);
-#endif
     const auto route = select_causal_conv_split_plan(x.ne[1]);
     if (route == CausalConvRoute::TokenParallel)
         launch_token_parallel_split(x, weight, state_in, state_out, out0, out1, out2, geometry,

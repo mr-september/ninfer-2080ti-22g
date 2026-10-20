@@ -29,13 +29,13 @@ void launch(const Tensor& logits, Tensor& out, std::int32_t token_domain,
     const Workspace scratch           = layout.bind(workspace);
     const dim3 partial_grid(static_cast<unsigned int>(partial_blocks),
                             static_cast<unsigned int>(batch));
-    sampling_partial_topk_kernel<ParallelSchedule, NINFER_TARGET_SPARK>
+    sampling_partial_topk_kernel<ParallelSchedule>
         <<<partial_grid, ParallelSchedule::kSamplerBlock, 0, stream>>>(
             static_cast<const __nv_bfloat16*>(logits.data), configs, token_domain, physical_rows,
             scratch);
     CUDA_CHECK(cudaGetLastError());
     const dim3 group_grid(static_cast<unsigned int>(groups), static_cast<unsigned int>(batch));
-    sampling_group_finalize_sample_kernel<ParallelSchedule, NINFER_TARGET_SPARK>
+    sampling_group_finalize_sample_kernel<ParallelSchedule>
         <<<group_grid, ParallelSchedule::kSamplerGroupBlock, 0, stream>>>(
             static_cast<std::int32_t*>(out.data), configs, positions, purpose, token_domain,
             partial_blocks, groups, scratch);

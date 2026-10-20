@@ -168,7 +168,7 @@ std::string serve_usage_text(const char* argv0) {
            "       larger media is downscaled, and a smaller value shrinks the Vision workspace\n"
            "       startup uses " +
            std::to_string(kDefaultKvCapacityHeadroomBytes / (1024ULL * 1024ULL)) +
-           " MiB of planning headroom; DGX Spark Vision additionally reserves live media capacity\n"
+           " MiB of planning headroom\n"
            "       --no-prefix-reuse disables cross-request history; request pause/replay "
            "resources remain available\n" +
            product::defaults_help(product::kDefaultServeMaxContext, "       ") +

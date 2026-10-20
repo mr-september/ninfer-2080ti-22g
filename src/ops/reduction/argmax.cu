@@ -158,13 +158,6 @@ void argmax_launch(const Tensor& logits, Tensor& out, std::int32_t valid_rows,
         return;
     }
 
-#if NINFER_TARGET_SPARK
-    if (physical_rows == kFullPhysicalRows && valid_rows == kFullValidRows &&
-        reinterpret_cast<std::uintptr_t>(logits.data) % 16 == 0) {
-        argmax_tiled_atomic_launch<256, 8>(logits, out, valid_rows, 256, stream);
-        return;
-    }
-#endif
     argmax_tiled_atomic_launch<kArgmaxBlock, 1>(
         logits, out, valid_rows, select_tiled_block(physical_rows, valid_rows, t_count), stream);
 }

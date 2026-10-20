@@ -185,20 +185,7 @@ void launch_bf16_scalar(const Tensor& ids, const Weight& table, Tensor& out, cud
         static_cast<__nv_bfloat16*>(out.data), out.ne[0], ids.ne[0]);
 }
 
-#if NINFER_TARGET_SPARK
-void launch_bf16_d2560(const Tensor& ids, const Weight& table, Tensor& out, cudaStream_t stream) {
-    kernels::embed_gather_bf16_d2560_kernel<5, 64><<<ids.ne[0] * 5, 64, 0, stream>>>(
-        static_cast<const std::int32_t*>(ids.data), static_cast<const uint4*>(table.qdata),
-        static_cast<uint4*>(out.data));
-}
-#endif
-
 EmbeddingLaunch select_bf16(const Weight& table, const Tensor& out) {
-#if NINFER_TARGET_SPARK
-    if (out.ne[0] == 2560 && common::operand::aligned(table.qdata, 16) &&
-        common::operand::aligned(out.data, 16))
-        return launch_bf16_d2560;
-#endif
     return launch_bf16_scalar;
 }
 

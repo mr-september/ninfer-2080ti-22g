@@ -115,8 +115,7 @@ std::string usage_text(const char* argv0) {
            "toward --max-new.\n"
            "Startup uses " +
            std::to_string(kDefaultKvCapacityHeadroomBytes / (1024ULL * 1024ULL)) +
-           " MiB of planning headroom; DGX Spark Vision additionally reserves live media "
-           "capacity.\n"
+           " MiB of planning headroom.\n"
            "Sampling defaults come from the loaded model and thinking mode; flags override "
            "individual fields.\n";
 }
