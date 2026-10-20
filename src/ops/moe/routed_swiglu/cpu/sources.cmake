@@ -1,4 +1,4 @@
-if(NINFER_TARGET STREQUAL "dgx_spark" OR NINFER_TARGET STREQUAL "turing")
+if(NINFER_TARGET STREQUAL "turing")
   target_sources(ninfer_ops PRIVATE "${CMAKE_CURRENT_LIST_DIR}/unavailable.cpp")
   return()
 endif()

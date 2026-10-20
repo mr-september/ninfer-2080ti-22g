@@ -14,10 +14,5 @@ target_sources(ninfer_ops PRIVATE
   "${CMAKE_CURRENT_LIST_DIR}/sparse_gqa/${NINFER_SOURCE_TARGET}/launch.cu"
 )
 
-if(NINFER_TARGET STREQUAL "dgx_spark")
-  target_sources(ninfer_ops_non_rdc PRIVATE
-    "${CMAKE_CURRENT_LIST_DIR}/indexer/dgx_spark/launch.cu")
-else()
-  target_sources(ninfer_ops PRIVATE
-    "${CMAKE_CURRENT_LIST_DIR}/indexer/${NINFER_SOURCE_TARGET}/launch.cu")
-endif()
+target_sources(ninfer_ops PRIVATE
+  "${CMAKE_CURRENT_LIST_DIR}/indexer/${NINFER_SOURCE_TARGET}/launch.cu")

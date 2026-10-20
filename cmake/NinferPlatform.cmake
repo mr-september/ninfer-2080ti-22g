@@ -1,6 +1,6 @@
-# This fork targets Turing by default; rtx5090 and dgx_spark keep upstream's behavior.
+# This fork targets Turing by default; rtx5090 keeps upstream's behavior.
 set(NINFER_TARGET turing CACHE STRING "NInfer execution target")
-set_property(CACHE NINFER_TARGET PROPERTY STRINGS turing rtx5090 dgx_spark)
+set_property(CACHE NINFER_TARGET PROPERTY STRINGS turing rtx5090)
 
 if(DEFINED NINFER_CONFIGURED_TARGET AND
    NOT NINFER_CONFIGURED_TARGET STREQUAL NINFER_TARGET)
@@ -15,7 +15,6 @@ endif()
 set(NINFER_SOURCE_TARGET ${NINFER_TARGET})
 set(NINFER_TARGET_TURING 0)
 set(NINFER_TARGET_RTX5090 0)
-set(NINFER_TARGET_SPARK 0)
 set(NINFER_SYSTEMS "Linux")
 if(NINFER_TARGET STREQUAL "turing")
   set(NINFER_TARGET_TURING 1)
@@ -27,10 +26,6 @@ elseif(NINFER_TARGET STREQUAL "rtx5090")
   set(NINFER_TARGET_RTX5090 1)
   set(NINFER_CUDA_ARCHITECTURE 120a)
   set(NINFER_PROCESSOR_PATTERN "^(x86_64|amd64|AMD64)$")
-elseif(NINFER_TARGET STREQUAL "dgx_spark")
-  set(NINFER_TARGET_SPARK 1)
-  set(NINFER_CUDA_ARCHITECTURE 121a)
-  set(NINFER_PROCESSOR_PATTERN "^(aarch64|arm64|ARM64)$")
 else()
   message(FATAL_ERROR "Unknown NINFER_TARGET '${NINFER_TARGET}'")
 endif()
