@@ -357,7 +357,7 @@ mathematical interface and caller-owned resources independent of that selection.
 Op stays in its existing source. Split only where target-specific dispatch, instantiation or launch
 requirements need independent ownership; not every family needs platform subdirectories.
 
-Within an affected Op, `rtx5090/` and `dgx_spark/` own their private shape catalogs, schedules and
+Within an affected Op, `rtx5090/` owns its private shape catalogs, schedules and
 launch bindings. CMake includes the selected source manifest. Shared kernel templates, codecs,
 operand contracts and mathematical oracles remain outside those directories when useful to both.
 Each target owns its tuning independently. The compiled Op defines its supported inputs;

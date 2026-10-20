@@ -77,8 +77,8 @@ cmake --build build/rtx5090-dev -j
 ctest --test-dir build/rtx5090-dev --output-on-failure
 ```
 
-`rtx5090-dev` enables products, tests and benchmarks together. `rtx5090-ops` and
-`dgx-spark-ops` instead register Core, Artifact and Op tests. Use the selected build directory
+`rtx5090-dev` enables products, tests and benchmarks together. `rtx5090-ops` instead
+registers Core, Artifact and Op tests. Use the selected build directory
 in the commands below; `ctest --preset <preset-name>` runs its registered suite. See
 [Build system](../docs/maintainer/build-system.md) for local interpreter presets.
 
@@ -169,8 +169,7 @@ initcheck. Use `--list` / `--case` to select the read-footprint recipe rather th
 format sweep under instrumentation.
 
 Both execution targets share mathematical cases and criteria. Cases derived from device size query
-the actual SM count after selection, so listing does not require a CUDA device. Run the Spark build
-with `build/dgx-spark-dev` in these commands when qualifying that target.
+the actual SM count after selection, so listing does not require a CUDA device.
 
 Run the native Python suites with the project Python environment:
 
@@ -305,7 +304,7 @@ The agent entry checks multi-turn continuation and branching. The preemption ent
 Snapshot/Replay recovery and cancellation while paused or replaying; `NINFER_PREEMPTION_REAL_SCENARIO`
 selects `all`, `snapshot`, `replay`, `cancel-paused` or `cancel-replay`.
 `NINFER_TEST_PROPOSAL_HEAD=full` selects the full head for Qwen4Exp MTP; the default is `optimized`.
-On Spark, use the replay/cancellation cases with Device context storage. Native transaction tests cover
+Native transaction tests cover
 physical state/KV ownership, binding, capture, reclamation and abort; their positional backend is
 `none`, `mtp`, `dflash` or `dflash2`. Each backend requires an artifact containing that component.
 Public-HTTP latency and output gaps are measured separately by the
@@ -500,8 +499,7 @@ NINFER_QWEN4_EXP_TEST_ARTIFACT=out/qwen3_8_flash_next.ninfer \
 The first command plans component combinations, KV formats and concurrency without loading weight
 payloads. `--materialize` additionally loads one full-component model, checks stored words and
 parameter sharing, constructs its execution resources, and reads/uploads a PLE window. It needs
-about 64 GiB of available Host memory plus system headroom with `--host-experts`. For resident
-loading on Spark, use its build directory and omit `--host-experts`. These are loading/resource checks;
+about 64 GiB of available Host memory plus system headroom with `--host-experts`. These are loading/resource checks;
 Text/Vision/MTP generation, eager or CUDA Graph decode, and text causal scoring use the public Engine,
 with current support described in the [execution reference](../docs/maintainer/qwen4_exp-execution.md)
 and commands in the [CLI guide](../docs/cli.md).

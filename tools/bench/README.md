@@ -5,8 +5,7 @@ runners, and the external Serve TTFT client. Correctness is owned by the affecte
 [`tests/`](../../tests/README.md).
 
 Runners that start Serve require `--serve`; the performance matrix requires `--build-dir`.
-Choose the executable or configured tree explicitly. Examples use `rtx5090-dev`; use the matching
-Spark build paths when running there.
+Choose the executable or configured tree explicitly. Examples use `rtx5090-dev`.
 
 ## External Serve TTFT
 

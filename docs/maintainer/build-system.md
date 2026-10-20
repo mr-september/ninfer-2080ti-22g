@@ -13,7 +13,6 @@ CUDA 13.4 is the validated development toolkit. Product commands and prerequisit
 |---|---|---|
 | `turing` (default in this fork) | Linux x86-64 or native Windows x86-64 | `75` |
 | `rtx5090` | Linux x86-64 | `120a` |
-| `dgx_spark` | Linux AArch64 | `121a` |
 
 `turing` composes its sources from the `rtx5090` trees: `NINFER_SOURCE_TARGET` is `rtx5090` and keys the
 source directories, while `NINFER_TARGET` stays `turing` for behavior that must differ (no CPU expert
@@ -33,13 +32,12 @@ Libraries and executables retain their logical names across targets; their build
 The same selection generates `<build-dir>/generated/core/platform.h` from
 [`src/core/platform.h.in`](../../src/core/platform.h.in). Internal consumers explicitly include
 `core/platform.h`; `ninfer_internal_includes()` supplies its private include root. `NINFER_TARGET_TURING`,
-`NINFER_TARGET_RTX5090` and `NINFER_TARGET_SPARK` are defined as 0 or 1, so test them with `#if`.
+and `NINFER_TARGET_RTX5090` are defined as 0 or 1, so test them with `#if`.
 These definitions do not propagate into public headers or third-party targets.
 
 Target identity and capabilities are distinct. The platform header maps each target to
-`NINFER_SHARED_PHYSICAL_MEMORY` and `NINFER_EXPERT_OFFLOAD` independently. Memory planning uses the
-former; model offload entry points use the latter. Shared physical memory is not a Spark identity
-test, and lack of shared memory does not itself imply CPU expert support. CMake still owns
+`NINFER_EXPERT_OFFLOAD` and `NINFER_HOST_MAPPED_EMBEDDING` independently; model offload entry points
+use the former. CMake still owns
 target-private translation units and dependencies; macros handle small differences within shared
 sources, not whole implementation catalogs. Benchmark reference data belongs to
 [`bench/common/roofline.h`](../../bench/common/roofline.h), selected by target identity.
@@ -72,8 +70,7 @@ conversion/evaluation scripts run separately from CMake and CTest.
 Shared CPU topology, affinity, worker startup and `TaskPool` belong to the ordinary C++
 `ninfer_cpu` library, linked with hwloc >= 2.5 and Threads. The x86 collective executor and CPUID
 implementation belong to `ninfer_cpu_executor`, compiled only for `rtx5090`. CPU MoE, the model runtime
-when built with offload, and executor tests/benchmarks link it explicitly. Spark has no CPU expert
-executor or AVX objects; its CPU MoE Op entry reports unsupported. Artifact Host page population uses shared
+when built with offload, and executor tests/benchmarks link it explicitly. Artifact Host page population uses shared
 worker startup/affinity facilities directly, without depending on the arithmetic executor.
 Core's direct-file I/O uses liburing >= 2.5.
 Its registered files and buffers are caller-owned; the queue creates no CUDA resources or threads.
@@ -87,9 +84,6 @@ The checked-in presets use independent `build/<preset-name>/` directories:
 - `rtx5090-release`: product binaries;
 - `rtx5090-dev`: products, tests and benchmarks;
 - `rtx5090-ops`: Core, Artifact and Ops with their tests and benchmarks;
-- `dgx-spark-release`: AArch64/SM121a product binaries;
-- `dgx-spark-dev`: AArch64/SM121a products, tests and benchmarks;
-- `dgx-spark-ops`: AArch64/SM121a Core, Artifact and Ops development.
 - `turing-release`, `turing-dev`, `turing-ops`: the same three presets for Turing on Linux;
 - `turing-windows`, `turing-windows-dev`, `turing-windows-ops`: native Windows with MSVC and the vcpkg
   toolchain file (`VCPKG_ROOT`), building in `build/turing-windows/` and so on. The `vcpkg.json` manifest
@@ -112,9 +106,9 @@ A local preset can inherit any checked-in preset:
   "version": 6,
   "configurePresets": [
     {
-      "name": "local-spark",
-      "inherits": "dgx-spark-ops",
-      "binaryDir": "${sourceDir}/build/local-spark",
+      "name": "local-turing",
+      "inherits": "turing-ops",
+      "binaryDir": "${sourceDir}/build/local-turing",
       "cacheVariables": {
         "CMAKE_CUDA_COMPILER": "/path/to/cuda/bin/nvcc",
         "Python3_EXECUTABLE": "/path/to/python3"

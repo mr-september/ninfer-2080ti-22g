@@ -63,7 +63,7 @@ Qwen3.5 的 bank ID 按 Main 层顺序建立，选中的 MTP bank 追加在末�
 workspace 查询消费数学 profile；完整 GPU FFN 显式接受 resident/cached CUDA bank，
 混合单层执行另外借用原生 Host bank 和交接资源。
 Qwen3.5 MoE 与 Qwen4Exp 均支持完整 GPU 放置；5090 预算不足时可选择 Host Main experts
-和 Program GPU cache。Spark 使用完整 GPU 放置。Qwen4Exp 的 block-FP8 MTP experts 常驻 GPU，
+和 Program GPU cache。Qwen4Exp 的 block-FP8 MTP experts 常驻 GPU，
 模型编排见 [Qwen4Exp 执行](qwen4_exp-execution.md)。
 
 ## 副本容量与 GPU 寻址

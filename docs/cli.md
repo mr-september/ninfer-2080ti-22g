@@ -6,7 +6,7 @@ The examples use the Qwen3.8-27B `groupwise-int` artifact with this build's INT8
 
 > **Turing fork.** Upstream's forms of these commands target an RTX 5090 (NVFP4 weights, `--kv-dtype fp8`); FP8 and NVFP4 are not available on a GeForce RTX 2080 Ti. The defaults of this build are INT8 KV, a 65,536-token context, and MTP with three draft tokens and the optimized proposal head when the artifact has one; see the [README](../README.md#defaults).
 
-The CPU-expert-offload (`NINFER_VRAM_BUDGET_MIB`), Qwen3.8-Flash-Next (Qwen4Exp) and DGX Spark examples below are upstream's. They need CPU expert offload or FP8/NVFP4 weights or KV, none of which the `turing` target provides (`NINFER_EXPERT_OFFLOAD` is 0 there), so they cannot run on a Turing GPU.
+The CPU-expert-offload (`NINFER_VRAM_BUDGET_MIB`) and Qwen3.8-Flash-Next (Qwen4Exp) examples below are upstream's. They need CPU expert offload or FP8/NVFP4 weights or KV, none of which the `turing` target provides (`NINFER_EXPERT_OFFLOAD` is 0 there), so they cannot run on a Turing GPU.
 
 For Qwen3.6-35B-A3B, `NINFER_VRAM_BUDGET_MIB` caps the Engine's GPU allocation budget. If the
 model cannot remain fully on GPU, Main MoE experts use CPU/GPU execution with segmented CUDA
@@ -30,8 +30,7 @@ Qwen3.8-Flash-Next uses Qwen4Exp Text/Vision/MTP. CUDA Graph decode is enabled b
 ```
 
 On RTX 5090, this recipe uses registered Host experts with GPU caching and streaming, requiring
-about 63.3 GiB of Host expert backing plus runtime and system memory. On DGX Spark, use
-`build/dgx-spark-release/apps/ninfer`; selected weights reside on the GPU without a Host expert copy. PLE reads its
+about 63.3 GiB of Host expert backing plus runtime and system memory. PLE reads its
 NF4 rows from the artifact on disk. Add `--vision` for image/video messages. Native MTP supports
 `--spec mtp --draft-tokens 1..5` with either Text or Vision, using the full shared BF16 head;
 omit `--lm-head-draft`. MTP's own experts remain on GPU. Serving uses the same execution path;
@@ -311,7 +310,7 @@ from artifact metadata before allocating their backing. With resident weights,
 `--kv-capacity auto` chooses the largest legal page capacity within the available Device budget,
 including the selected speculative backend, fixed sequence state, unified workspace and
 measured CUDA Graph rebuilding cost. Both explicit and automatic capacity use 1 GiB of base startup
-planning headroom. On Spark, Vision also reserves the configured live media capacity in shared memory.
+planning headroom.
 Startup calibration releases its temporary storage before sizing the final pools;
 retained driver memory is already included in the remaining free memory. With CPU expert
 offload, `auto` reserves one full context and assigns the remaining budget to expert storage;

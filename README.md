@@ -132,7 +132,7 @@ Checked on one 2080 Ti 22 GB with Qwen3.8-27B `groupwise-int` on native Windows 
 
 ## Known limitations
 
-- Turing only: the `rtx5090` and `dgx_spark` targets in the tree are upstream's and are neither built nor tested here. FP8 and NVFP4 weights and KV are unavailable.
+- Turing only: the `rtx5090` target in the tree is upstream's and is neither built nor tested here. FP8 and NVFP4 weights and KV are unavailable.
 - Qwen3.8-27B is the only tested model.
 - Greedy output is not bit-identical to the fork's build from before the port onto upstream `dev`: on 5 of 8 test prompts the text diverges at a near-tied token, while log-probabilities agree to 0.19 nats at most and perplexity to 0.045% ([details](docs/turing-port.md#port-onto-upstream-dev-2026-10-18)).
 - The 64k default context leaves little VRAM headroom; other programs using the GPU can force a smaller context at startup.

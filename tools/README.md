@@ -32,7 +32,7 @@ The stored-scale CUDA quantization extension uses PyTorch's visible-device archi
 ## Memory bandwidth probe
 
 This probe is a CMake benchmark target, using the selected native CUDA architecture and benchmark
-reference table. With a configured development tree (substitute `dgx-spark-dev` on Spark):
+reference table. With a configured development tree:
 
 ```bash
 cmake --build build/rtx5090-dev -j --target ninfer_memory_bandwidth_bench

@@ -381,8 +381,7 @@ handoff 单独计入。PLE 容量为
 `Mmax=max(prefill_chunk,max_concurrency*(draft_tokens+1))`，
 两份 pinned E 和两份 Device E 各自共占 `2*Mmax*2560*2` B，
 另计 64 MiB row cache、I/O buffers 和有界 Host metadata。PLE 容量查询使用独立的
-TableGeometry；启动重试不借用已销毁 Model 的 table。Spark 将这些 Host 分配与 GPU
-分配计入同一物理预算，Host State/KV cache 为零；Vision 的 live media 额度另在启动预算中预留。
+TableGeometry；启动重试不借用已销毁 Model 的 table。
 
 以下是本实例的逻辑 state payload，尚未计入 field/slot 对齐：
 
