@@ -129,7 +129,8 @@ struct PhysicalReclaim {
 
             struct PageOwners {
                 LogicalKVPageHandle handle;
-                std::uint32_t holders = none, position = 0, last_owner = 0;
+                std::uint32_t holders = std::numeric_limits<std::uint32_t>::max(), position = 0,
+                              last_owner = 0;
             };
 
             std::vector<PageOwners> owners(pages.capacity());
