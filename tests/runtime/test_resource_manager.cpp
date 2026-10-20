@@ -2022,8 +2022,8 @@ void test_host_selection_against_full_rescoring() {
                     if (std::find(combined.begin(), combined.end(), cursor.victims[j].handle) !=
                         combined.end())
                         order = j;
-                const auto left  = mul_wide(loss, best_bytes);
-                const auto right = mul_wide(best_loss, units);
+                const auto left  = ninfer::mul_wide(loss, best_bytes);
+                const auto right = ninfer::mul_wide(best_loss, units);
                 if (!best || left < right || (left == right && order < best_order)) {
                     best       = std::move(combined);
                     best_loss  = loss;
