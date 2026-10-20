@@ -166,7 +166,8 @@ struct PhysicalReclaim {
                             entry.holders = set;
                         else {
                             const auto key       = (std::uint64_t(entry.holders) << 32) | set;
-                            auto [merged, added] = merged_sets.try_emplace(key, holder_sets.size());
+                            auto [merged, added] = merged_sets.try_emplace(
+                                key, static_cast<std::uint32_t>(holder_sets.size()));
                             if (added) {
                                 std::vector<std::uint32_t> joined;
                                 const auto& left  = holder_sets[entry.holders];
