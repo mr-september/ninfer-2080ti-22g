@@ -56,6 +56,8 @@ token (comma-separated texts, each one token) after the prompt, and the log-prob
   --candidates We,Let --ids "1596 1144 310" --context 8192 --kv-dtype bf16
 ```
 
+`--batch <entries.json>` scores several prompts through one loaded Engine: the file is an array of `{"messages": "<file.json>", "ids": "1 2 3", "candidates": "We,Let"}` entries (`ids` and `candidates` optional) and the output is an array holding, per entry, exactly the object the single-prompt form prints. It replaces `--messages`, `--ids` and `--candidates`.
+
 Take the ids from `ninfer --greedy --print-token-ids` of one build, score them with both builds'
 binaries, and compare the two `continuation_logprobs` arrays. `--kv-dtype` accepts `bf16` and `int8`.
 The final logits are BF16, so a logit moves in whole steps (0.125 at magnitude 16 to
