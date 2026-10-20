@@ -71,7 +71,6 @@ EngineOptions options(const execution::ModelProfile& profile, const EngineOption
         (o.max_concurrency != 1 || o.enable_vision ||
          o.speculative.backend != SpeculativeBackend::None))
         throw std::invalid_argument("scoring requires normalized single-lane text options");
-    if constexpr (NINFER_SHARED_PHYSICAL_MEMORY != 0) o.context_cache.host_capacity_bytes = 0;
     if (!o.prefill_chunk) o.prefill_chunk = 4096;
     if (o.prefill_chunk % 128)
         throw std::invalid_argument("prefill chunk must be a multiple of 128");
@@ -129,12 +128,7 @@ std::size_t ExecutionPlan::device_bytes() const {
            (moe ? moe->description().device_bytes : 0);
 }
 
-std::size_t ExecutionPlan::device_reservation_bytes() const {
-    const auto host = ple_prepare_bytes + ple_upload.ordinary_host_bytes +
-                      ple_upload.pinned_host_bytes + pinned_io_bytes + pinned_output_bytes +
-                      pinned_sampling_bytes + pinned_mtp_bytes;
-    return device_bytes() + ((NINFER_SHARED_PHYSICAL_MEMORY != 0) ? host : 0);
-}
+std::size_t ExecutionPlan::device_reservation_bytes() const { return device_bytes(); }
 
 std::optional<ExecutionPlan> plan_execution(std::shared_ptr<const execution::ModelProfile> profile,
                                             ple::disk::TableGeometry table,

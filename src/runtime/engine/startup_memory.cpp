@@ -6,10 +6,9 @@
 namespace ninfer::runtime {
 
 StartupMemoryBudget::StartupMemoryBudget(DeviceMemorySnapshot initial, std::size_t limit,
-                                         std::size_t headroom, std::size_t host_reservation)
-    : initial_(initial), limit_(std::min(initial.free_bytes, limit)), headroom_(headroom),
-      host_reservation_(host_reservation) {
-    if (limit_ <= headroom_ || host_reservation_ >= limit_ - headroom_)
+                                         std::size_t headroom)
+    : initial_(initial), limit_(std::min(initial.free_bytes, limit)), headroom_(headroom) {
+    if (limit_ <= headroom_)
         throw std::invalid_argument("Device budget is smaller than runtime headroom");
 }
 
@@ -22,7 +21,7 @@ std::size_t StartupMemoryBudget::available(DeviceMemorySnapshot current) const {
 
 bool StartupMemoryBudget::fits(DeviceMemorySnapshot current) const noexcept {
     const auto consumed = device_memory_growth(initial_, current);
-    return consumed <= static_cast<std::int64_t>(limit_ - host_reservation_);
+    return consumed <= static_cast<std::int64_t>(limit_);
 }
 
 std::int64_t StartupMemoryBudget::retained(DeviceMemorySnapshot current,
