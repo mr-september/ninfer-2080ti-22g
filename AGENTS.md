@@ -2,80 +2,40 @@
 
 ## Product and architecture
 
-NInfer is a C++/CUDA inference engine for maximum single-GPU performance. Execution targets are
-selected at compile time: `rtx5090` (Linux x86-64, `sm_120a`) and `dgx_spark` (Linux AArch64,
-`sm_121a`). Follow [Build system](docs/maintainer/build-system.md) for target composition.
-Choose designs for functional and numerical correctness, clear ownership, and the performance goal
-within the requested scope.
+This repository is a fork of Neroued/ninfer, cut down to one product: a C++/CUDA inference engine for dense Qwen3.8-27B (`Qwen3_5ForCausalLM`, `groupwise-int` Q4/Q5/Q6/Q8 and BF16 weights) on one NVIDIA RTX 2080 Ti with 22 GB (Turing, `sm_75`), built natively on Windows 11 and on Linux/WSL2/Docker. It keeps vision input, MTP, DFlash and DFlash2 speculative decoding, Qwen3.6-27B support, the CLI, the OpenAI/Anthropic-compatible server, `ninfer-perplexity` and `ninfer-logit-compare`.
 
-It implements `Qwen3_5ForCausalLM`, `Qwen3_5MoeForCausalLM`, and Text/Vision/MTP for
-`Qwen4ExpForCausalLM`. Checkpoints and recipe combinations
-of existing representations use the same architecture, binding and execution path; do not add
-checkpoint-specific execution registration. Generation uses one GPU, one resident model, and
-one to eight resident execution lanes fixed at startup.
+The `turing` build target composes the upstream `rtx5090` source trees with `NINFER_SM75` defined; see [Build system](docs/maintainer/build-system.md). The tree is being stripped of everything this product does not use (the `rtx5090` and `dgx_spark` targets, FP8/NVFP4/K8V4 kernels, the MoE architecture and CPU expert execution, Qwen4Exp). Until the strip finishes, files and docs may still describe those features; they are not part of the product, and new work must not extend them.
 
-V3 `.ninfer` is the only C++ product artifact. Generation, offline CausalScoring, CLI, serving, and
-inference benchmarks use the public Engine. There is no Python model-inference route or
-installed/exported C++ SDK.
+V3 `.ninfer` is the only C++ product artifact. Generation, offline CausalScoring, CLI, serving and inference benchmarks use the public Engine. Model data is immutable; every Program owns its mutable state and device allocations. Runtime owns execution and publication policy; product and serving own input acquisition and protocol translation.
 
-This is a local, single-owner project with trusted local models, artifacts, and workflows.
-Do not derive requirements from another deployment or trust model.
+Keep architecture, binding and execution explicit. Do not introduce generic model graphs, family base classes, plugin discovery, string-driven execution, hidden device allocation or runtime weight repacking.
 
-Model data is immutable; every Program owns its mutable state and device allocations. The loader
-validates, uploads, and binds the stored representation; actual Parameters and Ops determine
-execution support, without a whole-artifact capability registry.
-Runtime owns execution and publication policy; product/serving own input acquisition and protocol
-translation. Model code does not acquire media or own transport.
-
-Keep architecture, binding, and execution explicit. Without a product requirement, do not introduce
-generic model graphs, family base classes, plugin discovery, string-driven execution, hidden device
-allocation, or runtime weight repacking. New mathematical architectures, execution platforms,
-large-scale continuous batching, or priority/QoS require an explicit product change. When a task
-changes product or architecture, update affected contracts and implementation together.
+This is a local, single-owner project with trusted local models, artifacts and workflows. Do not derive requirements from another deployment or trust model.
 
 ## Change policy
 
-Project-owned contracts do not preserve backward compatibility. Replace behavior completely:
-remove superseded aliases, fallbacks, transition branches, and their tests within the affected contract.
-Advertised OpenAI and Anthropic protocols are external contracts; update affected schema tests
-and serving documentation together.
-Update stable requirements in their existing authoritative document; maintain one current authority.
-Use Conventional Commit subjects with concise lowercase types when a commit is requested.
+There is no more upstream sync. Project-owned contracts do not preserve backward compatibility: replace behavior completely and remove superseded aliases, fallbacks and transition branches, together with their tests and docs. Advertised OpenAI and Anthropic protocols are external contracts; update schema tests and serving documentation together. Update stable requirements in their existing authoritative document.
+
+Work directly on `master` and push to `origin master`; never create branches or worktrees. Use Conventional Commit subjects with lowercase types. One concern per commit: a commit deletes, or moves/renames (`git mv`), or edits, never two of these.
+
+## The strip rules
+
+The strip deletes what the product does not use **without changing a bit of what it computes**. The plan lives in the untracked `docs/plans/strip-roadmap.md`. Every strip commit is gated on exact equality, never "within noise": the build compiles, CTest passes (minus deleted tests), protocol B perplexity and `ninfer-logit-compare` are bit-identical to the baseline, greedy CLI output and the startup memory plan are identical, and per-kernel SASS hashes of surviving kernels are identical. Do not loosen a gate, re-baseline or call a difference noise; report it. A commit that removes a feature also removes every doc, help text, test and CMake reference to it.
 
 ## Verification and reporting
 
-Before changing Ops, numerical or state semantics, read
-[Op development](docs/maintainer/op-development.md). Qualify affected production routes directly
-against the contract's independent mathematical oracle or specified exact reference. Kernel parity
-and plausible model output do not establish mathematical correctness.
+Before changing Ops, numerical or state semantics, read [Op development](docs/maintainer/op-development.md). Qualify affected production routes directly against the contract's independent mathematical oracle or specified exact reference. Kernel parity and plausible model output do not establish mathematical correctness; perplexity does.
 
-Measure performance at the claimed scope. An Op microbenchmark establishes an Op result,
-not an end-to-end improvement. For comparisons, establish the baseline, workloads, metrics,
-aggregation, and acceptance criteria before evaluating results.
-Distinguish new capability, fallback replacement, and improvement to an optimized implementation.
-Report the baseline, hardware/toolchain, workloads or commands, run conditions, metrics, coverage,
-result distribution, worst changes, and exceptions. Include small and unexplained regressions;
-do not dismiss slowdowns as noise without evidence.
+Measure performance at the claimed scope, and establish the baseline, workloads, metrics and acceptance criteria before evaluating results. Report the baseline, hardware/toolchain, commands, run conditions, metrics, coverage, result distribution and worst changes. Include small and unexplained regressions. The standard measurements and acceptance rules are in [Turing port](docs/turing-port.md#standard-measurements-and-acceptance-rules).
 
 ## References
 
-Read [Engine architecture](docs/maintainer/engine-architecture.md) before changing execution or
-ownership. [README](README.md) and executable `--help` define capabilities and exact commands.
-The [documentation map](docs/README.md) routes to detailed contracts;
-[Tests](tests/README.md) and [Benchmarks](bench/README.md) own their commands and execution details.
+Read [Engine architecture](docs/maintainer/engine-architecture.md) before changing execution or ownership. [README](README.md) and executable `--help` define capabilities and exact commands. The [documentation map](docs/README.md) routes to detailed contracts; [Tests](tests/README.md) and [Benchmarks](bench/README.md) own their commands.
 
 ## Local environment
 
-Use Python 3.11 via `/home/neroued/miniconda3/envs/py311/bin/python` explicitly; use `python3` only
-after selecting the maintainer environment or checking its version.
-The usual local model on this fork's machine is
-`E:/AI_Models/LLM/neroued/Qwen3.8-27B-NInfer/qwen3_8_27b.ninfer` (v3, `groupwise-int`; `/mnt/e/...` from WSL). Select artifacts by explicit path, never glob order,
-modification time, or unqualified “latest”. Source checkpoints and large artifacts are prerequisites;
-download or regenerate them only when that work is in scope.
+Windows 11, PowerShell, Visual Studio 2022 Build Tools, CUDA 12.9, vcpkg at `E:\vcpkg`. Build with `scripts\build.ps1` (release, `build\turing-windows`) or `scripts\build.ps1 -Dev` (tests and benchmarks, `build\turing-windows-dev`); set `CMAKE_BUILD_PARALLEL_LEVEL=4`, because nvcc runs out of memory at the default. Run tests with `PYTHONUTF8=1` and `ctest --test-dir build\turing-windows-dev`. Python is `C:\Users\Larry\AppData\Local\Python\pythoncore-3.10-64\python.exe`.
 
-Store all agent-generated temporary files under the repository-root `.agent-tmp/<task>/`,
-including temporary plans, experimental code and binaries, test data, logs, profiling captures,
-performance reports, and intermediate artifacts. This directory is ignored by Git; do not commit
-its contents. Remove temporary files that are no longer needed when the task ends.
-Reserve `out/` for model weights, their companion files, and explicitly retained important artifacts.
-Do not use `out/` for temporary experiments or task output.
+The usual local model is `E:/AI_Models/LLM/neroued/Qwen3.8-27B-NInfer/qwen3_8_27b.ninfer` (v3, `groupwise-int`). Select artifacts by explicit path, never glob order, modification time or "latest". The model needs about 18 GB of VRAM; check that the desktop holds under about 3 GB and never run two GPU jobs at once.
+
+Store all agent-generated temporary files under the repository-root `.agent-tmp/<task>/` (ignored by Git; do not commit it): plans, experimental code and binaries, test data, logs, profiling captures and reports. Remove what is no longer needed when the task ends. Reserve `out/` for model weights, companion files and explicitly retained artifacts.
