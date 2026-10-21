@@ -20,7 +20,6 @@ struct Roofline {
     double fp8_f16_tflops     = std::numeric_limits<double>::quiet_NaN();
     double fp8_f32_tflops     = std::numeric_limits<double>::quiet_NaN();
     double mxfp8_f32_tflops   = std::numeric_limits<double>::quiet_NaN();
-    double nvfp4_f32_tflops   = std::numeric_limits<double>::quiet_NaN();
 };
 
 #if NINFER_TARGET_RTX5090
@@ -32,7 +31,6 @@ inline constexpr Roofline kRoofline{
     .fp8_f16_tflops     = 838.0,
     .fp8_f32_tflops     = 419.0,
     .mxfp8_f32_tflops   = 838.0,
-    .nvfp4_f32_tflops   = 1676.0,
 };
 #elif NINFER_TARGET_TURING
 // RTX 2080 Ti (TU102, 22 GB): nominal GDDR6 bandwidth, and the sustained read rate measured
