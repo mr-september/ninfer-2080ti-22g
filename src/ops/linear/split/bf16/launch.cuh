@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ops/linear/kernels/bf16/bf16_template_launch.cuh"
-#include "ops/linear/kernels/bf16/bf16_a16_tma_mma.cuh"
 
 namespace ninfer::ops::detail::linear_split {
 

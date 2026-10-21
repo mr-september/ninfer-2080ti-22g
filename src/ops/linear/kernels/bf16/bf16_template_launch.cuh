@@ -9,7 +9,6 @@
 #include "ops/linear/kernels/bf16/bf16_a16_simt.cuh"
 #include "ops/linear/kernels/bf16/bf16_a16_mma.cuh"
 #include "ops/linear/kernels/bf16/bf16_a16_sliced_k_mma.cuh"
-#include "ops/linear/kernels/bf16/bf16_a16_tma_mma.cuh"
 
 namespace ninfer::ops::detail {
 
