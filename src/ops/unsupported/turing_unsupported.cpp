@@ -9,7 +9,6 @@
 #include <string>
 
 #include "ninfer/ops/gated_residual.h"
-#include "ninfer/ops/kimi_delta_attention.h"
 #include "ninfer/ops/qsa.h"
 #include "ops/linear/add/fp8/dispatch.h"
 #include "ops/linear/projection/fp8/fp8_dispatch.h"
@@ -49,28 +48,10 @@ std::size_t hc_mix_workspace_capacity_bytes(const HcMixProfile& profile,
 std::size_t hc_mix_workspace_capacity_bytes(const HcMixWeights& weights,
                                                           std::int32_t min_tokens,
                                                           std::int32_t max_tokens) { unsupported("hc_mix_workspace_capacity_bytes"); }
-std::size_t kimi_delta_attention_workspace_capacity_bytes(std::int32_t qk_heads,
-                                                                        std::int32_t value_heads,
-                                                                        std::int32_t min_tokens,
-                                                                        std::int32_t max_tokens) { unsupported("kimi_delta_attention_workspace_capacity_bytes"); }
 void hc_mix(const Tensor& normalized, const HcFinalMixWeights& weights, MemoryArena& workspace,
             Tensor& sample_hidden, CudaExecutionView execution) { unsupported("hc_mix"); }
 void hc_mix(const Tensor& normalized, const HcMixWeights& weights, MemoryArena& workspace,
             Tensor& block_input, Tensor& injection, CudaExecutionView execution) { unsupported("hc_mix"); }
-void kimi_delta_attention(const Tensor& q, const Tensor& k, const Tensor& v, const Tensor& g,
-                          const Tensor& beta, const Tensor& A_log, const Tensor& dt_bias,
-                          float lower_bound, float scale, MemoryArena& workspace,
-                          const Tensor& state_in, Tensor& state_out, Tensor& out,
-                          CudaExecutionView execution) { unsupported("kimi_delta_attention"); }
-void kimi_delta_attention(const Tensor& q, const Tensor& k, const Tensor& v, const Tensor& g,
-                          const Tensor& beta, const Tensor& A_log, const Tensor& dt_bias,
-                          float lower_bound, float scale, MemoryArena& workspace, Tensor& state,
-                          Tensor& out, CudaExecutionView execution) { unsupported("kimi_delta_attention"); }
-void kimi_delta_attention_batch_update(const Tensor& q, const Tensor& k, const Tensor& v,
-                                       const Tensor& g, const Tensor& beta, const Tensor& A_log,
-                                       const Tensor& dt_bias, float lower_bound, float scale,
-                                       Tensor& states, const Tensor& slots, Tensor& out,
-                                       CudaExecutionView execution) { unsupported("kimi_delta_attention_batch_update"); }
 void qsa_indexer(const Tensor& index_query, const QsaIndexCacheView& cache,
                  const QsaBatchView& batch, QsaIndexerExecutionEnvelope envelope,
                  MemoryArena& workspace, QsaBlockSelection& out, CudaExecutionView execution) { unsupported("qsa_indexer"); }

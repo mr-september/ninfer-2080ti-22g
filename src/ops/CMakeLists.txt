@@ -44,7 +44,6 @@ set(_ninfer_blackwell_only_regex
   "/fp8/"
   "/fp8[a-z0-9_]*[.](cu|cpp)$"
   "/gated_residual/mix/"
-  "/kimi_delta_attention/"
   "/softmax_attention/qsa/")
 string(REPLACE ";" "|" _ninfer_blackwell_only_regex "${_ninfer_blackwell_only_regex}")
 foreach(_target ninfer_ops ninfer_ops_non_rdc)
