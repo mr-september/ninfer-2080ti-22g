@@ -40,21 +40,19 @@ include("${CMAKE_CURRENT_LIST_DIR}/moe/sources.cmake")
 # kernels need sm_120a instructions. A Turing build drops these sources from the family manifests
 # above (which stay identical to upstream's) and links throwing definitions of the same
 # declarations instead; the BF16 and grouped-integer routes are the supported surface there.
-if(NINFER_TARGET STREQUAL "turing")
-  set(_ninfer_blackwell_only_regex
-    "/fp8/"
-    "/fp8[a-z0-9_]*[.](cu|cpp)$"
-    "/gated_residual/mix/"
-    "/kimi_delta_attention/"
-    "/softmax_attention/qsa/")
-  string(REPLACE ";" "|" _ninfer_blackwell_only_regex "${_ninfer_blackwell_only_regex}")
-  foreach(_target ninfer_ops ninfer_ops_non_rdc)
-    get_target_property(_sources ${_target} SOURCES)
-    list(FILTER _sources EXCLUDE REGEX "${_ninfer_blackwell_only_regex}")
-    set_property(TARGET ${_target} PROPERTY SOURCES ${_sources})
-  endforeach()
-  target_sources(ninfer_ops PRIVATE
-    "${CMAKE_CURRENT_LIST_DIR}/unsupported/turing_unsupported.cpp")
-  target_sources(ninfer_ops_non_rdc PRIVATE
-    "${CMAKE_CURRENT_LIST_DIR}/unsupported/empty_non_rdc.cpp")
-endif()
+set(_ninfer_blackwell_only_regex
+  "/fp8/"
+  "/fp8[a-z0-9_]*[.](cu|cpp)$"
+  "/gated_residual/mix/"
+  "/kimi_delta_attention/"
+  "/softmax_attention/qsa/")
+string(REPLACE ";" "|" _ninfer_blackwell_only_regex "${_ninfer_blackwell_only_regex}")
+foreach(_target ninfer_ops ninfer_ops_non_rdc)
+  get_target_property(_sources ${_target} SOURCES)
+  list(FILTER _sources EXCLUDE REGEX "${_ninfer_blackwell_only_regex}")
+  set_property(TARGET ${_target} PROPERTY SOURCES ${_sources})
+endforeach()
+target_sources(ninfer_ops PRIVATE
+  "${CMAKE_CURRENT_LIST_DIR}/unsupported/turing_unsupported.cpp")
+target_sources(ninfer_ops_non_rdc PRIVATE
+  "${CMAKE_CURRENT_LIST_DIR}/unsupported/empty_non_rdc.cpp")

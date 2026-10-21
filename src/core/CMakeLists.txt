@@ -5,12 +5,6 @@ add_library(ninfer_cpu ${NINFER_LIBRARY_TYPE}
 ninfer_internal_includes(ninfer_cpu)
 target_link_libraries(ninfer_cpu PRIVATE PkgConfig::HWLOC Threads::Threads)
 
-if(NINFER_TARGET STREQUAL "rtx5090")
-  add_library(ninfer_cpu_executor ${NINFER_LIBRARY_TYPE} cpu/executor.cpp cpu/x86.cpp)
-  ninfer_internal_includes(ninfer_cpu_executor)
-  target_link_libraries(ninfer_cpu_executor PUBLIC ninfer_cpu)
-endif()
-
 # Linux reads weights through io_uring; native Windows through an I/O completion port.
 if(WIN32)
   set(NINFER_CORE_IO_SOURCES io/direct_read.cpp io/windows/file.cpp io/windows/read_queue.cpp)

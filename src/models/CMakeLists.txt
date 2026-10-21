@@ -33,16 +33,6 @@ target_sources(ninfer_model_runtime PRIVATE
   common/moe/execution.cpp
   common/moe/schedule.cpp)
 
-if(NINFER_TARGET STREQUAL "rtx5090")
-  target_link_libraries(ninfer_model_runtime PRIVATE ninfer_cpu_executor)
-  target_sources(ninfer_model_runtime PRIVATE
-    common/moe/offload/plan.cpp
-    common/moe/offload/resources.cpp
-    common/moe/offload/execution.cpp
-    common/moe/offload/graph.cpp
-    common/moe/offload/schedule.cpp)
-endif()
-
 include(qwen3_5/loading_sources.cmake)
 include(qwen4_exp/loading_sources.cmake)
 include(common/qwen/sources.cmake)
