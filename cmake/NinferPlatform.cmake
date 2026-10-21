@@ -9,16 +9,13 @@ if(DEFINED NINFER_CONFIGURED_TARGET AND
     "use a separate directory for ${NINFER_TARGET}")
 endif()
 
-# Source directories are keyed by NINFER_SOURCE_TARGET. Turing builds the portable kernels that the
-# rtx5090 directories list (the Blackwell-only ones are filtered out in src/ops/CMakeLists.txt) and
-# keeps NINFER_TARGET for behavior that must differ (no CPU expert executor, no expert offload).
-set(NINFER_SOURCE_TARGET ${NINFER_TARGET})
+# Turing builds the portable kernels the source manifests list (the Blackwell-only ones are filtered out in
+# src/ops/CMakeLists.txt); NINFER_TARGET keeps behavior that must differ (no CPU expert executor, no expert offload).
 set(NINFER_TARGET_TURING 0)
 set(NINFER_TARGET_RTX5090 0)
 set(NINFER_SYSTEMS "Linux")
 if(NINFER_TARGET STREQUAL "turing")
   set(NINFER_TARGET_TURING 1)
-  set(NINFER_SOURCE_TARGET rtx5090)
   set(NINFER_CUDA_ARCHITECTURE 75)
   set(NINFER_PROCESSOR_PATTERN "^(x86_64|amd64|AMD64)$")
   set(NINFER_SYSTEMS "Linux;Windows")

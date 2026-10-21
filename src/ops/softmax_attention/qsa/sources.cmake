@@ -9,10 +9,10 @@ target_sources(ninfer_ops PRIVATE
 )
 
 target_sources(ninfer_ops PRIVATE
-  "${CMAKE_CURRENT_LIST_DIR}/indexer/${NINFER_SOURCE_TARGET}/plan.cpp"
-  "${CMAKE_CURRENT_LIST_DIR}/sparse_gqa/${NINFER_SOURCE_TARGET}/plan.cpp"
-  "${CMAKE_CURRENT_LIST_DIR}/sparse_gqa/${NINFER_SOURCE_TARGET}/launch.cu"
+  "${CMAKE_CURRENT_LIST_DIR}/indexer/rtx5090/plan.cpp"
+  "${CMAKE_CURRENT_LIST_DIR}/sparse_gqa/rtx5090/plan.cpp"
+  "${CMAKE_CURRENT_LIST_DIR}/sparse_gqa/rtx5090/launch.cu"
 )
 
 target_sources(ninfer_ops PRIVATE
-  "${CMAKE_CURRENT_LIST_DIR}/indexer/${NINFER_SOURCE_TARGET}/launch.cu")
+  "${CMAKE_CURRENT_LIST_DIR}/indexer/rtx5090/launch.cu")
