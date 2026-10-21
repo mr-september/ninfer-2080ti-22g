@@ -1,6 +1,6 @@
 # Turing (sm_75) port
 
-This fork builds NInfer for NVIDIA Turing (RTX 2080 Ti 22 GB, `CMAKE_CUDA_ARCHITECTURES=75`) as the only build target of the engine. The engine, the Qwen3.5-family runtime, frontend, serving and scheduling are unchanged; only the CUDA layer differs. This page records what differs and why. Device code that differs on sm_75 sits behind `NINFER_SM75`.
+This fork builds NInfer for NVIDIA Turing (RTX 2080 Ti 22 GB, `CMAKE_CUDA_ARCHITECTURES=75`) as the only build target of the engine. The engine, the Qwen3.5-family runtime, frontend, serving and scheduling are unchanged; only the CUDA layer differs. This page records what differs and why. Device code is written for sm_75 only.
 
 ## Status of this tree
 
@@ -34,7 +34,7 @@ Unsupported formats are not stubbed one symbol at a time inside upstream sources
 
 ## Prefill tiles and token embedding (previous base, one RTX 2080 Ti 22 GB)
 
-**Prefill tiles.** About 95% of prefill time is the dequantizing GEMMs. Upstream sizes their tiles for the RTX 5090 (two `cp.async` stages, about 46 KB of shared memory), which on Turing leaves one 4-warp CTA per SM: profiled at 9.8% tensor-pipe and 11% issue-slot utilization, stalled on global loads with no `cp.async` to hide them. Single-stage tiles use about 27 KB, so two CTAs share each SM and one tile's MMA overlaps the other's decode and loads. Applied under `NINFER_SM75` only (the other architectures keep upstream's tables): Q5 plain and residual-add (`linear_add`) projections, Q4 plain projections, the folded Q4 gate/up SwiGLU (`MmaPairC128W8S1B2`), and the grouped GDN and attention input projections. Routes were chosen per shape by timing every instance across 128 to 2048 tokens.
+**Prefill tiles.** About 95% of prefill time is the dequantizing GEMMs. Upstream sizes their tiles for the RTX 5090 (two `cp.async` stages, about 46 KB of shared memory), which on Turing leaves one 4-warp CTA per SM: profiled at 9.8% tensor-pipe and 11% issue-slot utilization, stalled on global loads with no `cp.async` to hide them. Single-stage tiles use about 27 KB, so two CTAs share each SM and one tile's MMA overlaps the other's decode and loads. Applied to: Q5 plain and residual-add (`linear_add`) projections, Q4 plain projections, the folded Q4 gate/up SwiGLU (`MmaPairC128W8S1B2`), and the grouped GDN and attention input projections. Routes were chosen per shape by timing every instance across 128 to 2048 tokens.
 
 | Operation (1024 tokens) | Before | After |
 |---|---|---|
@@ -425,8 +425,8 @@ Everything here was run on the sources of `master` after the port (`7923b62f`, p
 
 Facts and decisions that outlive any one change:
 
-- **Where Turing code lives.** The build targets Turing only. Behaviour that exists only for Turing sits behind `NINFER_SM75`, and the unsupported Blackwell-only routes are throwing definitions in `src/ops/unsupported/turing_unsupported.cpp`.
-- **Only sm_75 is supported.** The build requires `CMAKE_CUDA_ARCHITECTURES=75` (`cmake/NinferPlatform.cmake`). An Ampere (sm_86) build is not supported and was never tested: the tree contains TMA kernels (`cp.async.bulk.tensor` in `src/ops/common/cuda/pipeline.cuh` and others), which need sm_90, and the Turing builds avoid them through `NINFER_SM75` guards. Supporting another architecture means adding a no-TMA path under its own guard and a preset.
+- **Where Turing code lives.** The build targets Turing only. Device code is written for sm_75 only, and the unsupported Blackwell-only routes are throwing definitions in `src/ops/unsupported/turing_unsupported.cpp`.
+- **Only sm_75 is supported.** The build requires `CMAKE_CUDA_ARCHITECTURES=75` (`cmake/NinferPlatform.cmake`). An Ampere (sm_86) build is not supported and was never tested: the tree contains TMA kernels (`cp.async.bulk.tensor` in `src/ops/common/cuda/pipeline.cuh` and others), which need sm_90, and the Turing build does not compile them. Supporting another architecture means adding a no-TMA path and a preset.
 - **FP16 range.** On Turing every BF16 operand becomes FP16 before a tensor-core GEMM at 5 or more tokens, so values beyond 65504 saturate. Measured maxima (see the FP16 range section) leave at least 4x headroom to 16384 and no pre-scaling exists. If a new model or workload reaches 16384 at some GEMM input, add an exact power-of-two pre-scale while staging and fold it back into the FP32 epilogue, then require perplexity not to get worse.
 - **Decode depth and MTP.** MTP depth is fixed at startup because the draft count shapes the captured CUDA graphs and round buffers (51 references), so an adaptive depth is a larger change than tuning; depth 3 is the default (best for code, 1 to 2 for prose).
 - **Output head.** A keep-list output head would make a few percent of tokens impossible to generate (see "Not done: a keep-list output head" above); a Q6 head saves memory but not time.

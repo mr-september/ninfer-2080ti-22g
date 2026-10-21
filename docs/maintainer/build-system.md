@@ -12,8 +12,7 @@ The build targets NVIDIA Turing (`sm_75`) on Linux x86-64 or native Windows x86-
 `src/ops/CMakeLists.txt` filters the Blackwell-only Op sources (FP8 weights and KV, TMA, block-scaled
 MoE, QSA sparse attention, Kimi delta attention, hyper-connection mix) out of the manifests, and
 `src/ops/unsupported/turing_unsupported.cpp` links throwing stubs for the declarations that remain, so
-these Ops report unsupported at their capacity/execution entries. `NINFER_SM75` is defined for device
-code that differs on sm_75.
+these Ops report unsupported at their capacity/execution entries. Device code is written for sm_75 only.
 
 [`cmake/NinferPlatform.cmake`](../../cmake/NinferPlatform.cmake) fixes and validates
 `CMAKE_CUDA_ARCHITECTURES` before `project()` detects CUDA. After toolchain initialization it checks
