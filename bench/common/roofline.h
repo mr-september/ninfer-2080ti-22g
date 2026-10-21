@@ -1,7 +1,5 @@
 #pragma once
 
-#include "core/platform.h"
-
 #include <cmath>
 #include <cstdio>
 #include <limits>
@@ -22,17 +20,6 @@ struct Roofline {
     double mxfp8_f32_tflops   = std::numeric_limits<double>::quiet_NaN();
 };
 
-#if NINFER_TARGET_RTX5090
-inline constexpr Roofline kRoofline{
-    .target             = "rtx5090",
-    .memory_gbs         = 1792.0,
-    .sustained_read_gbs = 1674.5,
-    .bf16_f32_tflops    = 209.5,
-    .fp8_f16_tflops     = 838.0,
-    .fp8_f32_tflops     = 419.0,
-    .mxfp8_f32_tflops   = 838.0,
-};
-#elif NINFER_TARGET_TURING
 // RTX 2080 Ti (TU102, 22 GB): nominal GDDR6 bandwidth, and the sustained read rate measured
 // with the dependent-free streaming kernel (docs/turing-port.md). Tensor-core rates are not
 // established for this target.
@@ -41,7 +28,6 @@ inline constexpr Roofline kRoofline{
     .memory_gbs         = 616.0,
     .sustained_read_gbs = 584.0,
 };
-#endif
 
 // Console uses "-"; CSV callers pass "" so absent references stay empty fields.
 inline std::string format_metric(double value, int precision = 2, const char* absent = "-") {
