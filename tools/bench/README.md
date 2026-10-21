@@ -5,7 +5,7 @@ runners, and the external Serve TTFT client. Correctness is owned by the affecte
 [`tests/`](../../tests/README.md).
 
 Runners that start Serve require `--serve`; the performance matrix requires `--build-dir`.
-Choose the executable or configured tree explicitly. Examples use `rtx5090-dev`.
+Choose the executable or configured tree explicitly. Examples use `turing-dev`.
 
 ## External Serve TTFT
 
@@ -15,7 +15,7 @@ controller manages the fixed Qwen3.8-27B NVFP4/FP8 Serve profiles and fresh-proc
 
 ```bash
 python3 tools/bench/run_serve_ttft_campaign.py \
-  --serve build/rtx5090-dev/apps/ninfer-serve --campaign resource --samples 5
+  --serve build/turing-dev/apps/ninfer-serve --campaign resource --samples 5
 ```
 
 The controller chooses the profile, starts and stops Serve for every sample, runs the external
@@ -102,19 +102,19 @@ cover CUDA Graph and eager execution; prefill-only cases vary prompt length and 
 
 ```bash
 # Configure the benchmark targets once; they are off in the default public build.
-cmake --preset rtx5090-dev
+cmake --preset turing-dev
 
 # Inspect commands without running the model.
-python3 tools/bench/run_ninfer_bench_matrix.py --build-dir build/rtx5090-dev --preset core --dry-run
+python3 tools/bench/run_ninfer_bench_matrix.py --build-dir build/turing-dev --preset core --dry-run
 
-# Main run. Builds build/rtx5090-dev/bench/ninfer_bench first, then writes JSON and summary.csv.
-python3 tools/bench/run_ninfer_bench_matrix.py --build-dir build/rtx5090-dev --preset core
+# Main run. Builds build/turing-dev/bench/ninfer_bench first, then writes JSON and summary.csv.
+python3 tools/bench/run_ninfer_bench_matrix.py --build-dir build/turing-dev --preset core
 
 # Longer run that adds 32k/64k prompt and context-decode points.
-python3 tools/bench/run_ninfer_bench_matrix.py --build-dir build/rtx5090-dev --preset full
+python3 tools/bench/run_ninfer_bench_matrix.py --build-dir build/turing-dev --preset full
 
 # Run only the MTP draft-window sweep.
-python3 tools/bench/run_ninfer_bench_matrix.py --build-dir build/rtx5090-dev --preset full --suite mtp_sweep
+python3 tools/bench/run_ninfer_bench_matrix.py --build-dir build/turing-dev --preset full --suite mtp_sweep
 ```
 
 Default outputs:
@@ -189,7 +189,7 @@ server logs. Historical model pages identify the report directory associated wit
 
 ```bash
 python3 tools/bench/run_serve_concurrency.py \
-  --serve build/rtx5090-dev/apps/ninfer-serve \
+  --serve build/turing-dev/apps/ninfer-serve \
   --artifact qwen3_6_27b=out/qwen3_6_27b.ninfer \
   --kv-dtype int8 \
   --mode mtp3 --suite decode-saturation \
@@ -198,7 +198,7 @@ python3 tools/bench/run_serve_concurrency.py \
   --output profiles/bench/concurrent-decode
 
 python3 tools/bench/run_serve_concurrency.py \
-  --serve build/rtx5090-dev/apps/ninfer-serve \
+  --serve build/turing-dev/apps/ninfer-serve \
   --artifact qwen3_6_27b=out/qwen3_6_27b.ninfer \
   --kv-dtype int8 \
   --mode mtp3 --suite corpus-makespan \

@@ -34,7 +34,7 @@ and `models/`. All executables remain under `<build-dir>/bench/`; the Op registr
 lives in `cmake/NinferBenchmarks.cmake`.
 
 `ninfer_cpu_execution_bench` measures synchronous collective dispatch and eight team barriers.
-For example: `./build/rtx5090-dev/bench/ninfer_cpu_execution_bench --workers 8 --samples 500 --idle-us 1000`.
+For example: `./build/turing-dev/bench/ninfer_cpu_execution_bench --workers 8 --samples 500 --idle-us 1000`.
 Workers select physical cores from the allowed topology; `--caller-cpu ID` optionally binds the
 submitter. The benchmark prints actual affinity and ISA facts and P50/P95/max call latency.
 Process CPU/wall cost is averaged over a separate run lasting at least 250 ms at the same cadence,
@@ -46,7 +46,7 @@ These are scheduling costs, not CPU arithmetic throughput or model performance.
 using an explicit NF4 artifact and a raw little-endian U32 token corpus:
 
 ```bash
-build/rtx5090-dev/bench/ninfer_ple_disk_prepare_bench /explicit/model.ninfer /explicit/corpus.u32 8 16 6 64 \
+build/turing-dev/bench/ninfer_ple_disk_prepare_bench /explicit/model.ninfer /explicit/corpus.u32 8 16 6 64 \
   --read-budget-mib 64
 ```
 
@@ -63,15 +63,15 @@ overlap, not complete model scheduling or generation speed. `--dump PATH` emits 
 Host/Device E and optional projection output for independent qualification, outside timing.
 
 ```bash
-cmake --preset rtx5090-dev
-cmake --build build/rtx5090-dev -j --target ninfer_bench
+cmake --preset turing-dev
+cmake --build build/turing-dev -j --target ninfer_bench
 ```
 
-The `rtx5090-dev` configure preset also enables all benchmarks, alongside products and tests; see
+The `turing-dev` configure preset also enables all benchmarks, alongside products and tests; see
 [Build system](../docs/maintainer/build-system.md) for presets and dependencies. Tests use a
-Python interpreter; a benchmark-only configuration does not require one. The `rtx5090-ops`
+Python interpreter; a benchmark-only configuration does not require one. The `turing-ops`
 preset omits Engine/model benchmarks. CPU MoE/executor benchmarks are x86-only.
-Examples below use `rtx5090-dev`; substitute the selected build directory. A multi-Op benchmark
+Examples below use `turing-dev`; substitute the selected build directory. A multi-Op benchmark
 may expose entries that its target does not implement; those requests report the Op error.
 
 ## Hardware references
@@ -152,7 +152,7 @@ models or 4096 for CPU expert offload.
 Example:
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_bench \
+./build/turing-dev/bench/ninfer_bench \
   --weights out/qwen3_6_27b.ninfer \
   -p 512,2048 -n 128 -pg '2048,128' -r 5 --warmup 1
 ```
@@ -215,8 +215,8 @@ with no such boundary it is simply `ceil(S/prefill_chunk)`.
 Build the tool, then measure machine transfer without a model:
 
 ```bash
-cmake --build build/rtx5090-dev -j --target ninfer_context_cost_bench
-./build/rtx5090-dev/bench/ninfer_context_cost_bench \
+cmake --build build/turing-dev -j --target ninfer_context_cost_bench
+./build/turing-dev/bench/ninfer_context_cost_bench \
   --suite transfer \
   --json profiles/bench/context_cost_transfer.json \
   --preset-out profiles/bench/context_cost_presets.json
@@ -225,7 +225,7 @@ cmake --build build/rtx5090-dev -j --target ninfer_context_cost_bench
 Measure prefill separately when the GPU has room for the artifact:
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_context_cost_bench \
+./build/turing-dev/bench/ninfer_context_cost_bench \
   --suite prefill \
   --artifact out/qwen3_6_27b.ninfer \
   --corpus bench/fixtures/bench_corpus.ids \
@@ -280,12 +280,12 @@ elsewhere in this file.
 Build the benchmark and measure one exact production point:
 
 ```bash
-cmake --build build/rtx5090-dev --parallel --target ninfer_linear_bench
-./build/rtx5090-dev/bench/ninfer_linear_bench \
+cmake --build build/turing-dev --parallel --target ninfer_linear_bench
+./build/turing-dev/bench/ninfer_linear_bench \
   --qtype q4 --policy a16 --n 4096 --k 5120 --t 8
-./build/rtx5090-dev/bench/ninfer_linear_bench \
+./build/turing-dev/bench/ninfer_linear_bench \
   --qtype fp8 --policy a8 --n 14336 --k 5120 --t 1
-./build/rtx5090-dev/bench/ninfer_linear_bench \
+./build/turing-dev/bench/ninfer_linear_bench \
   --qtype fp8 --policy a8 --n 16384 --k 5120 --t 1024
 ```
 
@@ -298,13 +298,13 @@ A continuous small-T sweep reuses one packed weight and one maximum-T activation
 allocation:
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_linear_bench \
+./build/turing-dev/bench/ninfer_linear_bench \
   --qtype q4 --policy a16 --n 4096 --k 5120 \
   --sweep 1:128:1 --csv-out profiles/bench/q4_4096x5120_t1_128.csv
-./build/rtx5090-dev/bench/ninfer_linear_bench \
+./build/turing-dev/bench/ninfer_linear_bench \
   --qtype q4 --policy a16 --n 3456 --k 1152 \
   --sweep 4:512:4 --csv-out profiles/bench/q4_vision_qkv.csv
-./build/rtx5090-dev/bench/ninfer_linear_bench \
+./build/turing-dev/bench/ninfer_linear_bench \
   --qtype q8 --policy a16 --n 248320 --k 5120 \
   --sweep 48:65:1 --warmup 5 --repeat 30
 ```
@@ -314,9 +314,9 @@ They are compact performance surveys, not copies of the production selector or n
 matrix:
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_linear_bench --suite qwen3_6_27b
-./build/rtx5090-dev/bench/ninfer_linear_bench --suite qwen3_6_35b_a3b
-./build/rtx5090-dev/bench/ninfer_linear_bench --suite all
+./build/turing-dev/bench/ninfer_linear_bench --suite qwen3_6_27b
+./build/turing-dev/bench/ninfer_linear_bench --suite qwen3_6_35b_a3b
+./build/turing-dev/bench/ninfer_linear_bench --suite all
 ```
 
 When a point group includes `T=1`, `T1_lin_x` reports the calculated ratio
@@ -330,7 +330,7 @@ launches:
 
 ```bash
 ncu --profile-from-start off --set full \
-  ./build/rtx5090-dev/bench/ninfer_linear_bench \
+  ./build/turing-dev/bench/ninfer_linear_bench \
   --qtype q4 --policy a16 --n 4096 --k 5120 --t 8 --profile
 ```
 
@@ -365,12 +365,12 @@ Reported logical bandwidth counts the encoded head once, useful FLOPs count cand
 workspace bytes and Graph nodes describe the actual public call. These are Op measurements.
 
 ```bash
-cmake --build build/rtx5090-dev -j --target ninfer_linear_topk_bench
-./build/rtx5090-dev/bench/ninfer_linear_topk_bench
-./build/rtx5090-dev/bench/ninfer_linear_topk_bench --profile q8-full --columns 7
-./build/rtx5090-dev/bench/ninfer_linear_topk_bench --columns 1,7,16,24,64,120 --repeat 25
-./build/rtx5090-dev/bench/ninfer_linear_topk_bench --profile fp8-full --columns 120
-./build/rtx5090-dev/bench/ninfer_linear_topk_bench --profile q4-optimized --columns 129 --repeat 60
+cmake --build build/turing-dev -j --target ninfer_linear_topk_bench
+./build/turing-dev/bench/ninfer_linear_topk_bench
+./build/turing-dev/bench/ninfer_linear_topk_bench --profile q8-full --columns 7
+./build/turing-dev/bench/ninfer_linear_topk_bench --columns 1,7,16,24,64,120 --repeat 25
+./build/turing-dev/bench/ninfer_linear_topk_bench --profile fp8-full --columns 120
+./build/turing-dev/bench/ninfer_linear_topk_bench --profile q4-optimized --columns 129 --repeat 60
 ```
 
 ## CandidateSelectorPath Op benchmark
@@ -383,9 +383,9 @@ It reports the selected route's required caller workspace and actual Graph node 
 interval includes all device work of the complete public Op; fixture allocation and setup are outside it.
 
 ```bash
-cmake --build build/rtx5090-dev -j --target ninfer_candidate_selector_bench
-./build/rtx5090-dev/bench/ninfer_candidate_selector_bench --warmup 8 --repeat 60
-./build/rtx5090-dev/bench/ninfer_candidate_selector_bench --steps 15 --batch 8 --repeat 60
+cmake --build build/turing-dev -j --target ninfer_candidate_selector_bench
+./build/turing-dev/bench/ninfer_candidate_selector_bench --warmup 8 --repeat 60
+./build/turing-dev/bench/ninfer_candidate_selector_bench --steps 15 --batch 8 --repeat 60
 ```
 
 ## Embedding Op benchmark
@@ -410,14 +410,14 @@ normalizes per call. A cold bundle flushes only before its first call. `--profil
 call of one format and one extent for kernel profiling.
 
 ```bash
-cmake --build build/rtx5090-dev -j --target ninfer_embedding_bench
-./build/rtx5090-dev/bench/ninfer_embedding_bench --format q8-d5120 --execution graph --cache cold
-./build/rtx5090-dev/bench/ninfer_embedding_bench --format fp8-d5120 \
+cmake --build build/turing-dev -j --target ninfer_embedding_bench
+./build/turing-dev/bench/ninfer_embedding_bench --format q8-d5120 --execution graph --cache cold
+./build/turing-dev/bench/ninfer_embedding_bench --format fp8-d5120 \
   --tokens 8,16,24,32,40,48,56,64 --id-pattern masked --block-width 8
-./build/rtx5090-dev/bench/ninfer_embedding_bench --format fp8-d5120 \
+./build/turing-dev/bench/ninfer_embedding_bench --format fp8-d5120 \
   --tokens 16,32,48,64,80,96,112,128 --id-pattern masked --block-width 16 \
   --cache warm --graph-calls 32 --csv-out /tmp/embedding.csv
-./build/rtx5090-dev/bench/ninfer_embedding_bench --format fp8-d5120 --tokens 128 --profile
+./build/turing-dev/bench/ninfer_embedding_bench --format fp8-d5120 --tokens 128 --profile
 ```
 
 ## Feature scatter benchmarks
@@ -440,11 +440,11 @@ time per capture, so a bundle has 160 kernel nodes. Cold mode flushes 256 MiB be
 interval, not between the five calls or individual repetitions within a bundle.
 
 ```bash
-cmake --build build/rtx5090-dev -j --target ninfer_scatter_bf16_batch_bench
-./build/rtx5090-dev/bench/ninfer_scatter_bf16_batch_bench --widths 1,2,8,9,16 --batches 1,8 --counts full
-./build/rtx5090-dev/bench/ninfer_scatter_bf16_batch_bench --widths 2,8,16 --batches 1,8 \
+cmake --build build/turing-dev -j --target ninfer_scatter_bf16_batch_bench
+./build/turing-dev/bench/ninfer_scatter_bf16_batch_bench --widths 1,2,8,9,16 --batches 1,8 --counts full
+./build/turing-dev/bench/ninfer_scatter_bf16_batch_bench --widths 2,8,16 --batches 1,8 \
   --counts ragged --cache warm --graph-calls 32 --csv-out /tmp/feature-scatter.csv
-./build/rtx5090-dev/bench/ninfer_scatter_bf16_batch_bench --widths 16 --batches 8 --profile
+./build/turing-dev/bench/ninfer_scatter_bf16_batch_bench --widths 16 --batches 8 --profile
 ```
 
 ## RMSNorm Op benchmark
@@ -473,15 +473,15 @@ All three benchmarks accept `--execution graph|eager|both`, `--cache cold|warm|b
 10 warmups, 100 samples and a 256 MiB cold-cache flush; CSV goes to stdout unless a path is supplied.
 
 ```bash
-cmake --build build/rtx5090-dev -j --target ninfer_rmsnorm_bench
-./build/rtx5090-dev/bench/ninfer_rmsnorm_bench \
+cmake --build build/turing-dev -j --target ninfer_rmsnorm_bench
+./build/turing-dev/bench/ninfer_rmsnorm_bench \
   --op rmsnorm --dim 5120 --heads 1 --tokens 1,8,16,32,64,96,128,2048
-./build/rtx5090-dev/bench/ninfer_rmsnorm_bench \
+./build/turing-dev/bench/ninfer_rmsnorm_bench \
   --op offset --dim 256 --heads 24 --tokens 1,8,16,32,64,96,128 \
   --execution graph --cache warm --csv-out /tmp/rmsnorm.csv
-./build/rtx5090-dev/bench/ninfer_rmsnorm_bench \
+./build/turing-dev/bench/ninfer_rmsnorm_bench \
   --op silu-gated --dim 128 --heads 48 --tokens 1,8,16,128
-./build/rtx5090-dev/bench/ninfer_rmsnorm_bench \
+./build/turing-dev/bench/ninfer_rmsnorm_bench \
   --op sigmoid-gated --dim 128 --heads 48 --batch 8 --tokens 1,7,16 \
   --execution both --cache both
 ```
@@ -513,17 +513,17 @@ compare the public point capacity query with measured arena peak; direct control
 Only operands needed by the selected Op are allocated. Production owns all dispatch.
 
 ```bash
-cmake --build build/rtx5090-dev -j --target ninfer_gdn_control_bench
-./build/rtx5090-dev/bench/ninfer_gdn_control_bench \
+cmake --build build/turing-dev -j --target ninfer_gdn_control_bench
+./build/turing-dev/bench/ninfer_gdn_control_bench \
   --op projection --heads 48 --input-rows 2560 --weights parent --sweep 1:128 \
   --execution graph --cache cold --warmup 10 --repeat 61
-./build/rtx5090-dev/bench/ninfer_gdn_control_bench \
+./build/turing-dev/bench/ninfer_gdn_control_bench \
   --op norm-projection --heads 48 --input-rows 5120 --weights pair \
   --tokens 1,2,4,8,9,16,32,64,128 --execution graph --cache warm \
   --csv-out /tmp/gdn-norm-warm.csv
-./build/rtx5090-dev/bench/ninfer_gdn_control_bench \
+./build/turing-dev/bench/ninfer_gdn_control_bench \
   --op norm-projection --heads 32 --input-rows 2048 --tokens 16,17,128
-./build/rtx5090-dev/bench/ninfer_gdn_control_bench \
+./build/turing-dev/bench/ninfer_gdn_control_bench \
   --op control --heads 48 --batch 8 --tokens 1,7,16 --execution both --cache warm
 ```
 
@@ -570,25 +570,25 @@ staging are excluded, and cache retention/writeback can make the logical rate ex
 Mix leaves these fields empty because its contractions require separate work accounting.
 
 ```bash
-cmake --build build/rtx5090-dev -j --target ninfer_gated_residual_bench
-./build/rtx5090-dev/bench/ninfer_gated_residual_bench \
+cmake --build build/turing-dev -j --target ninfer_gated_residual_bench
+./build/turing-dev/bench/ninfer_gated_residual_bench \
   --op expand-norm --tokens 1,8,128,1024,2048 --execution both --cache both
-./build/rtx5090-dev/bench/ninfer_gated_residual_bench \
+./build/turing-dev/bench/ninfer_gated_residual_bench \
   --op combine-norm --alias inplace --tokens 1,8,128,2048,4096 \
   --execution graph --cache cold --csv-out /tmp/hc-combine-norm.csv
-./build/rtx5090-dev/bench/ninfer_gated_residual_bench \
+./build/turing-dev/bench/ninfer_gated_residual_bench \
   --op combine-then-norm --alias inplace --tokens 1,8,128,2048,4096 \
   --execution graph --cache cold --csv-out /tmp/hc-staged.csv
-./build/rtx5090-dev/bench/ninfer_gated_residual_bench \
+./build/turing-dev/bench/ninfer_gated_residual_bench \
   --op add-norm --tokens 1,7,16 --batch 8 --execution both --cache warm
-./build/rtx5090-dev/bench/ninfer_gated_residual_bench \
+./build/turing-dev/bench/ninfer_gated_residual_bench \
   --op combine-norm --tokens 1,128 --execution eager --cache warm --condition-us 0
-./build/rtx5090-dev/bench/ninfer_gated_residual_bench \
+./build/turing-dev/bench/ninfer_gated_residual_bench \
   --op block-mix --sweep 1:128 --execution graph --cache both \
   --warmup 10 --repeat 61 --csv-out /tmp/hc-block-mix.csv
-./build/rtx5090-dev/bench/ninfer_gated_residual_bench \
+./build/turing-dev/bench/ninfer_gated_residual_bench \
   --op final-mix --tokens 1,4,8,64,128,512,1024 --execution both --cache both
-./build/rtx5090-dev/bench/ninfer_gated_residual_bench \
+./build/turing-dev/bench/ninfer_gated_residual_bench \
   --op block-mix --tokens 1,7,16 --batch 8 --execution both --cache warm
 ```
 
@@ -601,8 +601,8 @@ convolution, and both public output writes. Every sample follows a 256 MiB L2 ev
 contains complete-Op latency, useful coefficient-projection TFLOP/s, and exact workspace capacity.
 
 ```bash
-cmake --build build/rtx5090-dev -j --target ninfer_dynamic_grouped_conv_prepare_bench
-./build/rtx5090-dev/bench/ninfer_dynamic_grouped_conv_prepare_bench --warmup 10 --repeat 80
+cmake --build build/turing-dev -j --target ninfer_dynamic_grouped_conv_prepare_bench
+./build/turing-dev/bench/ninfer_dynamic_grouped_conv_prepare_bench --warmup 10 --repeat 80
 ```
 
 ## GDN benchmarks
@@ -627,9 +627,9 @@ Q4/Q5 or FP8 `[16384,5120]`. Q4/Q5 uses the two stored parents `[4096,5120]` and
 valid-prefix extents supplied by `--valid-columns`.
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_gdn_input_proj_bench \
+./build/turing-dev/bench/ninfer_gdn_input_proj_bench \
   --op snapshot --format fp8 --n 16384 --k 5120 --policy allow-a8 --sweep 1:17
-./build/rtx5090-dev/bench/ninfer_gdn_input_proj_bench \
+./build/turing-dev/bench/ninfer_gdn_input_proj_bench \
   --op record --format fp8 --n 16384 --k 5120 --policy allow-a8 \
   --tokens 6 --batch 3 --valid-columns 6,3,1 --csv-out .agent-tmp/gdn/record.csv
 ```
@@ -645,11 +645,11 @@ calls followed by a batch update at B=1; its scratch footprint includes the two 
 BF16 Q/K tensors.
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_gated_delta_net_bench \
+./build/turing-dev/bench/ninfer_gated_delta_net_bench \
   --mode running --qk-heads 16 --value-heads 48 --tokens 1,15,16,17,1024 --cache cold
-./build/rtx5090-dev/bench/ninfer_gated_delta_net_bench \
+./build/turing-dev/bench/ninfer_gated_delta_net_bench \
   --mode batch-update --value-heads 32 --batch 8 --qk-norm fused
-./build/rtx5090-dev/bench/ninfer_gated_delta_net_bench \
+./build/turing-dev/bench/ninfer_gated_delta_net_bench \
   --mode chunked-raw --value-heads 48 --tokens 1024 --breakdown
 ```
 
@@ -696,10 +696,10 @@ The calibrated read-only bandwidth is not used as a mixed-read/write reference. 
 within a full chunked pipeline can also serve workspace requests without a DRAM round trip.
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_gdn_replay_bench \
+./build/turing-dev/bench/ninfer_gdn_replay_bench \
   --op fold --layers 36 --value-heads 48 --conv-channels 10240 \
   --tokens 16 --batch 8 --commits mixed --execution both
-./build/rtx5090-dev/bench/ninfer_gdn_replay_bench \
+./build/turing-dev/bench/ninfer_gdn_replay_bench \
   --op record --value-heads 48 --tokens 2,8,16 --batch 8 --valid mixed
 ```
 
@@ -722,11 +722,11 @@ written per row, except zero-acceptance rows whose destination already aliases t
 Device count/index reads are included; repeated reads and private staging traffic are excluded.
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_ple_bench --op gate --tokens 1,16,256,1024,2048,4096 --cache both
-./build/rtx5090-dev/bench/ninfer_ple_bench --op gate --tokens 5,16 --batch 8 --valid mixed --offset 5
-./build/rtx5090-dev/bench/ninfer_ple_bench --op conv-add-norm --tokens 1,16,1024,2048,4096 --cache cold
-./build/rtx5090-dev/bench/ninfer_ple_bench --op conv-add --tokens 16 --batch 8 --valid mixed --offset 5
-./build/rtx5090-dev/bench/ninfer_ple_bench --op state-extract --tokens 16 --batch 8 \
+./build/turing-dev/bench/ninfer_ple_bench --op gate --tokens 1,16,256,1024,2048,4096 --cache both
+./build/turing-dev/bench/ninfer_ple_bench --op gate --tokens 5,16 --batch 8 --valid mixed --offset 5
+./build/turing-dev/bench/ninfer_ple_bench --op conv-add-norm --tokens 1,16,1024,2048,4096 --cache cold
+./build/turing-dev/bench/ninfer_ple_bench --op conv-add --tokens 16 --batch 8 --valid mixed --offset 5
+./build/turing-dev/bench/ninfer_ple_bench --op state-extract --tokens 16 --batch 8 \
   --accepted 0,1,2,3,8,9,15,16 --inplace --execution both
 ```
 
@@ -764,21 +764,21 @@ cover every visible row. The default uses the exact visible length. CSV rows rec
 so broad Graph-envelope measurements can be distinguished from exact-length measurements.
 
 ```bash
-cmake --build build/rtx5090-dev --parallel --target ninfer_causal_softmax_attention_bench
-./build/rtx5090-dev/bench/ninfer_causal_softmax_attention_bench \
+cmake --build build/turing-dev --parallel --target ninfer_causal_softmax_attention_bench
+./build/turing-dev/bench/ninfer_causal_softmax_attention_bench \
   --entry append --geometry all --kv-dtype all --batch 1,2,4,8 \
   --tokens 1,2,4,8,16 --context 8192,32768,131072 --mapping fragmented \
   --execution graph --cache cold --warmup 10 --repeat 61
-./build/rtx5090-dev/bench/ninfer_causal_softmax_attention_bench \
+./build/turing-dev/bench/ninfer_causal_softmax_attention_bench \
   --entry append --geometry all --kv-dtype all --batch 1 \
   --tokens 1024 --context 8192,32768,131072 --mapping fragmented \
   --execution eager --cache cold --warmup 10 --repeat 61
-./build/rtx5090-dev/bench/ninfer_causal_softmax_attention_bench \
+./build/turing-dev/bench/ninfer_causal_softmax_attention_bench \
   --entry append --geometry d256-h16-kv2 --kv-dtype int8 \
   --batch 3 --tokens 6 --row-contexts 127,2047,63 \
   --valid-columns 6,3,0 --table-rows 2,0,1 \
   --execution graph --cache cold --warmup 10 --repeat 61
-./build/rtx5090-dev/bench/ninfer_causal_softmax_attention_bench \
+./build/turing-dev/bench/ninfer_causal_softmax_attention_bench \
   --entry cached --geometry d256-h16-kv2 --kv-dtype int8 \
   --tokens 16 --context 8192 --execution graph --cache cold --profile
 ```
@@ -805,8 +805,8 @@ at Q32/KV8/D128 with BF16 context storage. `T` is a complete non-causal query bl
 external context length.
 
 ```bash
-cmake --build build/rtx5090-dev --parallel --target ninfer_context_softmax_attention_bench
-./build/rtx5090-dev/bench/ninfer_context_softmax_attention_bench \
+cmake --build build/turing-dev --parallel --target ninfer_context_softmax_attention_bench
+./build/turing-dev/bench/ninfer_context_softmax_attention_bench \
   --tokens 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 \
   --context 0,2048,8192,32768,131072,196608,262144 \
   --execution graph --cache cold --warmup 10 --repeat 61
@@ -823,12 +823,12 @@ so only its first call starts cold. These rows are labeled `cold-before-graph-bu
 bundled rows omit the DRAM roofline fraction. Profiling uses one public call (`--graph-calls 1`).
 
 ```bash
-cmake --build build/rtx5090-dev --parallel --target ninfer_sliding_window_attention_bench
-./build/rtx5090-dev/bench/ninfer_sliding_window_attention_bench \
+cmake --build build/turing-dev --parallel --target ninfer_sliding_window_attention_bench
+./build/turing-dev/bench/ninfer_sliding_window_attention_bench \
   --window 2048 --tokens 2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 --batches 1,2,3,4,5,6,7,8 \
   --context 64,96,97,128,2047,2048,262144 \
   --execution graph --cache cold --warmup 10 --repeat 61
-./build/rtx5090-dev/bench/ninfer_sliding_window_attention_bench \
+./build/turing-dev/bench/ninfer_sliding_window_attention_bench \
   --window 4096 \
   --tokens 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 \
   --batches 1 \
@@ -844,11 +844,11 @@ selects three contiguous planes. CSV records this layout, unique input/output by
 QK/PV useful FLOPs `4*72*16*sum(length²)`, and their bandwidth/compute reference times.
 
 ```bash
-cmake --build build/rtx5090-dev --parallel --target ninfer_packed_softmax_attention_bench
-./build/rtx5090-dev/bench/ninfer_packed_softmax_attention_bench \
+cmake --build build/turing-dev --parallel --target ninfer_packed_softmax_attention_bench
+./build/turing-dev/bench/ninfer_packed_softmax_attention_bench \
   --entry both --segments 16 --length 256 \
   --execution graph --cache cold --warmup 10 --repeat 61
-./build/rtx5090-dev/bench/ninfer_packed_softmax_attention_bench \
+./build/turing-dev/bench/ninfer_packed_softmax_attention_bench \
   --entry packed --segment-lengths 128,256,384,512 \
   --execution graph --cache cold --warmup 10 --repeat 61
 ```
@@ -871,11 +871,11 @@ with the total Graph node count. A cold bundle flushes L2 only before its first 
 uses one public call.
 
 ```bash
-cmake --build build/rtx5090-dev --parallel --target ninfer_kv_cache_append_bench
-./build/rtx5090-dev/bench/ninfer_kv_cache_append_bench \
+cmake --build build/turing-dev --parallel --target ninfer_kv_cache_append_bench
+./build/turing-dev/bench/ninfer_kv_cache_append_bench \
   --mode full --full-geometry all --kv-dtype all --tokens 1,2,4,8,16 \
   --context 128 --execution graph --cache cold --warmup 10 --repeat 61
-./build/rtx5090-dev/bench/ninfer_kv_cache_append_bench \
+./build/turing-dev/bench/ninfer_kv_cache_append_bench \
   --mode prefix --tokens 1,2,4,8,16 --counts 0,1,2,4,8,16 \
   --layout all --execution graph --cache cold --warmup 10 --repeat 61
 ```
@@ -892,11 +892,11 @@ DFlash. `--counts full|one|ragged|zero` controls actual per-request prefixes. Ze
 write the full output tail and metadata. Each ordinary call has one kernel and zero scratch.
 
 ```bash
-cmake --build build/rtx5090-dev -j --target ninfer_prepare_ragged_prefix_bench
-./build/rtx5090-dev/bench/ninfer_prepare_ragged_prefix_bench \
+cmake --build build/turing-dev -j --target ninfer_prepare_ragged_prefix_bench
+./build/turing-dev/bench/ninfer_prepare_ragged_prefix_bench \
   --rows 25600 --widths 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 \
   --batches 1,2,3,4,5,6,7,8 --counts ragged --execution graph --cache cold
-./build/rtx5090-dev/bench/ninfer_prepare_ragged_prefix_bench \
+./build/turing-dev/bench/ninfer_prepare_ragged_prefix_bench \
   --widths 1,8,16 --batches 1,8 --counts full --cache warm --graph-calls 32
 ```
 
@@ -911,11 +911,11 @@ registered `B=2..16`. Eager and graph modes call the same public contract; cold 
 256 MiB L2 eviction before the timed interval.
 
 ```bash
-cmake --build build/rtx5090-dev --parallel --target ninfer_prepare_masked_block_bench
-./build/rtx5090-dev/bench/ninfer_prepare_masked_block_bench \
+cmake --build build/turing-dev --parallel --target ninfer_prepare_masked_block_bench
+./build/turing-dev/bench/ninfer_prepare_masked_block_bench \
   --block-sizes 2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 \
   --execution graph --cache both --warmup 20 --repeat 101
-./build/rtx5090-dev/bench/ninfer_prepare_masked_block_bench \
+./build/turing-dev/bench/ninfer_prepare_masked_block_bench \
   --block-sizes 16 --execution graph --cache cold --profile
 ```
 
@@ -936,12 +936,12 @@ the logical weight/input/output bytes and the two projections' mathematical FLOP
 warms up and flushes before enabling CUDA profiling for exactly one complete Op call.
 
 ```bash
-cmake --build build/rtx5090-dev -j --target ninfer_q8_linear_swiglu_bench
-./build/rtx5090-dev/bench/ninfer_q8_linear_swiglu_bench \
+cmake --build build/turing-dev -j --target ninfer_q8_linear_swiglu_bench
+./build/turing-dev/bench/ninfer_q8_linear_swiglu_bench \
   --problem dflash2 --t-sweep 1,8,16,32,40,41,51,52,63,64,65,80,81,88,89,96,97,128,1024 \
   --execution graph --warmup 8 --repeat 60 \
   --csv-out profiles/bench/q8_linear_swiglu.csv
-./build/rtx5090-dev/bench/ninfer_q8_linear_swiglu_bench \
+./build/turing-dev/bench/ninfer_q8_linear_swiglu_bench \
   --problem dflash2 --profile --t-sweep 128
 ```
 
@@ -951,8 +951,8 @@ cmake --build build/rtx5090-dev -j --target ninfer_q8_linear_swiglu_bench
 queries workspace capacity for the requested aggregate interval.
 
 ```bash
-cmake --build build/rtx5090-dev --parallel --target ninfer_q4_linear_swiglu_bench
-./build/rtx5090-dev/bench/ninfer_q4_linear_swiglu_bench \
+cmake --build build/turing-dev --parallel --target ninfer_q4_linear_swiglu_bench
+./build/turing-dev/bench/ninfer_q4_linear_swiglu_bench \
   --t-sweep 1,2,4,8,16,24,32,40,48 --warmup 10 --repeat 50
 ```
 
@@ -965,8 +965,8 @@ The Tensor Core percentage uses the RTX 5090 dense MXFP8/FP32-accumulate referen
 only for extents that the production resolver sends to A8.
 
 ```bash
-cmake --build build/rtx5090-dev --parallel --target ninfer_fp8_linear_swiglu_bench
-./build/rtx5090-dev/bench/ninfer_fp8_linear_swiglu_bench \
+cmake --build build/turing-dev --parallel --target ninfer_fp8_linear_swiglu_bench
+./build/turing-dev/bench/ninfer_fp8_linear_swiglu_bench \
   --policy a8 \
   --t-sweep 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,24,32,40,48,1024 \
   --warmup 5 --repeat 30
@@ -979,10 +979,10 @@ LinearAdd profiles. Every cold-cache sample is one production-dispatched public 
 workspace capacity queried for the requested interval.
 
 ```bash
-cmake --build build/rtx5090-dev --parallel --target ninfer_q5_linear_add_bench
-./build/rtx5090-dev/bench/ninfer_q5_linear_add_bench \
+cmake --build build/turing-dev --parallel --target ninfer_q5_linear_add_bench
+./build/turing-dev/bench/ninfer_q5_linear_add_bench \
   --k 6144 --t-sweep 1,2,4,8,16,24,32,48,49,56,64,192,193 --warmup 10 --repeat 50
-./build/rtx5090-dev/bench/ninfer_q5_linear_add_bench \
+./build/turing-dev/bench/ninfer_q5_linear_add_bench \
   --k 17408 --t-sweep 1,2,4,8,16,24,32,48,49,56,64,192,193 --warmup 10 --repeat 50
 ```
 
@@ -997,13 +997,13 @@ and omit the Tensor Core percentage and combined compute/memory roofline; the me
 is still reported.
 
 ```bash
-cmake --build build/rtx5090-dev --parallel --target ninfer_bf16_linear_add_bench
-./build/rtx5090-dev/bench/ninfer_bf16_linear_add_bench \
+cmake --build build/turing-dev --parallel --target ninfer_bf16_linear_add_bench
+./build/turing-dev/bench/ninfer_bf16_linear_add_bench \
   --sweep 1:128:1 --warmup 10 --repeat 50 \
   --csv-out profiles/bench/bf16_linear_add_t1_128.csv
-./build/rtx5090-dev/bench/ninfer_bf16_linear_add_bench \
+./build/turing-dev/bench/ninfer_bf16_linear_add_bench \
   --t-sweep 1024,1536,2048 --warmup 10 --repeat 50
-./build/rtx5090-dev/bench/ninfer_bf16_linear_add_bench \
+./build/turing-dev/bench/ninfer_bf16_linear_add_bench \
   --t-sweep 1024 --profile
 ```
 
@@ -1014,18 +1014,18 @@ BF16 residual epilogue. Each sample calls the public Op, which updates the resid
 uses no workspace. Every cold-cache sample follows a 256 MiB L2 flush.
 
 ```bash
-cmake --build build/rtx5090-dev --parallel --target ninfer_q8_linear_add_bench
-./build/rtx5090-dev/bench/ninfer_q8_linear_add_bench \
+cmake --build build/turing-dev --parallel --target ninfer_q8_linear_add_bench
+./build/turing-dev/bench/ninfer_q8_linear_add_bench \
   --k 4096 \
   --t-sweep 1,2,4,8,16,32,48,64,96,128 --warmup 10 --repeat 50
-./build/rtx5090-dev/bench/ninfer_q8_linear_add_bench \
+./build/turing-dev/bench/ninfer_q8_linear_add_bench \
   --k 6144 \
   --t-sweep 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,32,33,64,65,96,128,256,640,641,896,960,1024,1280,2048 \
   --warmup 10 --repeat 50 --csv-out profiles/bench/q8_linear_add.csv
-./build/rtx5090-dev/bench/ninfer_q8_linear_add_bench \
+./build/turing-dev/bench/ninfer_q8_linear_add_bench \
   --t-sweep "$(seq -s, 1 2048)" \
   --warmup 3 --repeat 15 --csv-out profiles/bench/q8_linear_add_all_t.csv
-./build/rtx5090-dev/bench/ninfer_q8_linear_add_bench \
+./build/turing-dev/bench/ninfer_q8_linear_add_bench \
   --profile --t-sweep 1024
 ```
 
@@ -1039,11 +1039,11 @@ extents use FP8/FP32-accumulate Tensor Core contraction. `TC_%` is reported only
 actually executes, against the RTX 5090 unit-scale MXFP8/FP32-accumulate 838 TFLOP/s reference.
 
 ```bash
-cmake --build build/rtx5090-dev --parallel --target ninfer_fp8_linear_add_bench
-./build/rtx5090-dev/bench/ninfer_fp8_linear_add_bench \
+cmake --build build/turing-dev --parallel --target ninfer_fp8_linear_add_bench
+./build/turing-dev/bench/ninfer_fp8_linear_add_bench \
   --k 6144 --policy a8 --t-sweep 1,2,4,8,16,20,21,22,32,48,1024 \
   --warmup 5 --repeat 30
-./build/rtx5090-dev/bench/ninfer_fp8_linear_add_bench \
+./build/turing-dev/bench/ninfer_fp8_linear_add_bench \
   --k 17408 --policy a8 --t-sweep 1,2,4,8,16,24,25,32,48,1024 \
   --warmup 5 --repeat 30
 ```
@@ -1068,15 +1068,15 @@ allocation reserved for the entire requested sweep. Logical GB/s counts semantic
 bytes; it is not a measured DRAM utilization percentage.
 
 ```bash
-cmake --build build/rtx5090-dev -j --target ninfer_linear_split_multi_output_bench
-./build/rtx5090-dev/bench/ninfer_linear_split_multi_output_bench \
+cmake --build build/turing-dev -j --target ninfer_linear_split_multi_output_bench
+./build/turing-dev/bench/ninfer_linear_split_multi_output_bench \
   --format all --tokens 1,2,4,8,12,16,32,64,128,256,512,1024 \
   --cache cold --warmup 10 --repeat 50 \
   --csv-out profiles/bench/linear_split.csv
-./build/rtx5090-dev/bench/ninfer_linear_split_multi_output_bench \
+./build/turing-dev/bench/ninfer_linear_split_multi_output_bench \
   --format fp8 --fp8-policy a8 --tokens 1,5,32,64,65,96,128 \
   --cache cold --warmup 10 --repeat 50
-./build/rtx5090-dev/bench/ninfer_linear_split_multi_output_bench \
+./build/turing-dev/bench/ninfer_linear_split_multi_output_bench \
   --format q8-dflash2-qkv --tokens 8,16,32,53,54,64,65,96,128,1024 \
   --execution graph --cache cold --warmup 10 --repeat 50
 ```
@@ -1086,7 +1086,7 @@ FP8 `[16384,5120]`, and paired Q4/Q5 `[4096+12288,5120]`. It uses the common
 `op_measurement.cuh` options described above; `--n` is the total logical row count.
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_linear_split_two_output_bench \
+./build/turing-dev/bench/ninfer_linear_split_two_output_bench \
   --format q8 --n 16384 --k 2560 --tokens 1,16,1024,2048,4096 --cache cold
 ```
 
@@ -1106,11 +1106,11 @@ and actual Graph kernel count. Cold measurements evict 256 MiB before timing. CS
 projection and round; fixture creation is outside timing.
 
 ```bash
-cmake --build build/rtx5090-dev -j --target ninfer_qsa_bench
-./build/rtx5090-dev/bench/ninfer_qsa_bench --projection all --entry both --sweep 1:128 \
+cmake --build build/turing-dev -j --target ninfer_qsa_bench
+./build/turing-dev/bench/ninfer_qsa_bench --projection all --entry both --sweep 1:128 \
   --rounds 3 --warmup 10 --repeat 100 --execution graph --cache both \
   --csv-out .agent-tmp/qsa/qsa_small.csv
-./build/rtx5090-dev/bench/ninfer_qsa_bench --tokens 256,512,1024,2048,4096 \
+./build/turing-dev/bench/ninfer_qsa_bench --tokens 256,512,1024,2048,4096 \
   --rounds 3 --warmup 10 --repeat 100 --execution both --cache both \
   --csv-out .agent-tmp/qsa/qsa_prefill.csv
 ```
@@ -1125,7 +1125,7 @@ destinations and restores both source planes outside each timed call. Extraction
 `tokens` for R and include base positions, layout, in-place mode and round. There is zero workspace.
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_qsa_bench --op tail-extract --capacity 16,4096 --batch 8 \
+./build/turing-dev/bench/ninfer_qsa_bench --op tail-extract --capacity 16,4096 --batch 8 \
   --base-positions 6 --accepted mixed --layout layered --inplace \
   --rounds 3 --warmup 10 --repeat 100 --execution both --cache both \
   --csv-out .agent-tmp/qsa/qsa_tail.csv
@@ -1139,10 +1139,10 @@ tail/record views. `--inplace` aliases both Q/IQ outputs and restores their orig
 words outside every timed call. CSV rows include positions, axes, alias mode, layout and round.
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_qsa_bench --op prepare --sweep 1:16 --batch 8 --axes 3 \
+./build/turing-dev/bench/ninfer_qsa_bench --op prepare --sweep 1:16 --batch 8 --axes 3 \
   --base-positions 63 --inplace --rounds 3 --cache both \
   --csv-out .agent-tmp/qsa/qsa_prepare_small.csv
-./build/rtx5090-dev/bench/ninfer_qsa_bench --op prepare --tokens 128,1024,2048,4096 \
+./build/turing-dev/bench/ninfer_qsa_bench --op prepare --tokens 128,1024,2048,4096 \
   --kv-cache fp8 --axes 3 --rounds 3 --execution both --cache both \
   --csv-out .agent-tmp/qsa/qsa_prepare_prefill.csv
 ```
@@ -1158,10 +1158,10 @@ and Graph kernel count. The index plane is always BF16, independent of main KV e
 `--score-pattern random|ties` supplies ordinary inputs or zero queries with equal scores.
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_qsa_bench --op indexer --tokens 1,8,64,1024,2048,4096 \
+./build/turing-dev/bench/ninfer_qsa_bench --op indexer --tokens 1,8,64,1024,2048,4096 \
   --contexts 262144 --context-capacity 262144 --rounds 3 --execution graph --cache both \
   --csv-out .agent-tmp/qsa/qsa_indexer.csv
-./build/rtx5090-dev/bench/ninfer_qsa_bench --op indexer --tokens 8 --batch 8 \
+./build/turing-dev/bench/ninfer_qsa_bench --op indexer --tokens 8 --batch 8 \
   --contexts 262144,131072,32768,8192,2052,2051,4,0 --valid 8,8,8,8,8,8,4,0 \
   --rounds 3 --execution graph --cache both --csv-out .agent-tmp/qsa/qsa_indexer_mixed.csv
 ```
@@ -1201,10 +1201,10 @@ possible. Use targeted profiling for workspace traffic and executed-kernel utili
 do not duplicate private launch plans to infer either quantity.
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_qsa_bench --op sparse-gqa --tokens 1,8,128,1024,2048,4096 \
+./build/turing-dev/bench/ninfer_qsa_bench --op sparse-gqa --tokens 1,8,128,1024,2048,4096 \
   --contexts 262144 --kv-cache fp8 --execution graph --cache both \
   --csv-out .agent-tmp/qsa/qsa_sparse.csv
-./build/rtx5090-dev/bench/ninfer_qsa_bench --op sparse-gqa --tokens 9 --batch 8 \
+./build/turing-dev/bench/ninfer_qsa_bench --op sparse-gqa --tokens 9 --batch 8 \
   --contexts 64,2048,8192,32768,131072,262144,0,65536 --valid 9,9,9,5,9,9,0,9 \
   --context-capacity 262144 --execution graph --cache both
 ```
@@ -1218,10 +1218,10 @@ The latter includes the shared branch. Their `--subset all|mask-ones|mask-zeros|
 logical expert assignments; the fixture's mask assigns odd IDs to the 1 side.
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_moe_bench --codec q4-q5 --tokens 1 --execution graph --cache both
-./build/rtx5090-dev/bench/ninfer_moe_bench --codec all --sweep 1:64:1 --distribution trace-like \
+./build/turing-dev/bench/ninfer_moe_bench --codec q4-q5 --tokens 1 --execution graph --cache both
+./build/turing-dev/bench/ninfer_moe_bench --codec all --sweep 1:64:1 --distribution trace-like \
   --execution graph --cache both --warmup 10 --repeat 80 --csv-out /tmp/moe.csv
-./build/rtx5090-dev/bench/ninfer_moe_bench --op routed-shared --codec q4-q5 --tokens 32 \
+./build/turing-dev/bench/ninfer_moe_bench --op routed-shared --codec q4-q5 --tokens 32 \
   --subset mask-ones --execution graph --cache cold
 ```
 
@@ -1251,9 +1251,9 @@ independently sampled tail experts. All 512 experts have distinct physical backi
 construction makes the complete entry produce the same selected routes as the routed entry.
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_moe_block_scaled_bench --format fp8 --operation routed \
+./build/turing-dev/bench/ninfer_moe_block_scaled_bench --format fp8 --operation routed \
   --tokens 1,8,16,32,64,128,256,512,1024,2048,4096 --distribution all --cache both
-./build/rtx5090-dev/bench/ninfer_moe_block_scaled_bench --format fp8 --operation complete \
+./build/turing-dev/bench/ninfer_moe_block_scaled_bench --format fp8 --operation complete \
   --tokens 1024,2048,4096 --repeat 50 > /tmp/moe-fp8.csv
 ```
 
@@ -1272,7 +1272,7 @@ Full contributions route across the complete expert domain; partial CPU contribu
 masked half.
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_moe_cpu_bench --format q4-q5 --workers 15 --caller-cpu 31 \
+./build/turing-dev/bench/ninfer_moe_cpu_bench --format q4-q5 --workers 15 --caller-cpu 31 \
   --tokens 1,8,72 --active 1,8 --cache stream --distribution same --samples 240 --read-reference
 ```
 
@@ -1299,12 +1299,12 @@ list or sweep, and reports route-neutral effective bandwidth, logical FLOP/s, an
 linear extrapolation. `--flush-mib` must be positive; the header records the eviction size.
 
 ```bash
-cmake --build build/rtx5090-dev -j --target ninfer_linear_pair_bench
-./build/rtx5090-dev/bench/ninfer_linear_pair_bench \
+cmake --build build/turing-dev -j --target ninfer_linear_pair_bench
+./build/turing-dev/bench/ninfer_linear_pair_bench \
   --k 2048 --sweep 1:128:1 --execution graph --warmup 5 --repeat 30
-./build/rtx5090-dev/bench/ninfer_linear_pair_bench \
+./build/turing-dev/bench/ninfer_linear_pair_bench \
   --k 5120 --tokens 8,16,24,32,40,48,56,64 --execution graph --warmup 5 --repeat 30
-./build/rtx5090-dev/bench/ninfer_linear_pair_bench \
+./build/turing-dev/bench/ninfer_linear_pair_bench \
   --k 5120 --tokens 128,1024,2048 --execution eager --warmup 5 --repeat 30
 ```
 
@@ -1320,13 +1320,13 @@ outside the measurement. Zero-count rows verify an empty Graph and report latenc
 envelope. Widths above 16 are measured only for B=1. These are Op measurements, not Engine results.
 
 ```bash
-cmake --build build/rtx5090-dev -j --target ninfer_context_kv_materialize_bench
-./build/rtx5090-dev/bench/ninfer_context_kv_materialize_bench \
+cmake --build build/turing-dev -j --target ninfer_context_kv_materialize_bench
+./build/turing-dev/bench/ninfer_context_kv_materialize_bench \
   --widths 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 \
   --batches 1,2,3,4,5,6,7,8 --counts full --execution graph --warmup 8 --repeat 60
-./build/rtx5090-dev/bench/ninfer_context_kv_materialize_bench \
+./build/turing-dev/bench/ninfer_context_kv_materialize_bench \
   --widths 8,16,128,2048 --batches 1,8 --counts one --warmup 8 --repeat 60
-./build/rtx5090-dev/bench/ninfer_context_kv_materialize_bench \
+./build/turing-dev/bench/ninfer_context_kv_materialize_bench \
   --widths 17,85,86,128,512,1024,2048 --batches 1 --warmup 8 --repeat 60
 ```
 
@@ -1335,9 +1335,9 @@ cmake --build build/rtx5090-dev -j --target ninfer_context_kv_materialize_bench
 `ninfer_mtp_pack_bench` calls the public bit-exact pack or attention-split Op once per point:
 
 ```bash
-cmake --build build/rtx5090-dev --parallel --target ninfer_mtp_pack_bench
-./build/rtx5090-dev/bench/ninfer_mtp_pack_bench --op pack --d 5120 --tokens 1,2,3,4,5,6,48
-./build/rtx5090-dev/bench/ninfer_mtp_pack_bench --op split --tokens 1,2,3,4,5,6,48
+cmake --build build/turing-dev --parallel --target ninfer_mtp_pack_bench
+./build/turing-dev/bench/ninfer_mtp_pack_bench --op pack --d 5120 --tokens 1,2,3,4,5,6,48
+./build/turing-dev/bench/ninfer_mtp_pack_bench --op split --tokens 1,2,3,4,5,6,48
 ```
 
 ## Model MTP round benchmark
@@ -1347,8 +1347,8 @@ constructs the same v3 ModelInstance used by Engine, prepares a fixed token seed
 production Program's decode/commit schedule. It reports round latency and licensed-token counts:
 
 ```bash
-cmake --build build/rtx5090-dev --parallel --target ninfer_qwen3_5_mtp_round_bench
-./build/rtx5090-dev/bench/ninfer_qwen3_5_mtp_round_bench \
+cmake --build build/turing-dev --parallel --target ninfer_qwen3_5_mtp_round_bench
+./build/turing-dev/bench/ninfer_qwen3_5_mtp_round_bench \
   --artifact out/qwen3_6_27b.ninfer
 ```
 
@@ -1360,9 +1360,9 @@ the six-layer proposal, target verify/accept, and host publication. It reports G
 real acceptance, per-position acceptance, mean licensed length, and published tokens/s:
 
 ```bash
-cmake --build build/rtx5090-dev --parallel \
+cmake --build build/turing-dev --parallel \
   --target ninfer_qwen3_5_dflash_round_bench
-./build/rtx5090-dev/bench/ninfer_qwen3_5_dflash_round_bench \
+./build/turing-dev/bench/ninfer_qwen3_5_dflash_round_bench \
   --artifact out/qwen3_6_35b_a3b.ninfer \
   --context 4096 --draft-tokens 15 --proposal-head optimized
 ```
@@ -1406,15 +1406,15 @@ once plus target IDs and outputs; repeated internal reads are not included. This
 is separate from sampling or Engine decode latency.
 
 ```bash
-cmake --build build/rtx5090-dev -j --target \
+cmake --build build/turing-dev -j --target \
   ninfer_argmax_bench ninfer_sampling_select_bench ninfer_target_logprobs_bench
-./build/rtx5090-dev/bench/ninfer_argmax_bench --shape full --cols 48 --cache both
-./build/rtx5090-dev/bench/ninfer_sampling_select_bench --matrix --cache both
-./build/rtx5090-dev/bench/ninfer_sampling_select_bench \
+./build/turing-dev/bench/ninfer_argmax_bench --shape full --cols 48 --cache both
+./build/turing-dev/bench/ninfer_sampling_select_bench --matrix --cache both
+./build/turing-dev/bench/ninfer_sampling_select_bench \
   --mtp --batch 8 --mtp-k 5 --mixed --mask --row-extents 0,1,2,3,4,5,3,1
-./build/rtx5090-dev/bench/ninfer_sampling_select_bench \
+./build/turing-dev/bench/ninfer_sampling_select_bench \
   --dflash2 --drafts 15 --batch 8 --mode stochastic --no-counts --reject-at 7
-./build/rtx5090-dev/bench/ninfer_target_logprobs_bench --columns 1,8,128,512 --cache both
+./build/turing-dev/bench/ninfer_target_logprobs_bench --columns 1,8,128,512 --cache both
 ```
 
 ## 35B dFlash causal Attention qualification
@@ -1424,12 +1424,12 @@ append-and-attend and already-cached entries for the D256 H16/KV2 geometry. Batc
 qualification uses the append entry:
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_causal_softmax_attention_bench \
+./build/turing-dev/bench/ninfer_causal_softmax_attention_bench \
   --entry append --geometry d256-h16-kv2 --kv-dtype bf16 \
   --batch 1,2,4,8 \
   --tokens 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 \
   --context 128,1024,8192 --execution graph --cache cold
-./build/rtx5090-dev/bench/ninfer_causal_softmax_attention_bench \
+./build/turing-dev/bench/ninfer_causal_softmax_attention_bench \
   --entry cached --geometry d256-h16-kv2 --kv-dtype int8 \
   --tokens 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 \
   --context 128,1024,8192 --execution graph --cache cold
@@ -1445,17 +1445,17 @@ The pointwise benchmarks call their public Ops. Default invocation runs the regi
 established, maximum-video, and maximum-image shapes:
 
 ```bash
-cmake --build build/rtx5090-dev --parallel --target \
+cmake --build build/turing-dev --parallel --target \
   ninfer_residual_add_bench ninfer_sigmoid_mul_bench \
   ninfer_gelu_bench ninfer_add_bias_bench
 
-./build/rtx5090-dev/bench/ninfer_residual_add_bench [--patches P]
-./build/rtx5090-dev/bench/ninfer_sigmoid_mul_bench \
+./build/turing-dev/bench/ninfer_residual_add_bench [--patches P]
+./build/turing-dev/bench/ninfer_sigmoid_mul_bench \
   [--tokens T[,T...]]
-./build/rtx5090-dev/bench/ninfer_position_bench \
+./build/turing-dev/bench/ninfer_position_bench \
   [--tokens T[,T...]] [--cold-graph] [--warmup N] [--repeat N]
-./build/rtx5090-dev/bench/ninfer_gelu_bench [--mode tanh|exact --columns C]
-./build/rtx5090-dev/bench/ninfer_add_bias_bench [--d D --columns C]
+./build/turing-dev/bench/ninfer_gelu_bench [--mode tanh|exact --columns C]
+./build/turing-dev/bench/ninfer_add_bias_bench [--d D --columns C]
 ```
 
 LayerNorm, RoPE, position interpolation, AddBias, GELU and ResidualAdd use the shared Op
@@ -1476,8 +1476,8 @@ same measurement harness. `--warmup` and `--repeat` default to 10 and 100. `--in
 split entry's exact state alias, restoring its initial history outside every timed call.
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_causal_conv1d_silu_bench --split --cache cold --channels 8192 --tokens 1,2,7,15,16,17,24,32,33,64,65
-./build/rtx5090-dev/bench/ninfer_causal_conv1d_silu_bench --split --cache cold --channels 10240 --tokens 1024,4096,8192
+./build/turing-dev/bench/ninfer_causal_conv1d_silu_bench --split --cache cold --channels 8192 --tokens 1,2,7,15,16,17,24,32,33,64,65
+./build/turing-dev/bench/ninfer_causal_conv1d_silu_bench --split --cache cold --channels 10240 --tokens 1024,4096,8192
 ```
 
 `--split` selects the split-output entry. Its partition follows the channel extent, because those
@@ -1535,9 +1535,9 @@ The scattered samples use a fixed shuffled expert set. These measurements do not
 The overlap case uses four synthetic GPU reads of the current cached bank while loading the next.
 
 ```bash
-build/rtx5090-dev/bench/ninfer_expert_cache_bench --artifact out/qwen3_8_flash_next.ninfer \
+build/turing-dev/bench/ninfer_expert_cache_bench --artifact out/qwen3_8_flash_next.ninfer \
   --bank text/layers/0/moe/experts --experts 512
-build/rtx5090-dev/bench/ninfer_expert_cache_bench --artifact out/qwen3_6_35b_a3b.ninfer \
+build/turing-dev/bench/ninfer_expert_cache_bench --artifact out/qwen3_6_35b_a3b.ninfer \
   --bank text/layers/0/moe/experts --experts 256
 ```
 
@@ -1561,7 +1561,7 @@ conditional completion outside the graph. Capture/upload are excluded from timin
 comparison remains eager. The header records the selected execution mode.
 
 ```bash
-build/rtx5090-dev/bench/ninfer_qwen3_5_moe_execution_bench \
+build/turing-dev/bench/ninfer_qwen3_5_moe_execution_bench \
   --artifact out/qwen3_6_35b_a3b.ninfer --layer 0 --tokens 128 --gpu-experts 128 \
   --workers 15 --caller-cpu 31 --samples 256 --distribution independent --schedule both
 ```
