@@ -59,16 +59,13 @@ bool contiguous(const WeightView& view) {
 }
 
 LinearPolicy common_policy(std::span<const WeightInput> inputs) {
-    auto result = LinearPolicy::AllowA4;
+    auto result = LinearPolicy::AllowA8;
     for (const auto& input : inputs) {
         switch (input.policy) {
         case LinearPolicy::A16Only:
             result = LinearPolicy::A16Only;
             break;
         case LinearPolicy::AllowA8:
-            if (result == LinearPolicy::AllowA4) { result = LinearPolicy::AllowA8; }
-            break;
-        case LinearPolicy::AllowA4:
             break;
         default:
             throw std::invalid_argument("invalid projection activation policy");
@@ -80,32 +77,7 @@ LinearPolicy common_policy(std::span<const WeightInput> inputs) {
 SingleProjectionWeight single(const WeightView& view, std::span<const WeightInput> inputs) {
     const auto region = contiguous_weight_region(view);
     const auto policy = common_policy(inputs);
-    float divisor     = 0;
-    if (region.parent->geometry.format == QType::NVFP4) {
-        for (const auto& input : inputs) {
-            if (!input.activation_input_divisor) {
-                require(!allows_a4(policy), "NVFP4 A4 native input requires an activation divisor");
-                continue;
-            }
-            require(std::isfinite(*input.activation_input_divisor) &&
-                        *input.activation_input_divisor > 0,
-                    "NVFP4 native input requires a positive activation divisor");
-            if (divisor == 0) {
-                // A16 does not read this auxiliary; retain a stored positive value for the ABI.
-                divisor = *input.activation_input_divisor;
-            } else if (allows_a4(policy)) {
-                // Current NVFP4 consumers use A16 for AllowA8 as well. Only their A4 route
-                // quantizes the shared activation and therefore requires a common divisor.
-                require(std::bit_cast<std::uint32_t>(divisor) ==
-                            std::bit_cast<std::uint32_t>(*input.activation_input_divisor),
-                        "shared NVFP4 native input requires identical activation divisors");
-            }
-        }
-        // The legacy native ABI validates this field even on A16, where it is never read.
-        // Keep that ABI detail out of the artifact's optional Use auxiliaries.
-        if (divisor == 0) { divisor = 1.0F; }
-    }
-    return {native_weight(view, divisor), policy};
+    return {native_weight(view, 0), policy};
 }
 
 SingleProjectionWeight single(std::span<const WeightInput> inputs) {
@@ -117,11 +89,8 @@ LinearProfile describe_single(const WeightView& view, std::span<const WeightInpu
     require(view.shape.size() == 2 && view.shape[0] <= INT32_MAX && view.shape[1] <= INT32_MAX,
             "projection dimensions exceed int32");
     const auto& geometry = region.parent->geometry;
-    const auto layout    = geometry.layout == QuantLayout::BatchedBlockScaleK16M128x4
-                               ? QuantLayout::BlockScaleK16M128x4
-                               : geometry.layout;
     return {geometry.format, static_cast<std::int32_t>(view.shape[0]),
-            static_cast<std::int32_t>(view.shape[1]), common_policy(inputs), layout};
+            static_cast<std::int32_t>(view.shape[1]), common_policy(inputs), geometry.layout};
 }
 
 template <class Make>

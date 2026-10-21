@@ -52,13 +52,6 @@ std::vector<SnapshotCase> cases(Profile p) {
                 for (int i = 0; i < b; ++i) valid[i] = t - i % t;
                 batch(t, b, valid, 733);
             }
-    } else if (p.format == QType::NVFP4) {
-        result = {{1},
-                  {3, Policy::AllowA4},
-                  {4, Policy::AllowA4},
-                  {17, Policy::AllowA4, 0},
-                  {1024, Policy::AllowA4}};
-        batch(6, 3, {6, 3, 1}, 829, Policy::AllowA4);
     } else {
         result = {{.width = 1, .convenience = true, .shared_selectors = true},
                   {3},
@@ -126,26 +119,6 @@ int snapshot_capacity_contract() {
                 }
             }
         }
-    }
-    const std::size_t nvfp4_a4_4 = ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
-        ops::SingleProjectionWeight{capacity_weight(QType::NVFP4, 16384, 5120),
-                                    ops::LinearPolicy::AllowA4},
-        1, 4, 4);
-    if (ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
-            ops::SingleProjectionWeight{capacity_weight(QType::NVFP4, 16384, 5120),
-                                        ops::LinearPolicy::A16Only},
-            1, 1, 16) != 0 ||
-        ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
-            ops::SingleProjectionWeight{capacity_weight(QType::NVFP4, 16384, 5120),
-                                        ops::LinearPolicy::AllowA4},
-            1, 1, 3) != 0 ||
-        nvfp4_a4_4 == 0 ||
-        ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
-            ops::SingleProjectionWeight{capacity_weight(QType::NVFP4, 16384, 5120),
-                                        ops::LinearPolicy::AllowA4},
-            1, 1, 4) != nvfp4_a4_4) {
-        std::cerr << "NVFP4 snapshot interval did not preserve its A16/A4 route boundary\n";
-        ++failures;
     }
     const auto fp8_snapshot_capacity = [](ops::LinearPolicy policy, std::int32_t batch,
                                           std::int32_t min_width, std::int32_t max_width) {

@@ -7,7 +7,6 @@ namespace ninfer::ops::detail::gdn_input {
 ProjectionPlan select_projection_plan(const WeightProfile& weights, std::int32_t columns) {
     if (weights.format == Format::Fp8 && allows_a8(weights.policy) && columns >= 17)
         return {Compute::A8};
-    if (weights.format == Format::Nvfp4 && allows_a4(weights.policy)) return {Compute::A4};
     return {Compute::A16};
 }
 
@@ -22,16 +21,6 @@ ConvPlan select_conv_plan(const WeightProfile& weights, Batch batch) {
         return select_q8_conv_plan(weights, batch);
     case Format::Fp8:
         if (batch.rows == 1 && batch.tokens <= 3) plan.kernel = ConvKernel::Fp8Fused;
-        break;
-    case Format::Nvfp4:
-        if (batch.rows == 1) {
-            if (batch.tokens == 1)
-                plan.kernel = ConvKernel::Nvfp4Decode;
-            else if (batch.tokens <= (allows_a4(weights.policy) ? 3 : 16))
-                plan.kernel = ConvKernel::Nvfp4Window;
-            // This strategy consumes BF16 projected values, independently of weight format.
-            plan.post = ProjectedConvKernel::TokenParallel;
-        }
         break;
     }
     if (!plan.materialized()) plan.projection.compute = Compute::A16;

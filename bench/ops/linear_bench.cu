@@ -214,8 +214,6 @@ const char* qtype_name(QType qtype) {
         return "Q8";
     case QType::BF16:
         return "BF16";
-    case QType::NVFP4:
-        return "NVFP4";
     case QType::FP8_E4M3FN_ROW_BF16:
         return "FP8";
     default:
@@ -227,7 +225,6 @@ const char* qtype_name(QType qtype) {
 const char* policy_name(LinearPolicy policy) {
     if (policy == LinearPolicy::A16Only) { return "A16"; }
     if (policy == LinearPolicy::AllowA8) { return "A8"; }
-    if (policy == LinearPolicy::AllowA4) { return "A4"; }
     throw std::invalid_argument("unsupported Linear benchmark policy");
 }
 
@@ -238,7 +235,6 @@ QType parse_qtype(std::string_view text) {
     if (value == "q6" || value == "q6_g64_fp16") { return QType::Q6_G64_FP16; }
     if (value == "q8" || value == "q8_g32_fp16") { return QType::Q8_G32_FP16; }
     if (value == "bf16") { return QType::BF16; }
-    if (value == "nvfp4") { return QType::NVFP4; }
     if (value == "fp8" || value == "fp8_e4m3fn_row_bf16") { return QType::FP8_E4M3FN_ROW_BF16; }
     throw std::invalid_argument("unknown qtype: " + std::string(text));
 }
@@ -247,21 +243,20 @@ LinearPolicy parse_policy(std::string_view text) {
     const std::string value = lower(text);
     if (value == "a16" || value == "a16only") { return LinearPolicy::A16Only; }
     if (value == "a8" || value == "allowa8") { return LinearPolicy::AllowA8; }
-    if (value == "a4" || value == "allowa4") { return LinearPolicy::AllowA4; }
-    throw std::invalid_argument("Linear benchmark policy must be a16, a8, or a4");
+    throw std::invalid_argument("Linear benchmark policy must be a16 or a8");
 }
 
 void usage(const char* argv0) {
     std::fprintf(stderr,
                  "Usage:\n"
-                 "  %s --qtype Q4|Q5|Q6|Q8|BF16|NVFP4|FP8 --n N --k K --t T [options]\n"
-                 "  %s --qtype Q4|Q5|Q6|Q8|BF16|NVFP4|FP8 --n N --k K --sweep START:END[:STEP] "
+                 "  %s --qtype Q4|Q5|Q6|Q8|BF16|FP8 --n N --k K --t T [options]\n"
+                 "  %s --qtype Q4|Q5|Q6|Q8|BF16|FP8 --n N --k K --sweep START:END[:STEP] "
                  "[options]\n"
-                 "  %s --qtype Q4|Q5|Q6|Q8|BF16|NVFP4|FP8 --n N --k K --tokens T1,T2,... "
+                 "  %s --qtype Q4|Q5|Q6|Q8|BF16|FP8 --n N --k K --tokens T1,T2,... "
                  "[options]\n"
                  "  %s --suite qwen3_6_27b|qwen3_6_35b_a3b|all [options]\n\n"
                  "Options:\n"
-                 "  --policy a16|a8|a4 Activation-compute policy (default a16).\n"
+                 "  --policy a16|a8    Activation-compute policy (default a16).\n"
                  "  --execution MODE   eager (default) or graph; time the complete Op.\n"
                  "  --graph-calls N    Calls per timed graph (1..64, default 1); report per call.\n"
                  "  --profile          Capture exactly one post-warmup public Linear call.\n"
@@ -457,11 +452,6 @@ LinearBenchWeight make_weight(QType qtype, std::int32_t n, std::int32_t k) {
         const std::uint64_t model_bytes = direct.model_weight_bytes();
         return {std::move(direct.storage), direct.weight, model_bytes};
     }
-    if (qtype == QType::NVFP4) {
-        bench::PackedQuantizedWeight packed = bench::make_nvfp4_weight(n, k);
-        const std::uint64_t model_bytes     = packed.model_weight_bytes();
-        return {std::move(packed.storage), packed.weight, model_bytes};
-    }
     if (qtype == QType::FP8_E4M3FN_ROW_BF16) {
         bench::PackedQuantizedWeight packed = bench::make_fp8_weight(n, k);
         const std::uint64_t model_bytes     = packed.model_weight_bytes();
@@ -495,23 +485,6 @@ std::string join_labels(const std::vector<std::string>& labels) {
 double registered_tensor_peak_tflops(const BenchPoint& point, const char*& profile) {
     // Report Tensor Core utilization only when the exact registered problem and extent determine
     // that the public route executes the named MMA profile.
-    const bool nvfp4_problem =
-        (point.k == 5120 && (point.n == 14336 || point.n == 16384 || point.n == 34816)) ||
-        (point.n == 5120 && (point.k == 6144 || point.k == 17408));
-    if (point.qtype == QType::NVFP4 && nvfp4_problem) {
-        const bool a4 =
-            point.policy == LinearPolicy::AllowA4 &&
-            ((point.n == 14336 && point.t >= 4) || point.n == 16384 || point.n == 34816 ||
-             (point.k == 6144 && point.t >= 17) || (point.k == 17408 && point.t >= 8));
-        if (a4) {
-            profile = "NVFP4_F32ACC";
-            return bench::kRoofline.nvfp4_f32_tflops;
-        }
-        if (point.t >= (point.k == 17408 ? 6 : 3)) {
-            profile = "BF16_F32ACC";
-            return bench::kRoofline.bf16_f32_tflops;
-        }
-    }
     if (point.qtype == QType::Q8_G32_FP16 &&
         ((point.n == 2560 && point.k == 6144) || (point.n == 6144 && point.k == 2560) ||
          (point.n == 10240 && point.k == 2560) || (point.n == 12288 && point.k == 2560) ||
@@ -768,8 +741,6 @@ void print_header(const Options& opt) {
                 bench::format_metric(bench::kRoofline.mxfp8_f32_tflops).c_str());
     std::printf("# dense_bf16_tensor_tflops fp32_acc=%s\n",
                 bench::format_metric(bench::kRoofline.bf16_f32_tflops).c_str());
-    std::printf("# dense_nvfp4_tensor_tflops fp32_acc=%s\n",
-                bench::format_metric(bench::kRoofline.nvfp4_f32_tflops).c_str());
 }
 
 void print_results(const std::vector<Result>& results) {

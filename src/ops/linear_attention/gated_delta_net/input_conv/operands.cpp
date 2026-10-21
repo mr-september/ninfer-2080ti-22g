@@ -53,7 +53,6 @@ WeightProfile describe_profile(const ProjectionProfile& weights) {
     }
     if (w.n == 16384 && w.k == 5120) {
         if (w.qtype == QType::FP8_E4M3FN_ROW_BF16) return {Format::Fp8, {5120, 6144}, w.policy};
-        if (w.qtype == QType::NVFP4) return {Format::Nvfp4, {5120, 6144}, w.policy};
     }
     throw std::invalid_argument("GDN input: unsupported single-parent weight geometry");
 }
@@ -77,9 +76,6 @@ void validate_weights(const WeightOperands& weights) {
         break;
     case Format::Fp8:
         (void)common::validate_fp8_weight(*weights.first, "GDN input");
-        break;
-    case Format::Nvfp4:
-        (void)common::validate_nvfp4_weight(*weights.first, "GDN input");
         break;
     }
 }

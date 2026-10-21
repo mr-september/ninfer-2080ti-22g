@@ -33,14 +33,12 @@ std::vector<RecordCase> cases(Profile p) {
                     result.push_back({t, b, valid, 1541U + t + b});
                 }
     } else {
-        const bool fp8 = p.format == QType::FP8_E4M3FN_ROW_BF16;
-        for (auto policy : {Policy::A16Only, fp8 ? Policy::AllowA8 : Policy::AllowA4}) {
+        for (auto policy : {Policy::A16Only, Policy::AllowA8}) {
             for (int t = 2; t <= 16; ++t) {
-                result.push_back({t, 1, {}, (fp8 ? 1700U : 1600U) + t, policy});
-                result.push_back({t, 8, ragged(t, 8), (fp8 ? 1750U : 1650U) + t, policy});
+                result.push_back({t, 1, {}, 1700U + t, policy});
+                result.push_back({t, 8, ragged(t, 8), 1750U + t, policy});
             }
-            if (fp8)
-                for (int b : {2, 3, 4}) result.push_back({4, b, ragged(4, b), 1810U + b, policy});
+            for (int b : {2, 3, 4}) result.push_back({4, b, ragged(4, b), 1810U + b, policy});
         }
     }
     return result;

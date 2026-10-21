@@ -12,7 +12,7 @@ enum class SharedAlgorithm { Vector, Mma };
 struct Plan {
     // Policies select these widths from slice M, but each tile covers assignments
     // belonging to one expert. Public entries split total M into slices <= 4096.
-    QType format     = QType::NVFP4;
+    QType format     = QType::FP8_E4M3FN_BLOCK128X128_BF16;
     int gate_columns = 0, down_columns = 0;
     bool vector                = false;
     bool atomic_output         = false;

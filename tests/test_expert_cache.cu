@@ -36,23 +36,17 @@ struct Matrix {
     WeightParent parent;
 
     Matrix(QType format, std::uint32_t count, std::uint64_t n, std::uint64_t k, unsigned seed) {
-        const bool nv    = format == QType::NVFP4;
         const bool fp8   = format == QType::FP8_E4M3FN_BLOCK128X128_BF16;
-        const auto shape = nv || fp8 ? std::vector<std::uint64_t>{count, n, k}
-                                     : std::vector<std::uint64_t>{count * n, k};
+        const auto shape = fp8 ? std::vector<std::uint64_t>{count, n, k}
+                               : std::vector<std::uint64_t>{count * n, k};
         const auto g     = weight_geometry(format,
-                                       nv    ? QuantLayout::BatchedBlockScaleK16M128x4
-                                           : fp8 ? QuantLayout::BlockScaleM128K128
-                                                 : QuantLayout::RowSplit,
-                                           shape);
+                                       fp8 ? QuantLayout::BlockScaleM128K128
+                                           : QuantLayout::RowSplit,
+                                       shape);
         bytes            = HostBuffer(g.bytes, 4096);
         auto* data       = static_cast<std::byte*>(bytes.data());
         for (std::size_t i = 0; i < bytes.size(); ++i) {
             data[i] = std::byte((i * 17 + i / 4096 + seed) % 251);
-        }
-        if (nv) {
-            for (unsigned e = 0; e < count; ++e) { divisors.push_back(seed + e + 1.0F); }
-            std::memcpy(data + g.divisor_offset, divisors.data(), count * 4);
         }
         parent = {g, Device::cpu(), data, divisors};
     }
@@ -223,7 +217,6 @@ void codecs_and_chunks(const DeviceContext& device) {
     for (const auto types :
          {std::array{QType::Q4_G64_FP16, QType::Q5_G64_FP16},
           std::array{QType::Q4_G64_FP16, QType::Q6_G64_FP16},
-          std::array{QType::NVFP4, QType::NVFP4},
           std::array{QType::FP8_E4M3FN_BLOCK128X128_BF16, QType::FP8_E4M3FN_BLOCK128X128_BF16}}) {
         Bank bank(types[0], types[1]);
         const std::array sources{bank.source(device.device())};
@@ -276,7 +269,7 @@ private:
 };
 
 void lifetimes_and_graph(const DeviceContext& device) {
-    Bank bank(QType::NVFP4, QType::NVFP4);
+    Bank bank(QType::FP8_E4M3FN_BLOCK128X128_BF16, QType::FP8_E4M3FN_BLOCK128X128_BF16);
     const std::array sources{bank.source(device.device())};
     auto req = describe_expert_cache(sources, {.capacity_bytes = 131072, .max_batch_bytes = 65536});
     req.config.capacity_bytes = req.banks[0].entry_bytes * 2;
@@ -329,7 +322,7 @@ void lifetimes_and_graph(const DeviceContext& device) {
 }
 
 void independent_readiness(const DeviceContext& device) {
-    Bank bank(QType::NVFP4, QType::NVFP4);
+    Bank bank(QType::FP8_E4M3FN_BLOCK128X128_BF16, QType::FP8_E4M3FN_BLOCK128X128_BF16);
     const std::array sources{bank.source(device.device())};
     auto req = describe_expert_cache(sources, {.capacity_bytes = 131072, .max_batch_bytes = 65536});
     ExpertCache cache(sources, req, device, device.transfer_view());
@@ -403,7 +396,7 @@ void resident_fp8(const DeviceContext& device) {
 }
 
 void upload_budgets(const DeviceContext& device) {
-    Bank bank(QType::NVFP4, QType::NVFP4);
+    Bank bank(QType::FP8_E4M3FN_BLOCK128X128_BF16, QType::FP8_E4M3FN_BLOCK128X128_BF16);
     const std::array sources{bank.source(device.device())};
     auto req = describe_expert_cache(sources, {.capacity_bytes   = 262144,
                                                .max_batch_bytes  = 16384,
@@ -536,7 +529,7 @@ void fixed_regions_and_windows(const DeviceContext& device) {
 }
 
 void promote_partial_upload(const DeviceContext& device) {
-    Bank bank(QType::NVFP4, QType::NVFP4);
+    Bank bank(QType::FP8_E4M3FN_BLOCK128X128_BF16, QType::FP8_E4M3FN_BLOCK128X128_BF16);
     const std::array sources{bank.source(device.device())};
     auto req = describe_expert_cache(
         sources, {.capacity_bytes = 65536, .max_batch_bytes = 4096, .upload_slots = 2});
@@ -574,7 +567,8 @@ int main() {
         complete_bank(device);
         fixed_regions_and_windows(device);
         promote_partial_upload(device);
-        Bank failure_source(QType::NVFP4, QType::NVFP4);
+        Bank failure_source(QType::FP8_E4M3FN_BLOCK128X128_BF16,
+                            QType::FP8_E4M3FN_BLOCK128X128_BF16);
         ninfer::test::expert_cache_cuda_errors(failure_source.source(device.device()), device);
         std::cout << "expert cache bytes, lifetimes, Graph and resident access passed\n";
     } catch (const std::exception& e) {

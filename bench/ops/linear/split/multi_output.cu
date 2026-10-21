@@ -33,15 +33,14 @@ namespace {
 constexpr std::size_t kFlushBytes = std::size_t{256} << 20;
 
 
-enum class Format : std::uint8_t { Q4Q5, Q8Qgkv, Q8Qkv, Q8DFlash2Qkv, Bf16, Nvfp4, Fp8, All };
+enum class Format : std::uint8_t { Q4Q5, Q8Qgkv, Q8Qkv, Q8DFlash2Qkv, Bf16, Fp8, All };
 enum class CacheMode : std::uint8_t { Cold, Warm, Both };
 enum class CacheState : std::uint8_t { Cold, Warm };
 
 struct Options {
-    Format format                  = Format::All;
-    ops::LinearPolicy nvfp4_policy = ops::LinearPolicy::AllowA4;
-    ops::LinearPolicy fp8_policy   = ops::LinearPolicy::AllowA8;
-    CacheMode cache                = CacheMode::Cold;
+    Format format                = Format::All;
+    ops::LinearPolicy fp8_policy = ops::LinearPolicy::AllowA8;
+    CacheMode cache              = CacheMode::Cold;
     std::vector<std::int32_t> tokens{1, 2, 4, 8, 12, 16, 32, 64, 128, 256, 512, 1024};
     int warmup   = 5;
     int repeat   = 30;
@@ -73,8 +72,8 @@ struct Measurement {
     std::fprintf(stderr,
                  "error: %s\n"
                  "usage: ninfer_linear_split_multi_output_bench "
-                 "[--format q4q5|q8-qgkv|q8-qkv|q8-dflash2-qkv|bf16|nvfp4|fp8|all] "
-                 "[--nvfp4-policy a16|a4] [--fp8-policy a16|a8] "
+                 "[--format q4q5|q8-qgkv|q8-qkv|q8-dflash2-qkv|bf16|fp8|all] "
+                 "[--fp8-policy a16|a8] "
                  "[--tokens T,...] [--cache cold|warm|both] [--execution eager|graph] "
                  "[--warmup N] [--repeat N] [--profile] [--csv-out PATH]\n",
                  message);
@@ -129,23 +128,13 @@ Options parse_options(int argc, char** argv) {
                 options.format = Format::Q8DFlash2Qkv;
             else if (value == "bf16")
                 options.format = Format::Bf16;
-            else if (value == "nvfp4")
-                options.format = Format::Nvfp4;
             else if (value == "fp8")
                 options.format = Format::Fp8;
             else if (value == "all")
                 options.format = Format::All;
             else
-                usage("--format expects q4q5, q8-qgkv, q8-qkv, q8-dflash2-qkv, bf16, nvfp4, "
+                usage("--format expects q4q5, q8-qgkv, q8-qkv, q8-dflash2-qkv, bf16, "
                       "fp8, or all");
-        } else if (argument == "--nvfp4-policy") {
-            const std::string_view value(next("--nvfp4-policy requires a value"));
-            if (value == "a16")
-                options.nvfp4_policy = ops::LinearPolicy::A16Only;
-            else if (value == "a4")
-                options.nvfp4_policy = ops::LinearPolicy::AllowA4;
-            else
-                usage("--nvfp4-policy expects a16 or a4");
         } else if (argument == "--fp8-policy") {
             const std::string_view value(next("--fp8-policy requires a value"));
             if (value == "a16")
@@ -199,8 +188,6 @@ const char* policy_name(ops::LinearPolicy policy) {
         return "a16";
     case ops::LinearPolicy::AllowA8:
         return "a8";
-    case ops::LinearPolicy::AllowA4:
-        return "a4";
     }
     throw std::invalid_argument("unknown linear policy");
 }
@@ -521,11 +508,6 @@ int main(int argc, char** argv) {
             auto weight = bench::make_direct_bf16_weight(14336, 5120);
             run_four_output(options, "bf16", ops::LinearPolicy::A16Only, false, 5120, 6144, 1024,
                             14336, weight, flush, cuda, results);
-        }
-        if (selected(options.format, Format::Nvfp4)) {
-            auto weight = bench::make_nvfp4_weight(14336, 5120);
-            run_four_output(options, "nvfp4", options.nvfp4_policy, false, 5120, 6144, 1024, 14336,
-                            weight, flush, cuda, results);
         }
         if (selected(options.format, Format::Fp8)) { run_fp8(options, flush, cuda, results); }
         write_csv(options, results);

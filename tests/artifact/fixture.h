@@ -96,7 +96,7 @@ struct Fixture {
         for (int i = 0; i < 2; ++i) {
             root["uses"].push_back({{"parameter", "row"},
                                     {"input", i ? "context" : "query"},
-                                    {"activation_policy", i ? "AllowA8" : "AllowA4"},
+                                    {"activation_policy", i ? "AllowA8" : "A16Only"},
                                     {"auxiliaries",
                                      {{"input_divisor",
                                        {{"parts", Json::array({{{"object", "divisors"},

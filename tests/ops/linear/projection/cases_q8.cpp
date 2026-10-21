@@ -33,8 +33,7 @@ const std::array kGeometries{
 
 int q8_workspace_domain(std::int32_t n, std::int32_t k) {
     int failures = 0;
-    for (auto policy : {ninfer::ops::LinearPolicy::A16Only, ninfer::ops::LinearPolicy::AllowA8,
-                        ninfer::ops::LinearPolicy::AllowA4}) {
+    for (auto policy : {ninfer::ops::LinearPolicy::A16Only, ninfer::ops::LinearPolicy::AllowA8}) {
         if (ninfer::ops::linear_workspace_capacity_bytes(
                 ninfer::QType::Q8_G32_FP16, n, k, policy, 1,
                 std::numeric_limits<std::int32_t>::max()) != 0) {
@@ -150,7 +149,6 @@ void q8_a16_conformance(Suite& suite) {
         }
         for (int t : {1, 16, 64, 128}) calls.push_back({t, CallForm::A16Convenience});
         calls.push_back({17, CallForm::Policy, ninfer::ops::LinearPolicy::AllowA8});
-        calls.push_back({64, CallForm::Policy, ninfer::ops::LinearPolicy::AllowA4});
         add_shape(suite, ninfer::QType::Q8_G32_FP16, ActivationRecipe::TokenBlocks,
                   make_q8_g32_fp16_weight,
                   {shape.n, shape.k, shape.seed, Comparison::Sampled, true, calls});

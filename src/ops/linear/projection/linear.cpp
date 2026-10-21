@@ -3,7 +3,6 @@
 
 #include "ops/linear/projection/bf16/bf16_dispatch.h"
 #include "ops/linear/projection/fp8/fp8_dispatch.h"
-#include "ops/linear/projection/nvfp4/nvfp4_dispatch.h"
 #include "ops/linear/projection/q4/q4_dispatch.h"
 #include "ops/linear/projection/q5/q5_dispatch.h"
 #include "ops/linear/projection/q6/q6_dispatch.h"
@@ -40,7 +39,6 @@ void validate_linear_policy(LinearPolicy policy) {
     switch (policy) {
     case LinearPolicy::A16Only:
     case LinearPolicy::AllowA8:
-    case LinearPolicy::AllowA4:
         return;
     }
     throw std::invalid_argument("linear: invalid compute policy");
@@ -96,9 +94,6 @@ void dispatch_linear(const Tensor& x, const Weight& w, Tensor& out, LinearPolicy
     case QType::BF16:
         detail::bf16_dispatch(x, w, out, policy, stream);
         return;
-    case QType::NVFP4:
-        detail::nvfp4_dispatch(x, w, out, policy, workspace, stream);
-        return;
     case QType::FP8_E4M3FN_ROW_BF16:
         detail::fp8_dispatch(x, w, out, policy, workspace, stream);
         return;
@@ -140,9 +135,6 @@ std::size_t linear_workspace_capacity_bytes(QType qtype, std::int32_t output_row
         (void)detail::select_bf16_launch(output_rows, input_rows, min_tokens, policy);
         (void)detail::select_bf16_launch(output_rows, input_rows, max_tokens, policy);
         return 0;
-    case QType::NVFP4:
-        return detail::nvfp4_linear_workspace_capacity_bytes(output_rows, input_rows, policy,
-                                                             min_tokens, max_tokens);
     case QType::FP8_E4M3FN_ROW_BF16:
         return detail::fp8_linear_workspace_capacity_bytes(output_rows, input_rows, policy,
                                                            min_tokens, max_tokens);

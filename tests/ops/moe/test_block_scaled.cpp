@@ -13,16 +13,15 @@ namespace {
 constexpr int H = 2560, I = 640, E = 512, TopK = 10;
 // Two activation quantizations with a nonlinear product between them. The FP64 oracle
 // retains the original BF16 input and decoded weights; no private quantization is imitated.
-constexpr ReductionCriterion kA4{0.25, 1e-7, 0.35};
 constexpr ReductionCriterion kA8{0.08, 1e-7, 0.12};
 constexpr ReductionCriterion kA16{0.012, 1e-6, 0.008};
 // Same BF16/FP32 routing budget as the integer MoE suite; probabilities have unit scale.
 constexpr ReductionCriterion kRoute{3e-5, 5e-6, 0};
 
-ops::MoeProfile make_profile(bool fp8) {
-    const auto type   = fp8 ? QType::FP8_E4M3FN_BLOCK128X128_BF16 : QType::NVFP4;
-    const auto layout = fp8 ? QuantLayout::BlockScaleM128K128 : QuantLayout::BlockScaleK16M128x4;
-    const auto policy = fp8 ? ops::LinearPolicy::AllowA8 : ops::LinearPolicy::AllowA4;
+ops::MoeProfile make_profile() {
+    const auto type   = QType::FP8_E4M3FN_BLOCK128X128_BF16;
+    const auto layout = QuantLayout::BlockScaleM128K128;
+    const auto policy = ops::LinearPolicy::AllowA8;
     return {{{H, I, type, type, layout, layout, policy, policy}, E, TopK},
             {H, I, QType::BF16, QType::BF16, QuantLayout::Contiguous, QuantLayout::Contiguous}};
 }
@@ -42,7 +41,6 @@ Weight dense(const DeviceBuffer& buffer, int rows, int columns) {
 
 struct Matrix {
     int n, k;
-    bool fp8;
     std::size_t code_bytes, scale_bytes;
     std::vector<std::vector<std::uint8_t>> payload;
     std::vector<std::vector<float>> decoded;
@@ -50,61 +48,41 @@ struct Matrix {
     std::vector<float> dw;
     std::size_t stride, scale_offset;
 
-    Matrix(int rows, int columns, unsigned seed, bool is_fp8)
-        : n(rows), k(columns), fp8(is_fp8), offsets(cuda_environment().context.device(), E * 8),
-          divisors(cuda_environment().context.device(), is_fp8 ? 0 : E * 4) {
+    Matrix(int rows, int columns, unsigned seed)
+        : n(rows), k(columns), offsets(cuda_environment().context.device(), E * 8),
+          divisors(cuda_environment().context.device(), 0) {
         for (int slot = 0; slot < 2; ++slot) {
             std::vector<std::uint8_t> bytes;
             std::vector<float> values(std::size_t(n) * k);
-            if (fp8) {
-                code_bytes   = std::size_t(n) * k;
-                scale_bytes  = std::size_t(n / 128) * (k / 128) * 2;
-                scale_offset = code_bytes;
-                bytes.resize(code_bytes + scale_bytes);
-                for (std::size_t b = 0; b < code_bytes; ++b) {
-                    unsigned code =
-                        quantized_weight::detail::mix64(b + seed + slot * 998123ULL) & 255;
-                    if ((code & 127) == 127) { --code; }
-                    bytes[b] = code;
+            code_bytes   = std::size_t(n) * k;
+            scale_bytes  = std::size_t(n / 128) * (k / 128) * 2;
+            scale_offset = code_bytes;
+            bytes.resize(code_bytes + scale_bytes);
+            for (std::size_t b = 0; b < code_bytes; ++b) {
+                unsigned code =
+                    quantized_weight::detail::mix64(b + seed + slot * 998123ULL) & 255;
+                if ((code & 127) == 127) { --code; }
+                bytes[b] = code;
+            }
+            for (int nr = 0; nr < n / 128; ++nr) {
+                for (int kc = 0; kc < k / 128; ++kc) {
+                    const int index = nr * (k / 128) + kc;
+                    const float scale =
+                        (n == 2 * I && nr == 0)
+                            ? 0
+                            : (1 + (nr * 3 + kc * 7 + seed + slot) % 13) * 0.0000083F;
+                    quantized_weight::detail::store_u16_le(bytes, scale_offset + index * 2,
+                                                           f32_to_bf16(scale));
                 }
-                for (int nr = 0; nr < n / 128; ++nr) {
-                    for (int kc = 0; kc < k / 128; ++kc) {
-                        const int index = nr * (k / 128) + kc;
-                        const float scale =
-                            (n == 2 * I && nr == 0)
-                                ? 0
-                                : (1 + (nr * 3 + kc * 7 + seed + slot) % 13) * 0.0000083F;
-                        quantized_weight::detail::store_u16_le(bytes, scale_offset + index * 2,
-                                                               f32_to_bf16(scale));
-                    }
+            }
+            for (int r = 0; r < n; ++r) {
+                for (int c = 0; c < k; ++c) {
+                    const auto index = std::size_t(r) * k + c;
+                    const auto scale = quantized_weight::detail::load_u16_le(
+                        bytes, scale_offset + ((r / 128) * (k / 128) + c / 128) * 2);
+                    values[index] = quantized_weight::detail::decode_e4m3fn(bytes[index]) *
+                                    quantized_weight::detail::bf16_to_f32(scale);
                 }
-                for (int r = 0; r < n; ++r) {
-                    for (int c = 0; c < k; ++c) {
-                        const auto index = std::size_t(r) * k + c;
-                        const auto scale = quantized_weight::detail::load_u16_le(
-                            bytes, scale_offset + ((r / 128) * (k / 128) + c / 128) * 2);
-                        values[index] = quantized_weight::detail::decode_e4m3fn(bytes[index]) *
-                                        quantized_weight::detail::bf16_to_f32(scale);
-                    }
-                }
-            } else {
-                auto p = quantized_weight::make_patterned_weight(
-                    QType::NVFP4, n, k, seed + slot,
-                    {.weight_scale_divisor = 1, .input_scale_divisor = 1});
-                for (std::size_t b = 0; b < p.code_plane_bytes; ++b) {
-                    p.payload[b] =
-                        quantized_weight::detail::mix64(b + seed + slot * 998123ULL) & 255;
-                }
-                code_bytes   = p.code_plane_bytes;
-                scale_bytes  = p.scale_plane_bytes;
-                scale_offset = p.scale_plane_offset;
-                for (int r = 0; r < n; ++r) {
-                    for (int c = 0; c < k; ++c) {
-                        values[std::size_t(r) * k + c] =
-                            quantized_weight::logical_weight_fp64(p, r, c);
-                    }
-                }
-                bytes = std::move(p.payload);
             }
             payload.push_back(std::move(bytes));
             decoded.push_back(std::move(values));
@@ -114,11 +92,7 @@ struct Matrix {
         for (int slot = 0; slot < 2; ++slot) {
             data.copy_from_host(payload[slot].data(), payload[slot].size(), slot * stride);
         }
-        dw.resize(E);
-        for (int e = 0; e < E; ++e) {
-            dw[e] = fp8 ? 1.0F : (seed == 101 ? 6.0F : 3.0F) + (e % 8) * 0.5F;
-        }
-        if (!fp8) { divisors.copy_from_host(dw.data(), divisors.size()); }
+        dw.assign(E, 1.0F);
         publish({}, ops::ExpertSubsetKind::All, false);
     }
 
@@ -141,7 +115,7 @@ struct Matrix {
         result.offsets         = static_cast<const std::uint64_t*>(offsets.data());
         result.indexed_storage = data.span();
         result.divisors        = static_cast<const float*>(divisors.data());
-        result.divisor_stride  = fp8 ? 0 : 1;
+        result.divisor_stride  = 0;
         return result;
     }
 };
@@ -173,7 +147,6 @@ std::vector<double> ffn(std::span<const float> x, const std::vector<float>& gu,
 }
 
 struct Fixture {
-    const bool fp8;
     const ops::MoeProfile profile;
     Matrix gu, down;
     std::vector<std::vector<float>> x;
@@ -184,9 +157,9 @@ struct Fixture {
     std::vector<std::vector<double>> shared_values;
     std::array<std::vector<double>, 3> logits;
 
-    explicit Fixture(bool is_fp8)
-        : fp8(is_fp8), profile(make_profile(is_fp8)), gu(2 * I, H, 101, is_fp8),
-          down(H, I, 211, is_fp8), control(random_values(std::size_t(E + 1) * H, 303, .0004F)),
+    Fixture()
+        : profile(make_profile()), gu(2 * I, H, 101), down(H, I, 211),
+          control(random_values(std::size_t(E + 1) * H, 303, .0004F)),
           shared_gu(random_values(std::size_t(2 * I) * H, 404, .012F)),
           shared_down(random_values(std::size_t(H) * I, 505, .025F)) {
         for (int p = 0; p < 3; ++p) {
@@ -199,7 +172,7 @@ struct Fixture {
                 }
                 round_to_bf16(x.back());
             }
-            for (int k = 0; k < (fp8 ? 128 : 32); ++k) { x.back()[k] = 0; }
+            for (int k = 0; k < 128; ++k) { x.back()[k] = 0; }
             // Deliberate zero groups and a last-K coordinate expose stage/scale-tail errors.
             x.back()[H - 1] = p == 2 ? 3.5F : .875F;
             shared_values.push_back(ffn(x.back(), shared_gu, shared_down, 1, 1));
@@ -223,8 +196,7 @@ struct Fixture {
         shared_down_d = to_device_bf16(shared_down);
         weights       = {dense(control_d, E + 1, H),
                          {{gu.view(), down.view(), E, control_d.device()},
-                    fp8 ? ops::ExpertActivationDivisors{}
-                              : ops::ExpertActivationDivisors{719.7991333F, 313.927002F}},
+                    ops::ExpertActivationDivisors{}},
                          {{dense(shared_gu_d, 2 * I, H)}, {dense(shared_down_d, H, I)}}};
     }
 
@@ -321,7 +293,7 @@ int run(Fixture& f, CudaExecutionView execution, int tokens, ops::ExpertSubsetKi
             double total = 0;
             for (int j = 0; j < TopK; ++j) {
                 int e = complete ? order[j] : (replay == 1 ? j : (t * 13 + j * 31) % E);
-                if (!complete && f.fp8 && tokens == 2) {
+                if (!complete && tokens == 2) {
                     // Cover no overlap, permuted full overlap and partial overlap
                     // between tokens while retaining distinct IDs within each token.
                     if (replay == 1) {
@@ -382,14 +354,14 @@ int run(Fixture& f, CudaExecutionView execution, int tokens, ops::ExpertSubsetKi
             actual.assign(values.begin(), values.end());
         }
         const std::string label =
-            std::string(complete ? "complete" : "routed") + (f.fp8 ? " fp8 M=" : " nvfp4 M=") +
+            std::string(complete ? "complete" : "routed") + " fp8 M=" +
             std::to_string(tokens) + " subset=" + std::to_string(int(kind)) +
             " shared=" + std::to_string(shared) + " replay=" + std::to_string(replay);
         failures += verify_reduction(label, actual, ref,
                                      kind == ops::ExpertSubsetKind::None ||
-                                             (tokens == 1 || (f.fp8 && tokens == 2))
+                                             (tokens == 1 || tokens == 2)
                                          ? kA16
-                                         : (f.fp8 ? kA8 : kA4));
+                                         : kA8);
         failures +=
             scratch.verify_guards(label + " scratch") + result.verify_guards(label + " output");
         if (arena.used() || arena.peak_used() != bytes) {
@@ -474,7 +446,7 @@ int route_cases(Fixture& f, CudaExecutionView execution) {
             }
             expected_beta[t] = 1 / (1 + std::exp(-scores[E]));
         }
-        const auto label = "route nvfp4 geometry M=" + std::to_string(m);
+        const auto label = "route geometry M=" + std::to_string(m);
         failures += verify_reduction(label + " alpha",
                                      std::vector<double>(actual_alpha.begin(), actual_alpha.end()),
                                      expected_alpha, kRoute);
@@ -529,9 +501,8 @@ int affine_cases(Fixture& f, CudaExecutionView execution) {
 
 int zero_expert_cases(Fixture& f, CudaExecutionView execution) {
     // Keep the shared term observable at its own scale through the complete Op.
-    // The existing A4/A8 criterion stays unchanged; no private route is forced.
-    std::cout << "shared-only oracle (zero routed GU), format=" << (f.fp8 ? "fp8" : "nvfp4")
-              << '\n';
+    // The existing A8 criterion stays unchanged; no private route is forced.
+    std::cout << "shared-only oracle (zero routed GU), format=fp8\n";
     for (std::size_t slot = 0; slot < f.gu.payload.size(); ++slot) {
         auto& bytes = f.gu.payload[slot];
         std::fill(bytes.begin() + f.gu.scale_offset,
@@ -556,78 +527,74 @@ int main(int argc, char** argv) {
     using namespace ninfer::test;
     using namespace ninfer::test::moe_block_scaled;
     OpSuite suite;
-    for (bool fp8 : {false, true}) {
-        const std::string format = fp8 ? "fp8" : "nvfp4";
-        std::vector<OpCase> catalogue;
-        std::vector<std::function<int(Fixture&, CudaExecutionView)>> runners;
-        const auto special = [&](std::string id, auto run,
-                                 std::vector<std::pair<std::string, std::string>> tags = {}) {
-            tags.emplace_back("format", format);
-            catalogue.push_back({"moe/" + format + "/" + id, std::move(tags)});
-            runners.push_back(run);
-        };
-        special("affine", affine_cases);
-        if (!fp8) special("route", route_cases, {{"execution", "graph"}});
-        const auto add = [&](int m, ops::ExpertSubsetKind subset, bool shared, bool complete,
-                             DType dtype, ops::MoeEpilogue epilogue, bool graph) {
-            const auto id = std::string(complete ? "complete" : "routed") + "/t" +
-                            std::to_string(m) + "/subset" + std::to_string(int(subset)) +
-                            (shared ? "/shared" : "/no_shared") + "/dtype" +
-                            std::to_string(int(dtype)) + "/epilogue" +
-                            std::to_string(int(epilogue)) + (graph ? "/graph" : "/eager");
-            special(id,
-                    [=](Fixture& f, auto e) {
-                        return run(f, e, m, subset, shared, complete, dtype, epilogue, graph);
-                    },
-                    {{"execution", graph ? "graph" : "eager"}});
-        };
-        using ops::ExpertSubsetKind;
-        using ops::MoeEpilogue;
-        for (int m : {1,   2,   3,   7,    8,    9,    15,   16,   17,   18,   31,   32,   33,
-                      34,  63,  64,  65,   66,   127,  128,  129,  130,  255,  256,  257,  258,
-                      511, 512, 513, 1023, 1024, 1025, 3071, 3072, 3073, 3583, 3584, 3585, 4097}) {
-            add(m, ExpertSubsetKind::All, false, false, DType::FP32, MoeEpilogue::Write, false);
-        }
-        for (auto subset :
-             {ExpertSubsetKind::None, ExpertSubsetKind::MaskOnes, ExpertSubsetKind::MaskZeros}) {
-            add(17, subset, true, false, DType::BF16, MoeEpilogue::AddResidual, true);
-        }
-        for (auto subset : {ExpertSubsetKind::MaskOnes, ExpertSubsetKind::MaskZeros}) {
-            add(129, subset, false, false, DType::FP32, MoeEpilogue::Write, true);
-            add(1, subset, true, false, DType::BF16, MoeEpilogue::AddResidual, true);
-        }
-        add(1, ExpertSubsetKind::None, true, false, DType::FP32, MoeEpilogue::Write, true);
-        for (int m : {1, 65}) {
-            add(m, ExpertSubsetKind::None, false, false, DType::FP32, MoeEpilogue::Write, true);
-        }
-        for (int m : {512, 1024}) {
-            add(m, ExpertSubsetKind::All, false, false, DType::BF16, MoeEpilogue::Write, true);
-            add(m, ExpertSubsetKind::MaskZeros, true, false, DType::FP32, MoeEpilogue::Write, true);
-        }
-        add(2048, ExpertSubsetKind::None, true, false, DType::FP32, MoeEpilogue::Write, false);
-        if (fp8) {
-            add(2, ExpertSubsetKind::All, false, false, DType::FP32, MoeEpilogue::Write, true);
-            add(2, ExpertSubsetKind::MaskOnes, false, false, DType::FP32, MoeEpilogue::Write, true);
-            add(4098, ExpertSubsetKind::All, false, false, DType::FP32, MoeEpilogue::Write, true);
-            for (int m : {3071, 3072, 3073}) {
-                add(m, ExpertSubsetKind::MaskZeros, true, false, DType::FP32, MoeEpilogue::Write,
-                    true);
-            }
-            add(2, ExpertSubsetKind::MaskZeros, true, false, DType::BF16, MoeEpilogue::AddResidual,
-                true);
-        }
-        for (int m : {1,    2,    7,    8,    9,    65,   511,  512,  513,  1023,
-                      1024, 1025, 2047, 2048, 3071, 3072, 3073, 4096, 4097, 4098}) {
-            add(m, ExpertSubsetKind::All, true, true, DType::BF16, MoeEpilogue::Write, true);
-        }
-        special("shared_only", zero_expert_cases, {{"execution", "graph"}});
-        suite.add(std::move(catalogue), [=](auto selected) {
-            DeviceContext device;
-            Fixture fixture(fp8);
-            int failures = 0;
-            for (auto i : selected) failures += runners[i](fixture, device.execution_view());
-            return failures;
-        });
+    const std::string format = "fp8";
+    std::vector<OpCase> catalogue;
+    std::vector<std::function<int(Fixture&, CudaExecutionView)>> runners;
+    const auto special = [&](std::string id, auto run,
+                             std::vector<std::pair<std::string, std::string>> tags = {}) {
+        tags.emplace_back("format", format);
+        catalogue.push_back({"moe/" + format + "/" + id, std::move(tags)});
+        runners.push_back(run);
+    };
+    special("affine", affine_cases);
+    special("route", route_cases, {{"execution", "graph"}});
+    const auto add = [&](int m, ops::ExpertSubsetKind subset, bool shared, bool complete,
+                         DType dtype, ops::MoeEpilogue epilogue, bool graph) {
+        const auto id = std::string(complete ? "complete" : "routed") + "/t" +
+                        std::to_string(m) + "/subset" + std::to_string(int(subset)) +
+                        (shared ? "/shared" : "/no_shared") + "/dtype" +
+                        std::to_string(int(dtype)) + "/epilogue" +
+                        std::to_string(int(epilogue)) + (graph ? "/graph" : "/eager");
+        special(id,
+                [=](Fixture& f, auto e) {
+                    return run(f, e, m, subset, shared, complete, dtype, epilogue, graph);
+                },
+                {{"execution", graph ? "graph" : "eager"}});
+    };
+    using ops::ExpertSubsetKind;
+    using ops::MoeEpilogue;
+    for (int m : {1,   2,   3,   7,    8,    9,    15,   16,   17,   18,   31,   32,   33,
+                  34,  63,  64,  65,   66,   127,  128,  129,  130,  255,  256,  257,  258,
+                  511, 512, 513, 1023, 1024, 1025, 3071, 3072, 3073, 3583, 3584, 3585, 4097}) {
+        add(m, ExpertSubsetKind::All, false, false, DType::FP32, MoeEpilogue::Write, false);
     }
+    for (auto subset :
+         {ExpertSubsetKind::None, ExpertSubsetKind::MaskOnes, ExpertSubsetKind::MaskZeros}) {
+        add(17, subset, true, false, DType::BF16, MoeEpilogue::AddResidual, true);
+    }
+    for (auto subset : {ExpertSubsetKind::MaskOnes, ExpertSubsetKind::MaskZeros}) {
+        add(129, subset, false, false, DType::FP32, MoeEpilogue::Write, true);
+        add(1, subset, true, false, DType::BF16, MoeEpilogue::AddResidual, true);
+    }
+    add(1, ExpertSubsetKind::None, true, false, DType::FP32, MoeEpilogue::Write, true);
+    for (int m : {1, 65}) {
+        add(m, ExpertSubsetKind::None, false, false, DType::FP32, MoeEpilogue::Write, true);
+    }
+    for (int m : {512, 1024}) {
+        add(m, ExpertSubsetKind::All, false, false, DType::BF16, MoeEpilogue::Write, true);
+        add(m, ExpertSubsetKind::MaskZeros, true, false, DType::FP32, MoeEpilogue::Write, true);
+    }
+    add(2048, ExpertSubsetKind::None, true, false, DType::FP32, MoeEpilogue::Write, false);
+    add(2, ExpertSubsetKind::All, false, false, DType::FP32, MoeEpilogue::Write, true);
+    add(2, ExpertSubsetKind::MaskOnes, false, false, DType::FP32, MoeEpilogue::Write, true);
+    add(4098, ExpertSubsetKind::All, false, false, DType::FP32, MoeEpilogue::Write, true);
+    for (int m : {3071, 3072, 3073}) {
+        add(m, ExpertSubsetKind::MaskZeros, true, false, DType::FP32, MoeEpilogue::Write,
+            true);
+    }
+    add(2, ExpertSubsetKind::MaskZeros, true, false, DType::BF16, MoeEpilogue::AddResidual,
+        true);
+    for (int m : {1,    2,    7,    8,    9,    65,   511,  512,  513,  1023,
+                  1024, 1025, 2047, 2048, 3071, 3072, 3073, 4096, 4097, 4098}) {
+        add(m, ExpertSubsetKind::All, true, true, DType::BF16, MoeEpilogue::Write, true);
+    }
+    special("shared_only", zero_expert_cases, {{"execution", "graph"}});
+    suite.add(std::move(catalogue), [=](auto selected) {
+        DeviceContext device;
+        Fixture fixture;
+        int failures = 0;
+        for (auto i : selected) failures += runners[i](fixture, device.execution_view());
+        return failures;
+    });
     return suite.main(argc, argv);
 }

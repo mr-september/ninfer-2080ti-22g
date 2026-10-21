@@ -16,7 +16,6 @@ void add_multi_output_cases(Suite& suite) {
                         segments,
                         regions,
                         a16,
-                        1.0 / 256.0,
                         Binding::ProjectionInputs};
         std::vector<Invocation> calls;
         for (int t = 1; t <= 128; ++t) calls.push_back({.t = t, .input_seed = 101U});
@@ -48,33 +47,10 @@ void add_multi_output_cases(Suite& suite) {
     }
     {
         Profile profile{5120,
-                        {{QType::NVFP4,
-                          14336,
-                          331U,
-                          {.weight_scale_divisor = 0.125F, .input_scale_divisor = 3.5F}}},
-                        segments,
-                        regions,
-                        a16,
-                        1.0 / 256.0,
-                        Binding::Nvfp4Inputs};
-        std::vector<Invocation> calls;
-        for (int t : {1, 2, 4, 8, 16, 20, 32, 33})
-            calls.push_back({.t = t, .input_seed = 337U, .omit_divisors = t == 1});
-        calls.push_back({.t = 4, .policy = Policy::AllowA8, .input_seed = 337U});
-        calls.push_back(
-            {.t = 4, .policy = Policy::AllowA8, .input_seed = 337U, .omit_divisors = true});
-        for (int t : {4, 17, 1023, 1024, 1025})
-            calls.push_back(
-                {.t = t, .policy = Policy::AllowA4, .input_seed = 337U, .sample_rows = 31});
-        add_profile(suite, profile, std::move(calls));
-    }
-    {
-        Profile profile{5120,
                         {{QType::FP8_E4M3FN_ROW_BF16, 14336, 349U}},
                         segments,
                         regions,
                         fp8_a16,
-                        1.0 / 256.0,
                         Binding::ProjectionInputs};
         std::vector<Invocation> calls;
         for (auto policy : {Policy::A16Only, Policy::AllowA8}) {
@@ -94,12 +70,6 @@ void add_multi_output_cases(Suite& suite) {
                                  .sample_rows = 31});
             calls.push_back({.t = 0, .policy = policy, .workspace_intervals = true});
         }
-        for (int t : {1, 17, 129})
-            calls.push_back({.t           = t,
-                             .policy      = Policy::AllowA4,
-                             .graph       = t == 17,
-                             .input_seed  = 101U,
-                             .sample_rows = 31});
         add_profile(suite, profile, std::move(calls));
     }
     {
@@ -119,7 +89,6 @@ void add_multi_output_cases(Suite& suite) {
                         {4096, 1024, 1024},
                         {{0, 4096}, {4096, 1024}, {5120, 1024}},
                         a16,
-                        1.0 / 256.0,
                         Binding::LinearInputs};
         std::vector<Invocation> calls;
         if (k == 2048) {

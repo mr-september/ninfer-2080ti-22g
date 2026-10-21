@@ -1,6 +1,5 @@
 #include "ops/linear_attention/gated_delta_net/input_conv/execute.h"
 #include "ops/linear_attention/gated_delta_net/input_conv/fp8/launch.h"
-#include "ops/linear_attention/gated_delta_net/input_conv/nvfp4/launch.h"
 #include "ops/linear_attention/gated_delta_net/input_conv/projected_conv.h"
 #include "ops/linear_attention/gated_delta_net/input_conv/q4_q5/launch.h"
 #include "ops/linear_attention/gated_delta_net/input_conv/q8/launch.h"
@@ -26,12 +25,6 @@ void launch_projection(const Tensor& x, const WeightOperands& weights, Projected
             launch_fp8_gdn_input_decode(x, w, out.qkv, out.z, stream);
         else
             launch_fp8_gdn_input_matrix(x, w, out.qkv, out.z, stream);
-        break;
-    case Format::Nvfp4:
-        if (plan.compute == Compute::A4)
-            launch_nvfp4_gdn_input_a4(x, w, out.qkv, out.z, scratch.nvfp4, stream);
-        else
-            launch_nvfp4_gdn_input_a16(x, w, out.qkv, out.z, stream);
         break;
     }
 }
@@ -67,16 +60,6 @@ void launch_snapshot(const Tensor& x, const WeightOperands& weights, const Tenso
         launch_fp8_gdn_snapshot_fused(x, w, conv, state.history, valid, state.source_slots,
                                       state.snapshot_bases, out.query, out.key, out.value, out.z,
                                       stream);
-        return;
-    case ConvKernel::Nvfp4Decode:
-        launch_nvfp4_gdn_snapshot_decode(x, w, conv, state.history, valid, state.source_slots,
-                                         state.snapshot_bases, out.query, out.key, out.value, out.z,
-                                         stream);
-        return;
-    case ConvKernel::Nvfp4Window:
-        launch_nvfp4_gdn_snapshot_small_t(x, w, conv, state.history, valid, state.source_slots,
-                                          state.snapshot_bases, out.query, out.key, out.value,
-                                          out.z, stream);
         return;
     case ConvKernel::Materialized:
         break;
@@ -124,12 +107,7 @@ void launch_record(const Tensor& x, const WeightOperands& weights, const Tensor&
         launch_fp8_gdn_record_fused(x, w, conv, state.history, valid, state.source_slots, record,
                                     out.query, out.key, out.value, out.z, stream);
         return;
-    case ConvKernel::Nvfp4Window:
-        launch_nvfp4_gdn_record_small_t(x, w, conv, state.history, valid, state.source_slots,
-                                        record, out.query, out.key, out.value, out.z, stream);
-        return;
     case ConvKernel::Q8Decode:
-    case ConvKernel::Nvfp4Decode:
         throw std::logic_error("GDN record selected a one-token kernel");
     case ConvKernel::Materialized:
         break;

@@ -67,8 +67,6 @@ ReductionCriterion criterion(const Profile& profile, ops::LinearPolicy policy) {
         return profile.a16;
     case ops::LinearPolicy::AllowA8:
         return {0.04, 1.0 / 256.0, 0.06};
-    case ops::LinearPolicy::AllowA4:
-        return {0.16, profile.a4_absolute, 0.16};
     }
     throw std::invalid_argument("unknown Linear policy");
 }
@@ -156,11 +154,8 @@ ops::ProjectionWeights prepare(const Profile& profile, const Invocation& call,
     for (const auto& source : weights) {
         const auto weight = source->view();
         const std::array shape{std::uint64_t(weight.n), std::uint64_t(weight.k)};
-        const auto divisors = weight.qtype == QType::NVFP4
-                                  ? std::span(&source->host.weight.weight_scale_divisor, 1)
-                                  : std::span<const float>{};
         parents.push_back({weight_geometry(weight.qtype, weight.layout, shape), weight.device,
-                           static_cast<const std::byte*>(weight.payload), divisors});
+                           static_cast<const std::byte*>(weight.payload)});
     }
     std::vector<WeightView> views;
     const auto& slices = profile.input_slices.empty() ? profile.outputs : profile.input_slices;
@@ -176,22 +171,7 @@ ops::ProjectionWeights prepare(const Profile& profile, const Invocation& call,
         row += count;
     }
     std::vector<ops::WeightInput> inputs;
-    for (std::size_t i = 0; i < views.size(); ++i) {
-        std::optional<float> divisor;
-        if (profile.binding == Binding::Nvfp4Inputs && !call.omit_divisors)
-            divisor = weights[0]->view().input_scale_divisor +
-                      (call.policy == ops::LinearPolicy::AllowA4 ? 0.0F : float(i));
-        inputs.push_back({views[i], call.policy, divisor});
-    }
-    if (profile.binding == Binding::Nvfp4Inputs && call.policy == ops::LinearPolicy::AllowA8) {
-        auto mixed = inputs;
-        for (std::size_t i = 0; i < mixed.size(); ++i)
-            mixed[i].activation_input_divisor = weights[0]->view().input_scale_divisor + float(i);
-        mixed[0].policy = ops::LinearPolicy::AllowA4;
-        if (std::get<ops::SingleProjectionWeight>(ops::prepare_projection_weights(mixed)).policy !=
-            call.policy)
-            throw std::runtime_error("projection inputs lost their permission intersection");
-    }
+    for (std::size_t i = 0; i < views.size(); ++i) inputs.push_back({views[i], call.policy});
     if (profile.binding == Binding::LinearInputs) return ops::prepare_linear_weight(inputs);
     return ops::prepare_projection_weights(inputs);
 }
@@ -358,7 +338,6 @@ void add_profile(Suite& suite, const Profile& profile, std::vector<Invocation> c
             std::to_string(static_cast<int>(call.columns)) +
             (call.convenience ? "/convenience" : "/policy") +
             (call.shared_output ? "/shared" : "/separate");
-        if (call.omit_divisors) input += "/no-divisors";
         if (call.validate_operands) input += "/invalid-operands";
         if (call.workspace_intervals) input += "/workspace-intervals";
         auto test = linear_suite::make_case(

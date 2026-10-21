@@ -21,20 +21,14 @@ namespace ninfer::ops {
 enum class LinearPolicy : std::uint8_t {
     A16Only, ///< Admit only A16 compute profiles.
     AllowA8, ///< Admit either A16 or A8 compute profiles.
-    AllowA4, ///< Admit A16, A8 or A4 compute profiles.
 };
 
 [[nodiscard]] constexpr bool valid_linear_policy(LinearPolicy policy) noexcept {
-    return policy == LinearPolicy::A16Only || policy == LinearPolicy::AllowA8 ||
-           policy == LinearPolicy::AllowA4;
+    return policy == LinearPolicy::A16Only || policy == LinearPolicy::AllowA8;
 }
 
 [[nodiscard]] constexpr bool allows_a8(LinearPolicy policy) noexcept {
-    return policy == LinearPolicy::AllowA8 || policy == LinearPolicy::AllowA4;
-}
-
-[[nodiscard]] constexpr bool allows_a4(LinearPolicy policy) noexcept {
-    return policy == LinearPolicy::AllowA4;
+    return policy == LinearPolicy::AllowA8;
 }
 
 /**
@@ -56,10 +50,10 @@ enum class LinearPolicy : std::uint8_t {
  * any weight plane. Inputs are preserved. There is no bias, activation or transpose.
  *
  * Supports registered weight geometries and column domains for contiguous BF16, RowSplit
- * Q4/Q5/Q6-G64 and Q8-G32 with FP16 scales, row-scaled FP8, and block-scaled NVFP4.
+ * Q4/Q5/Q6-G64 and Q8-G32 with FP16 scales and row-scaled FP8.
  * Unsupported format/geometry/layout combinations throw.
  *
- * policy permits private A16/A8/A4 computation; input and output remain BF16. Permission
+ * policy permits private A16/A8 computation; input and output remain BF16. Permission
  * does not require activation quantization. Workspace is caller-owned transient storage,
  * sized by linear_workspace_capacity_bytes(), disjoint from all operands. No hidden allocation.
  */

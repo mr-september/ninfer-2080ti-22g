@@ -19,7 +19,7 @@ struct Region {
     int first, rows, head_dim = 0;
 };
 enum class Columns { All, Seven, Projection, HeadBoundaries };
-enum class Binding { Direct, ProjectionInputs, LinearInputs, Nvfp4Inputs };
+enum class Binding { Direct, ProjectionInputs, LinearInputs };
 
 struct Profile {
     int k;
@@ -27,8 +27,7 @@ struct Profile {
     std::vector<int> outputs;
     std::vector<Region> regions;
     ReductionCriterion a16;
-    double a4_absolute = 1.0 / 256.0;
-    Binding binding    = Binding::Direct;
+    Binding binding = Binding::Direct;
     std::vector<int> input_slices;
 };
 
@@ -43,7 +42,6 @@ struct Invocation {
     bool full_rows             = false;
     bool convenience           = false;
     bool shared_output         = false;
-    bool omit_divisors         = false;
     bool eager_before_capture  = false;
     bool validate_operands     = false;
     bool workspace_intervals   = false;
@@ -54,7 +52,5 @@ void add_profile(Suite& suite, const Profile& profile, std::vector<Invocation> c
 void add_segmented_cases(Suite& suite);
 void add_two_output_cases(Suite& suite);
 void add_multi_output_cases(Suite& suite);
-
-void add_bank_cases(Suite& suite);
 
 } // namespace ninfer::test::linear_split

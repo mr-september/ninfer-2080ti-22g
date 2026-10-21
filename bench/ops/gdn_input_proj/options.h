@@ -18,8 +18,8 @@ inline Options parse_options(int argc, char** argv) {
         const std::string_view flag = argv[i];
         if (flag == "--help" || flag == "-h") {
             std::cout << "GDN input Op benchmark\n"
-                         "  --op snapshot|record --format q4q5|q8|fp8|nvfp4\n"
-                         "  --n N --k K --policy a16|allow-a8|allow-a4\n"
+                         "  --op snapshot|record --format q4q5|q8|fp8\n"
+                         "  --n N --k K --policy a16|allow-a8\n"
                          "  --tokens T[,T...] or --sweep START:END[:STEP]\n"
                          "  --batch B --valid-columns T[,T...]\n"
                          "Uses physical T and B. Defaults: Q8 "
@@ -54,7 +54,7 @@ inline Options parse_options(int argc, char** argv) {
             throw std::invalid_argument("unknown option: " + std::string(flag));
     }
     if (o.op != "snapshot" && o.op != "record") throw std::invalid_argument("unknown input Op");
-    if (o.policy != "a16" && o.policy != "allow-a8" && o.policy != "allow-a4")
+    if (o.policy != "a16" && o.policy != "allow-a8")
         throw std::invalid_argument("unknown activation policy");
     if (o.format == "q4q5" && o.policy != "a16")
         throw std::invalid_argument("paired Q4/Q5 weights use A16");
@@ -64,15 +64,13 @@ inline Options parse_options(int argc, char** argv) {
         throw std::invalid_argument("valid columns must match exact T/B");
     const bool supported = o.format == "q8"
                                ? ((o.n == 12288 && o.k == 2048) || (o.n == 16384 && o.k == 2560))
-                               : (o.format == "q4q5" || o.format == "fp8" || o.format == "nvfp4") &&
+                               : (o.format == "q4q5" || o.format == "fp8") &&
                                      o.n == 16384 && o.k == 5120;
     if (!supported) throw std::invalid_argument("unsupported format/N/K");
     return o;
 }
 
 inline ops::LinearPolicy policy(const Options& o) {
-    return o.policy == "a16"        ? ops::LinearPolicy::A16Only
-           : o.policy == "allow-a8" ? ops::LinearPolicy::AllowA8
-                                    : ops::LinearPolicy::AllowA4;
+    return o.policy == "a16" ? ops::LinearPolicy::A16Only : ops::LinearPolicy::AllowA8;
 }
 } // namespace ninfer::bench::gdn_input

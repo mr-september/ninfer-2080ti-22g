@@ -61,11 +61,10 @@ void add_profile(Suite& suite, const Profile& profile) {
     auto test =
         test::linear_suite::make_case("fp8", profile.n, profile.k, 0, ops::LinearPolicy::A16Only,
                                       test::linear_suite::Execution::Eager, "workspace-intervals");
-    test.policies = 7;
+    test.policies = 3;
     suite.add(std::move(test), [profile] {
         int failures = 0;
-        for (auto policy :
-             {ops::LinearPolicy::A16Only, ops::LinearPolicy::AllowA8, ops::LinearPolicy::AllowA4}) {
+        for (auto policy : {ops::LinearPolicy::A16Only, ops::LinearPolicy::AllowA8}) {
             for (auto [first, last] :
                  {std::pair{1, 48}, std::pair{1, 1024}, std::pair{1000, 1048}}) {
                 const auto capacity = ops::linear_add_workspace_capacity_bytes(

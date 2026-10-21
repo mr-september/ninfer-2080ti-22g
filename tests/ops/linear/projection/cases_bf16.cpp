@@ -187,11 +187,10 @@ void run_new_bf16_geometry(Suite& suite, const Geometry& shape) {
     const bool wide        = shape.n == 2560 && shape.k == 2560;
     auto test     = linear_suite::make_case("bf16", shape.n, shape.k, 0, ops::LinearPolicy::A16Only,
                                             linear_suite::Execution::Eager, "column-domain");
-    test.policies = 7;
+    test.policies = 3;
     suite.add(std::move(test), [shape, step, maximum, raw, text] {
         int failures = 0;
-        for (const auto policy :
-             {ops::LinearPolicy::A16Only, ops::LinearPolicy::AllowA8, ops::LinearPolicy::AllowA4}) {
+        for (const auto policy : {ops::LinearPolicy::A16Only, ops::LinearPolicy::AllowA8}) {
             if (ops::linear_workspace_capacity_bytes(QType::BF16, shape.n, shape.k, policy, step,
                                                      maximum) != 0) {
                 std::cerr << "BF16: expected zero workspace across the admitted column domain\n";
@@ -282,7 +281,6 @@ void run_new_bf16_geometry(Suite& suite, const Geometry& shape) {
         if (end >= step && end % step == 0) calls.push_back({end, CallForm::A16Convenience});
     }
     calls.push_back({raw ? 20 : 17, CallForm::Policy, ops::LinearPolicy::AllowA8});
-    calls.push_back({64, CallForm::Policy, ops::LinearPolicy::AllowA4});
     const std::uint32_t seed = static_cast<std::uint32_t>(shape.n + shape.k + 431);
     add_shape(suite, ninfer::QType::BF16, ActivationRecipe::TokenBlocks, make_bf16_weight,
               {shape.n, shape.k, seed, shape.n <= 640 ? Comparison::Full : Comparison::Sampled,

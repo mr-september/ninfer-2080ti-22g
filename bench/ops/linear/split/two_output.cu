@@ -22,7 +22,7 @@ Options parse_options(int argc, char** argv) {
         const std::string_view flag = argv[i];
         if (flag == "--help" || flag == "-h") {
             std::cout << "LinearSplit two-output benchmark\n"
-                         "  --format q4q5|q8|fp8|nvfp4 --n N --k K --policy a16|allow-a8|allow-a4\n"
+                         "  --format q4q5|q8|fp8 --n N --k K --policy a16|allow-a8\n"
                          "  --tokens M[,M...] or --sweep START:END[:STEP]\n";
             measurement::help();
             std::exit(0);
@@ -44,13 +44,13 @@ Options parse_options(int argc, char** argv) {
         } else if (!measurement::parse(o.timing, flag, value))
             throw std::invalid_argument("unknown option: " + std::string(flag));
     }
-    if (o.policy != "a16" && o.policy != "allow-a8" && o.policy != "allow-a4")
+    if (o.policy != "a16" && o.policy != "allow-a8")
         throw std::invalid_argument("unknown activation policy");
     if (o.format == "q4q5" && o.policy != "a16")
         throw std::invalid_argument("paired Q4/Q5 weights use A16");
     const bool supported = o.format == "q8"
                                ? ((o.n == 12288 && o.k == 2048) || (o.n == 16384 && o.k == 2560))
-                               : (o.format == "q4q5" || o.format == "fp8" || o.format == "nvfp4") &&
+                               : (o.format == "q4q5" || o.format == "fp8") &&
                                      o.n == 16384 && o.k == 5120;
     if (!supported) throw std::invalid_argument("unsupported format/N/K");
     return o;
@@ -60,9 +60,8 @@ Options parse_options(int argc, char** argv) {
 int main(int argc, char** argv) {
     try {
         const auto options = parse_options(argc, argv);
-        const auto policy  = options.policy == "a16"        ? ops::LinearPolicy::A16Only
-                             : options.policy == "allow-a8" ? ops::LinearPolicy::AllowA8
-                                                            : ops::LinearPolicy::AllowA4;
+        const auto policy  = options.policy == "a16" ? ops::LinearPolicy::A16Only
+                                                     : ops::LinearPolicy::AllowA8;
         measurement::hardware();
         auto& device = ninfer::bench::device_context();
         PackedQuantizedWeight first, second;
@@ -75,10 +74,8 @@ int main(int argc, char** argv) {
             if (options.format == "q8")
                 first = make_row_split_weight(QType::Q8_G32_FP16, options.n, options.k, options.k,
                                               501U);
-            else if (options.format == "fp8")
-                first = make_fp8_weight(options.n, options.k, 501U);
             else
-                first = make_nvfp4_weight(options.n, options.k, 501U);
+                first = make_fp8_weight(options.n, options.k, 501U);
             weights = ops::SingleProjectionWeight{first.weight, policy};
         }
         const int tail = (options.n - 4096) / 2;

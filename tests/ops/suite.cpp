@@ -17,7 +17,7 @@ namespace ninfer::test {
 namespace {
 
 // Case IDs are slash-separated and name the format as one component (for example
-// "nvfp4/34816x5120/..." or "gdn_input_record/fp8/..."). Formats the target cannot execute are
+// "fp8/34816x5120/..." or "gdn_input_record/fp8/..."). Formats the target cannot execute are
 // counted as skipped.
 bool supported_on_target(const std::string& id) {
     if (kSm120Formats) return true;
@@ -25,7 +25,7 @@ bool supported_on_target(const std::string& id) {
     while (begin <= id.size()) {
         const std::size_t end = std::min(id.find('/', begin), id.size());
         const std::string part = id.substr(begin, end - begin);
-        if (part == "fp8" || part == "nvfp4") return false;
+        if (part == "fp8") return false;
         begin = end + 1;
     }
     return true;

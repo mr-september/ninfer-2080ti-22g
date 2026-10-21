@@ -3,14 +3,12 @@
 #include "ops/linear_attention/gated_delta_net/input_conv/fp8/launch.h"
 #include "ops/linear_attention/gated_delta_net/input_conv/plan.h"
 #include "ops/linear/kernels/fp8/fp8_a8_plan.h"
-#include "ops/linear/kernels/nvfp4/nvfp4_a4_plan.h"
 
 namespace ninfer::ops::detail::gdn_input {
 
 struct Scratch {
     Tensor projected;
     Fp8A8Workspace fp8;
-    Nvfp4A4Workspace nvfp4;
 };
 
 // The same allocation recipe runs on WorkspaceLayoutBuilder and on the call-local arena.
@@ -23,8 +21,6 @@ Scratch allocate_workspace(Allocator& allocator, const WeightProfile& weights, P
     if (plan.compute == Compute::A8)
         out.fp8 = allocate_fp8_a8_workspace(allocator, columns, weights.geometry.input_rows,
                                             fp8_gdn_input_partial_capacity_bytes(columns));
-    if (plan.compute == Compute::A4)
-        out.nvfp4 = allocate_nvfp4_a4_workspace(allocator, columns, weights.geometry.input_rows);
     return out;
 }
 

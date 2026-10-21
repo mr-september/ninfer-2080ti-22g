@@ -1,4 +1,3 @@
-#include "ops/moe/kernels/cuda/block_scaled/nvfp4/launch.h"
 #include "ops/moe/kernels/cuda/block_scaled/fp8/launch.h"
 #include "ops/moe/kernels/cuda/block_scaled/output.cuh"
 
@@ -194,23 +193,14 @@ void launch(const Tensor& x, const CudaSwiGLUExperts& experts, const ExpertRoute
             bool shared_prepared) {
     const auto stream = execution.stream();
     if (subset.kind != ExpertSubsetKind::None && plan.vector) {
-        if (plan.format == QType::NVFP4) {
-            nvfp4::launch_vector(x, experts, routes, subset, shared != nullptr, mode, destination,
-                                 s, execution);
-        } else {
-            fp8::launch_vector(x, experts, routes, subset, shared != nullptr, mode, destination, s,
-                               execution);
-        }
+        fp8::launch_vector(x, experts, routes, subset, shared != nullptr, mode, destination, s,
+                           execution);
         if (!shared) { return; }
     } else if (subset.kind != ExpertSubsetKind::None) {
         const int assignments = x.ne[1] * kTopK;
         const auto* ids       = static_cast<const int*>(routes.ids.data);
         const auto* mask      = static_cast<const int*>(subset.mask.data);
-        if (plan.format == QType::NVFP4) {
-            nvfp4::launch_input(x, experts, s, execution, !shared_prepared);
-        } else {
-            fp8::launch_input(x, experts, s, execution, !shared_prepared);
-        }
+        fp8::launch_input(x, experts, s, execution, !shared_prepared);
         if (plan.single_block_grouping) {
             group_small<<<1, kExperts, 0, stream>>>(ids, subset.kind, mask, s.groups, assignments,
                                                     plan.job_columns());
@@ -227,11 +217,7 @@ void launch(const Tensor& x, const CudaSwiGLUExperts& experts, const ExpertRoute
                                                                              s.groups, assignments);
             CUDA_CHECK(cudaGetLastError());
         }
-        if (plan.format == QType::NVFP4) {
-            nvfp4::launch_experts(x, experts, routes, plan, s, execution);
-        } else {
-            fp8::launch_experts(x, experts, routes, plan, s, execution);
-        }
+        fp8::launch_experts(x, experts, routes, plan, s, execution);
     }
     if (shared) {
         launch_shared(x, *shared, routes, mode, destination, s, plan, execution, shared_prepared);

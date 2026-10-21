@@ -1,6 +1,6 @@
 // Throwing definitions for the routes a Turing build does not compile.
 //
-// The FP8/NVFP4 weight kernels, the FP8/NVFP4/K8V4 KV-cache kernels, the block-scaled MoE,
+// The FP8 weight kernels, the FP8 KV-cache kernels, the block-scaled MoE,
 // and the TMA/sparse-attention families need sm_120a instructions or serve models that are
 // not supported on this target. Their sources are excluded in src/ops/CMakeLists.txt; the
 // shared dispatchers still name them, so these definitions keep the link complete and report
@@ -12,16 +12,11 @@
 #include "ninfer/ops/kimi_delta_attention.h"
 #include "ninfer/ops/qsa.h"
 #include "ops/linear/add/fp8/dispatch.h"
-#include "ops/linear/add/nvfp4/dispatch.h"
 #include "ops/linear/projection/fp8/fp8_dispatch.h"
-#include "ops/linear/projection/nvfp4/nvfp4_dispatch.h"
 #include "ops/linear/swiglu/fp8/dispatch.h"
-#include "ops/linear/swiglu/nvfp4/dispatch.h"
 #include "ops/linear/topk/dispatch.h"
 #include "ops/linear_attention/gated_delta_net/input_conv/fp8/launch.h"
-#include "ops/linear_attention/gated_delta_net/input_conv/nvfp4/launch.h"
 #include "ops/moe/kernels/cuda/block_scaled/fp8/launch.h"
-#include "ops/moe/kernels/cuda/block_scaled/nvfp4/launch.h"
 #include "ops/moe/routed_swiglu/cuda/dispatch.h"
 #include "ops/moe/topk_softmax_swiglu_moe/dispatch.h"
 #include "ops/softmax_attention/dense/causal_cache/fp8/launch.h"
@@ -110,17 +105,6 @@ std::size_t fp8_linear_workspace_capacity_bytes(std::int32_t output_rows,
                                                               LinearPolicy policy,
                                                               std::int32_t min_tokens,
                                                               std::int32_t max_tokens) { unsupported("fp8_linear_workspace_capacity_bytes"); }
-std::size_t nvfp4_linear_add_workspace_capacity_bytes(std::int32_t rows, std::int32_t k,
-                                                      LinearPolicy policy, std::int32_t first,
-                                                      std::int32_t last) { unsupported("nvfp4_linear_add_workspace_capacity_bytes"); }
-std::size_t nvfp4_linear_swiglu_workspace_capacity_bytes(LinearPolicy policy,
-                                                                       std::int32_t min_tokens,
-                                                                       std::int32_t max_tokens) { unsupported("nvfp4_linear_swiglu_workspace_capacity_bytes"); }
-std::size_t nvfp4_linear_workspace_capacity_bytes(std::int32_t output_rows,
-                                                                std::int32_t input_rows,
-                                                                LinearPolicy policy,
-                                                                std::int32_t min_tokens,
-                                                                std::int32_t max_tokens) { unsupported("nvfp4_linear_workspace_capacity_bytes"); }
 void fp8_dispatch(const Tensor& x, const Weight& weight, Tensor& out, LinearPolicy policy,
                   MemoryArena* workspace, cudaStream_t stream) { unsupported("fp8_dispatch"); }
 void fp8_kv_append_attention(const Tensor& q, const Tensor& k, const Tensor& v,
@@ -151,36 +135,10 @@ void launch_fp8_gdn_snapshot_fused(const Tensor& x, const Weight& weight, const 
                                    const Tensor& initial_slot, const Tensor& snapshot_base_slot,
                                    Tensor& query, Tensor& key, Tensor& value, Tensor& z,
                                    cudaStream_t stream) { unsupported("launch_fp8_gdn_snapshot_fused"); }
-void launch_nvfp4_gdn_input_a16(const Tensor& x, const Weight& weight, Tensor& qkv, Tensor& z,
-                                cudaStream_t stream) { unsupported("launch_nvfp4_gdn_input_a16"); }
-void launch_nvfp4_gdn_input_a4(const Tensor& x, const Weight& weight, Tensor& qkv, Tensor& z,
-                               Nvfp4A4Workspace workspace, cudaStream_t stream) { unsupported("launch_nvfp4_gdn_input_a4"); }
-void launch_nvfp4_gdn_record_small_t(const Tensor& x, const Weight& weight,
-                                     const Tensor& conv_weight, const Tensor& conv_states,
-                                     const Tensor& valid_columns, const Tensor& initial_slot,
-                                     Tensor& conv_record, Tensor& query, Tensor& key, Tensor& value,
-                                     Tensor& z, cudaStream_t stream) { unsupported("launch_nvfp4_gdn_record_small_t"); }
-void launch_nvfp4_gdn_snapshot_decode(const Tensor& x, const Weight& weight,
-                                      const Tensor& conv_weight, Tensor& conv_states,
-                                      const Tensor& valid_columns, const Tensor& initial_slot,
-                                      const Tensor& snapshot_base_slot, Tensor& query, Tensor& key,
-                                      Tensor& value, Tensor& z, cudaStream_t stream) { unsupported("launch_nvfp4_gdn_snapshot_decode"); }
-void launch_nvfp4_gdn_snapshot_small_t(const Tensor& x, const Weight& weight,
-                                       const Tensor& conv_weight, Tensor& conv_states,
-                                       const Tensor& valid_columns, const Tensor& initial_slot,
-                                       const Tensor& snapshot_base_slot, Tensor& query, Tensor& key,
-                                       Tensor& value, Tensor& z, cudaStream_t stream) { unsupported("launch_nvfp4_gdn_snapshot_small_t"); }
-void nvfp4_dispatch(const Tensor& x, const Weight& weight, Tensor& out, LinearPolicy policy,
-                    MemoryArena* workspace, cudaStream_t stream) { unsupported("nvfp4_dispatch"); }
-void nvfp4_linear_add_dispatch(const Tensor&, const Weight&, Tensor&, LinearPolicy, MemoryArena&,
-                               cudaStream_t) { unsupported("nvfp4_linear_add_dispatch"); }
-void nvfp4_linear_swiglu_dispatch(const Tensor& x, const Weight& weight, Tensor& out,
-                                  LinearPolicy policy, MemoryArena& workspace, cudaStream_t stream) { unsupported("nvfp4_linear_swiglu_dispatch"); }
 } // namespace ninfer::ops::detail
 
 namespace ninfer::ops::detail::moe_complete {
 const ShapePolicy& fp8_h2560_i640_e512_k10() { unsupported("fp8_h2560_i640_e512_k10"); }
-const ShapePolicy& nvfp4_h2560_i640_e512_k10() { unsupported("nvfp4_h2560_i640_e512_k10"); }
 } // namespace ninfer::ops::detail::moe_complete
 
 namespace ninfer::ops::detail::moe_cuda::block_scaled::fp8 {
@@ -193,17 +151,6 @@ void launch_vector(const Tensor& x, const CudaSwiGLUExperts& experts, const Expe
                    const Storage& storage, CudaExecutionView execution) { unsupported("launch_vector"); }
 } // namespace ninfer::ops::detail::moe_cuda::block_scaled::fp8
 
-namespace ninfer::ops::detail::moe_cuda::block_scaled::nvfp4 {
-void launch_experts(const Tensor& x, const CudaSwiGLUExperts& experts, const ExpertRoutes& routes,
-                    const Plan& plan, const Storage& storage, CudaExecutionView execution) { unsupported("launch_experts"); }
-void launch_input(const Tensor& x, const CudaSwiGLUExperts& experts, const Storage& storage,
-                  CudaExecutionView execution, bool clear_counts) { unsupported("launch_input"); }
-void launch_vector(const Tensor& x, const CudaSwiGLUExperts& experts, const ExpertRoutes& routes,
-                   ExpertSubset subset, bool shared, MoeEpilogue mode, Tensor& destination,
-                   const Storage& storage, CudaExecutionView execution) { unsupported("launch_vector"); }
-} // namespace ninfer::ops::detail::moe_cuda::block_scaled::nvfp4
-
 namespace ninfer::ops::detail::moe_routed {
 const ShapePolicy& fp8_h2560_i640_e512_k10() { unsupported("fp8_h2560_i640_e512_k10"); }
-const ShapePolicy& nvfp4_h2560_i640_e512_k10() { unsupported("nvfp4_h2560_i640_e512_k10"); }
 } // namespace ninfer::ops::detail::moe_routed

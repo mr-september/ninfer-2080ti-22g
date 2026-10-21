@@ -111,31 +111,4 @@ inline std::uint8_t encode_e4m3fn_rne_satfinite(float value) {
     return static_cast<std::uint8_t>(selected | (negative ? 128 : 0));
 }
 
-inline float decode_e2m1(std::uint8_t code) {
-    constexpr std::array<float, 8> magnitude{0.0f, 0.5f, 1.0f, 1.5f, 2.0f, 3.0f, 4.0f, 6.0f};
-    const float value = magnitude.at(static_cast<std::size_t>(code & 0x07U));
-    return (code & 0x08U) == 0 ? value : -value;
-}
-
-inline std::uint8_t encode_e2m1_rne_satfinite(float value) {
-    const bool negative   = std::signbit(value);
-    const float magnitude = std::abs(value);
-    std::uint8_t selected = 7;
-    if (magnitude < 6.0f) {
-        for (std::uint8_t upper = 1; upper <= 7; ++upper) {
-            const float upper_value = decode_e2m1(upper);
-            if (upper_value < magnitude) continue;
-            const std::uint8_t lower = static_cast<std::uint8_t>(upper - 1);
-            const float lower_value  = decode_e2m1(lower);
-            const float lower_error  = magnitude - lower_value;
-            const float upper_error  = upper_value - magnitude;
-            selected                 = lower_error < upper_error   ? lower
-                                       : upper_error < lower_error ? upper
-                                                                   : ((lower & 1U) == 0U ? lower : upper);
-            break;
-        }
-    }
-    return static_cast<std::uint8_t>(selected | (negative ? 0x08U : 0U));
-}
-
 } // namespace ninfer::test::float_codec

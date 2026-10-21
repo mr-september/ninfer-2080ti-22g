@@ -27,7 +27,7 @@ WeightBankLayout describe_weight_bank(const WeightGeometry& g, const WeightBankR
         g.shape.back() > std::numeric_limits<std::int32_t>::max()) {
         throw std::invalid_argument("weight bank exceeds its parent or native matrix domain");
     }
-    const auto alignment = g.format == QType::NVFP4 ? 128 : g.scale_block_rows;
+    const auto alignment = g.scale_block_rows;
     if (r.row_begin % alignment || r.rows % alignment || r.row_stride % alignment) {
         throw std::invalid_argument("weight bank splits a scale tile");
     }

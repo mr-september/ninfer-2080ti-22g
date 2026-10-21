@@ -118,25 +118,6 @@ static __global__ void fill_fp8_weight_kernel(std::uint8_t* codes, __nv_bfloat16
     }
 }
 
-static __global__ void fill_nvfp4_weight_kernel(std::uint8_t* codes, std::uint8_t* scales,
-                                                std::uint64_t count, int k, std::uint64_t seed,
-                                                float extent, float divisor) {
-    for (auto i = std::uint64_t(blockIdx.x) * blockDim.x + threadIdx.x; i < count / 2;
-         i += std::uint64_t(gridDim.x) * blockDim.x) {
-        codes[i] =
-            (fixture::bits(2 * i, seed) & 15U) | ((fixture::bits(2 * i + 1, seed) & 15U) << 4);
-        if (i < count / 16) {
-            const auto row    = i / (k / 16);
-            const auto group  = i % (k / 16);
-            const auto offset = ((row / 128) * (k / 64) + group / 4) * 512 + (row % 32) * 16 +
-                                ((row % 128) / 32) * 4 + group % 4;
-            scales[offset] = __nv_fp8_e4m3(extent * divisor / 6.F *
-                                           fixture::uniform(i, seed ^ 0x51ca1eU, .5F, 1.5F))
-                                 .__x;
-        }
-    }
-}
-
 inline int launch_grid(std::uint64_t elements) {
     return static_cast<int>(
         std::min<std::uint64_t>(65535, std::max<std::uint64_t>(1, (elements + 255) / 256)));
@@ -217,70 +198,6 @@ inline PackedQuantizedWeight make_row_split_weight(QType qtype, std::int32_t n, 
     weight.group       = geometry.group_size;
     weight.layout      = QuantLayout::RowSplit;
     weight.scale_dtype = DType::FP16;
-    return result;
-}
-
-inline PackedQuantizedWeight make_nvfp4_weight(std::int32_t n, std::int32_t k,
-                                               std::uint64_t seed = 0x51U, float extent = 0.05F) {
-    if (n <= 0 || k <= 0 || (n % 128) != 0 || (k % 64) != 0) {
-        throw std::invalid_argument("invalid benchmark NVFP4 weight shape");
-    }
-    const std::uint64_t elements =
-        detail::checked_mul(static_cast<std::uint64_t>(n), static_cast<std::uint64_t>(k),
-                            "benchmark NVFP4 element count overflow");
-    const std::uint64_t code_bytes   = elements / 2;
-    const std::uint64_t scale_offset = detail::align_up(code_bytes, 256);
-    const std::uint64_t scale_bytes  = elements / 16;
-    const std::uint64_t divisor_offset =
-        detail::checked_add(scale_offset, scale_bytes, "benchmark NVFP4 divisor offset overflow");
-    const std::uint64_t payload_bytes =
-        detail::checked_add(divisor_offset, sizeof(float), "benchmark NVFP4 payload size overflow");
-    if (payload_bytes > std::numeric_limits<std::size_t>::max()) {
-        throw std::overflow_error("benchmark NVFP4 payload does not fit size_t");
-    }
-
-    PackedQuantizedWeight result{
-        DeviceBuffer(ninfer::bench::device_context().device(),
-                     static_cast<std::size_t>(payload_bytes)),
-        {},
-        code_bytes,
-        0,
-        0,
-        scale_offset,
-        scale_bytes,
-    };
-    CUDA_CHECK(cudaMemset(result.storage.data(), 0, result.storage.size()));
-    constexpr float kWeightDivisor = 128.0F;
-    detail::fill_nvfp4_weight_kernel<<<detail::launch_grid(code_bytes), 256>>>(
-        static_cast<std::uint8_t*>(result.storage.data()),
-        static_cast<std::uint8_t*>(result.storage.data()) + scale_offset, elements, k, seed, extent,
-        kWeightDivisor);
-    CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaDeviceSynchronize());
-    CUDA_CHECK(cudaMemcpy(static_cast<std::uint8_t*>(result.storage.data()) + divisor_offset,
-                          &kWeightDivisor, sizeof(kWeightDivisor), cudaMemcpyHostToDevice));
-
-    Weight& weight              = result.weight;
-    weight.device               = result.storage.device();
-    weight.payload              = result.storage.data();
-    weight.payload_bytes        = payload_bytes;
-    weight.qtype                = QType::NVFP4;
-    weight.layout               = QuantLayout::BlockScaleK16M128x4;
-    weight.scale_dtype          = DType::FP8_E4M3FN;
-    weight.group_size           = 16;
-    weight.group                = 16;
-    weight.ndim                 = 2;
-    weight.shape[0]             = n;
-    weight.shape[1]             = k;
-    weight.padded_shape[0]      = n;
-    weight.padded_shape[1]      = k;
-    weight.qdata                = result.storage.data();
-    weight.qhigh                = nullptr;
-    weight.scales               = static_cast<std::uint8_t*>(result.storage.data()) + scale_offset;
-    weight.n                    = n;
-    weight.k                    = k;
-    weight.weight_scale_divisor = kWeightDivisor;
-    weight.input_scale_divisor  = 3.5F;
     return result;
 }
 

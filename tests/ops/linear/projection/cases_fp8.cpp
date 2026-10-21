@@ -40,12 +40,10 @@ void run_fp8_a16(Suite& suite) {
     std::vector<Invocation> vocabulary_invocations{
         Invocation{1, CallForm::A16Convenience, ops::LinearPolicy::A16Only},
         Invocation{8, CallForm::Policy, ops::LinearPolicy::AllowA8},
-        Invocation{9, CallForm::Policy, ops::LinearPolicy::AllowA4},
         Invocation{24, CallForm::Policy, ops::LinearPolicy::A16Only},
         Invocation{25, CallForm::Policy, ops::LinearPolicy::AllowA8},
         Invocation{41, CallForm::Policy, ops::LinearPolicy::A16Only},
         Invocation{42, CallForm::Policy, ops::LinearPolicy::AllowA8},
-        Invocation{48, CallForm::Policy, ops::LinearPolicy::AllowA4},
         Invocation{49, CallForm::Policy, ops::LinearPolicy::A16Only},
         Invocation{64, CallForm::Policy, ops::LinearPolicy::A16Only},
         Invocation{65, CallForm::Policy, ops::LinearPolicy::A16Only},
@@ -61,7 +59,6 @@ void run_fp8_a16(Suite& suite) {
         Invocation{257, CallForm::Policy, ops::LinearPolicy::A16Only},
         Invocation{288, CallForm::Policy, ops::LinearPolicy::A16Only},
         Invocation{289, CallForm::Policy, ops::LinearPolicy::A16Only},
-        Invocation{1024, CallForm::Policy, ops::LinearPolicy::AllowA4},
     };
     for (int t = 1; t <= 41; ++t)
         vocabulary_invocations.push_back({t, CallForm::Policy, ops::LinearPolicy::A16Only});
@@ -77,7 +74,6 @@ void run_fp8_a16(Suite& suite) {
                   const std::array vocabulary_policies{
                       ops::LinearPolicy::A16Only,
                       ops::LinearPolicy::AllowA8,
-                      ops::LinearPolicy::AllowA4,
                   };
                   for (const ops::LinearPolicy policy : vocabulary_policies) {
                       try {
@@ -184,7 +180,6 @@ void run_fp8_a8(Suite& suite) {
               {14336, 5120, 827U, Comparison::Sampled, true, attn_decode_invocations});
     const std::array attn_invocations{
         Invocation{17, CallForm::Policy, ops::LinearPolicy::AllowA8},
-        Invocation{48, CallForm::Policy, ops::LinearPolicy::AllowA4},
         Invocation{64, CallForm::Policy, ops::LinearPolicy::AllowA8},
         Invocation{65, CallForm::Policy, ops::LinearPolicy::AllowA8},
         Invocation{128, CallForm::Policy, ops::LinearPolicy::AllowA8},
@@ -217,7 +212,6 @@ void run_fp8_a8(Suite& suite) {
               {16384, 5120, 837U, Comparison::Sampled, true, gdn_decode_invocations});
     const std::array gdn_invocations{
         Invocation{17, CallForm::Policy, ops::LinearPolicy::AllowA8},
-        Invocation{48, CallForm::Policy, ops::LinearPolicy::AllowA4},
         Invocation{65, CallForm::Policy, ops::LinearPolicy::AllowA8},
         Invocation{1024, CallForm::Policy, ops::LinearPolicy::AllowA8},
     };
@@ -249,7 +243,6 @@ void run_fp8_a8(Suite& suite) {
               {34816, 5120, 851U, Comparison::Sampled, true, mlp_decode_invocations});
     const std::array mlp_invocations{
         Invocation{5, CallForm::Policy, ops::LinearPolicy::AllowA8},
-        Invocation{48, CallForm::Policy, ops::LinearPolicy::AllowA4},
         Invocation{65, CallForm::Policy, ops::LinearPolicy::AllowA8},
         Invocation{128, CallForm::Policy, ops::LinearPolicy::AllowA8},
         Invocation{1024, CallForm::Policy, ops::LinearPolicy::AllowA8},
@@ -282,7 +275,6 @@ void run_fp8_a8(Suite& suite) {
               {5120, 6144, 855U, Comparison::Sampled, true, residual6144_decode_invocations});
     const std::array residual6144_invocations{
         Invocation{17, CallForm::Policy, ops::LinearPolicy::AllowA8},
-        Invocation{48, CallForm::Policy, ops::LinearPolicy::AllowA4},
         Invocation{64, CallForm::Policy, ops::LinearPolicy::AllowA8},
         Invocation{65, CallForm::Policy, ops::LinearPolicy::AllowA8},
         Invocation{128, CallForm::Policy, ops::LinearPolicy::AllowA8},
@@ -310,7 +302,6 @@ void run_fp8_a8(Suite& suite) {
               {5120, 17408, 867U, Comparison::Sampled, true, residual17408_decode_invocations});
     const std::array residual17408_invocations{
         Invocation{17, CallForm::Policy, ops::LinearPolicy::AllowA8},
-        Invocation{48, CallForm::Policy, ops::LinearPolicy::AllowA4},
         Invocation{64, CallForm::Policy, ops::LinearPolicy::AllowA8},
         Invocation{65, CallForm::Policy, ops::LinearPolicy::AllowA8, true},
         Invocation{128, CallForm::Policy, ops::LinearPolicy::AllowA8},

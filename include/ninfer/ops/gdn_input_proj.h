@@ -38,11 +38,11 @@ struct GdnConvSnapshotState {
  *
  * Logical shapes / supported domain:
  *   H=input rows, V=value/z rows, C=4096+V. Single Q8-G32/FP16 weights use
- *   [12288,2048] (V=4096) or [16384,2560] (V=6144). FP8 row-scale and NVFP4
- *   block-scale weights use [16384,5120] (V=6144). Paired Q4-G64/FP16 [4096,5120]
+ *   [12288,2048] (V=4096) or [16384,2560] (V=6144). FP8 row-scale weights use
+ *   [16384,5120] (V=6144). Paired Q4-G64/FP16 [4096,5120]
  *   and Q5-G64/FP16 [12288,5120] use V=6144. The logical row order is [q,k,v,z].
- *   Q8 and paired weights use A16. Single-parent LinearPolicy permits A8 for FP8
- *   or A4 for NVFP4; the implementation selects its internal precision.
+ *   Q8 and paired weights use A16. Single-parent LinearPolicy permits A8 for FP8;
+ *   the implementation selects its internal precision.
  *   x BF16 [H,T,B], conv_weight BF16 [C,4], history BF16 [C,3,S],
  *   query/key BF16 [2048,T,B], value/z BF16 [V,T,B]. History has dense [C,3]
  *   slots with explicit nb[2]; other tensors are contiguous. Every slot starts 16-byte aligned.

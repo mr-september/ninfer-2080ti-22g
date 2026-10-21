@@ -20,8 +20,6 @@ MatrixBytes matrix_bytes(QType type, int rows, int columns) {
     switch (type) {
     case QType::BF16:
         return {elements * 2, 0, 0};
-    case QType::NVFP4:
-        return {elements / 2, 0, elements / 16};
     case QType::FP8_E4M3FN_BLOCK128X128_BF16:
         return {elements, 0, elements / (128 * 128) * 2};
     case QType::Q4_G64_FP16:
@@ -48,13 +46,10 @@ void validate_expert_profile(const RoutedSwiGLUProfile& p) {
     validate_route_profile({p.ffn.hidden, p.experts, p.top_k});
     const auto& f = p.ffn;
     if (f.hidden == 2560) {
-        const bool nvfp4 = f.gate_up_type == QType::NVFP4 &&
-                           f.gate_up_layout == QuantLayout::BlockScaleK16M128x4 &&
-                           f.gate_up_policy == LinearPolicy::AllowA4;
         const bool fp8 = f.gate_up_type == QType::FP8_E4M3FN_BLOCK128X128_BF16 &&
                          f.gate_up_layout == QuantLayout::BlockScaleM128K128 &&
                          f.gate_up_policy == LinearPolicy::AllowA8;
-        require(f.intermediate == 640 && (nvfp4 || fp8) && f.down_type == f.gate_up_type &&
+        require(f.intermediate == 640 && fp8 && f.down_type == f.gate_up_type &&
                     f.down_layout == f.gate_up_layout && f.down_policy == f.gate_up_policy,
                 "routed SwiGLU: unsupported block-scaled profile");
         return;
@@ -186,24 +181,14 @@ void MoeOperands::experts(const CudaSwiGLUExperts& w, const RoutedSwiGLUProfile&
         require(!divisor || (std::isfinite(*divisor) && *divisor > 0),
                 "MoE: activation divisor must be finite and positive");
     }
-    if (p.ffn.gate_up_type == QType::NVFP4) {
-        require(w.activation_divisors.gate_up && w.activation_divisors.down,
-                "MoE: NVFP4 A4 requires both activation divisors");
-    } else if (p.ffn.gate_up_type == QType::FP8_E4M3FN_BLOCK128X128_BF16) {
+    if (p.ffn.gate_up_type == QType::FP8_E4M3FN_BLOCK128X128_BF16) {
         require(!w.activation_divisors.gate_up && !w.activation_divisors.down,
                 "MoE: block FP8 has no activation divisors");
     }
     const auto matrix = [&](const ExpertMatrixDeviceView& view, QType type, int n, int k) {
         const auto bytes = matrix_bytes(type, n, k);
-        if (type == QType::NVFP4) {
-            require(operand::aligned(view.divisors, alignof(float)) &&
-                        view.divisor_stride <= (SIZE_MAX / sizeof(float) - 1) / (p.experts - 1),
-                    "MoE: invalid NVFP4 matrix divisors");
-            read(view.divisors, ((p.experts - 1) * view.divisor_stride + 1) * sizeof(float));
-        } else {
-            require(!view.divisors && view.divisor_stride == 0,
-                    "MoE: this weight format has no matrix divisors");
-        }
+        require(!view.divisors && view.divisor_stride == 0,
+                "MoE: this weight format has no matrix divisors");
         if (view.offsets) {
             require(operand::aligned(view.offsets, 8), "MoE: unaligned expert offsets");
             read(view.offsets, std::size_t(p.experts) * 8);

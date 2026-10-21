@@ -11,22 +11,14 @@ quantized_weight::PackedWeight make_first(Profile p, bool record) {
     case QType::Q8_G32_FP16:
         seed = record ? 1501 : 727;
         break;
-    case QType::NVFP4:
-        seed = record ? 1601 : 823;
-        break;
     case QType::FP8_E4M3FN_ROW_BF16:
         seed = record ? 1701 : 929;
         break;
     default:
         throw std::logic_error("unknown GDN input-conv test format");
     }
-    quantized_weight::PatternedWeightOptions options;
-    if (p.format == QType::NVFP4) {
-        options.weight_scale_divisor = 0.125F;
-        options.input_scale_divisor  = 3.5F;
-    }
     const int rows = p.format == QType::Q4_G64_FP16 ? 4096 : 4096 + 2 * p.value_rows();
-    return quantized_weight::make_patterned_weight(p.format, rows, p.hidden, seed, options);
+    return quantized_weight::make_patterned_weight(p.format, rows, p.hidden, seed);
 }
 } // namespace
 
@@ -36,8 +28,6 @@ const char* policy_name(ops::LinearPolicy p) {
         return "a16";
     case ops::LinearPolicy::AllowA8:
         return "a8";
-    case ops::LinearPolicy::AllowA4:
-        return "a4";
     }
     throw std::logic_error("unknown policy");
 }

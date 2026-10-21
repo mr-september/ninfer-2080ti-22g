@@ -33,19 +33,17 @@ oracle::PackedWeight host_weight(const qb::PackedQuantizedWeight& source) {
     host.high_plane_bytes      = source.high_bytes;
     host.scale_plane_offset    = source.scale_offset;
     host.scale_plane_bytes     = source.scale_bytes;
-    host.weight_divisor_offset = source.scale_offset + source.scale_bytes;
     return host;
 }
 
 void packed_fixtures() {
     constexpr std::uint64_t seed = 617U;
     for (const auto type : {QType::Q4_G64_FP16, QType::Q5_G64_FP16, QType::Q6_G64_FP16,
-                            QType::Q8_G32_FP16, QType::FP8_E4M3FN_ROW_BF16, QType::NVFP4}) {
-        const bool fp8 = type == QType::FP8_E4M3FN_ROW_BF16, fp4 = type == QType::NVFP4;
-        const int k     = fp8 || fp4 ? 128 : 70;
+                            QType::Q8_G32_FP16, QType::FP8_E4M3FN_ROW_BF16}) {
+        const bool fp8 = type == QType::FP8_E4M3FN_ROW_BF16;
+        const int k     = fp8 ? 128 : 70;
         const auto make = [&](std::uint64_t chosen_seed) {
             return fp8   ? qb::make_fp8_weight(128, k, chosen_seed)
-                   : fp4 ? qb::make_nvfp4_weight(128, k, chosen_seed)
                          : qb::make_row_split_weight(type, 128, k, 128, chosen_seed);
         };
         auto device = make(seed), again = make(seed), different = make(seed + 1);
@@ -62,7 +60,7 @@ void packed_fixtures() {
             }
         }
         require(positive > 128 * k / 4 && negative > 128 * k / 4, "degenerate signed weights");
-        if (!fp8 && !fp4) {
+        if (!fp8) {
             const int bits  = type == QType::Q4_G64_FP16   ? 4
                               : type == QType::Q5_G64_FP16 ? 5
                               : type == QType::Q6_G64_FP16 ? 6

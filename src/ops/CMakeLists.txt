@@ -36,14 +36,14 @@ include("${CMAKE_CURRENT_LIST_DIR}/rope/sources.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/softmax_attention/sources.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/moe/sources.cmake")
 
-# Blackwell-only kernels. FP8/NVFP4 weight paths, FP8/NVFP4/K8V4 KV caches and the TMA/tcgen
+# Blackwell-only kernels. FP8 weight paths, FP8 KV caches and the TMA/tcgen
 # kernels need sm_120a instructions. A Turing build drops these sources from the family manifests
 # above (which stay identical to upstream's) and links throwing definitions of the same
 # declarations instead; the BF16 and grouped-integer routes are the supported surface there.
 if(NINFER_TARGET STREQUAL "turing")
   set(_ninfer_blackwell_only_regex
-    "/(fp8|nvfp4|k8v4)/"
-    "/(fp8|nvfp4|k8v4)[a-z0-9_]*[.](cu|cpp)$"
+    "/fp8/"
+    "/fp8[a-z0-9_]*[.](cu|cpp)$"
     "/gated_residual/mix/"
     "/kimi_delta_attention/"
     "/softmax_attention/qsa/")

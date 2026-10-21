@@ -27,9 +27,6 @@ struct ModelFixture {
         const auto geometry = weight_geometry(format, layout, shape);
         const auto offset   = (file.payload.size() + 255) / 256 * 256;
         file.payload.resize(offset + geometry.bytes);
-        if (format == QType::NVFP4) {
-            put_word(file.payload, offset + geometry.divisor_offset, 0x3f800000, 4);
-        }
         file.root["objects"].push_back({{"id", id},
                                         {"kind", "tensor"},
                                         {"shape", shape},
@@ -51,7 +48,7 @@ struct ModelFixture {
     }
 
     void use(const std::string& name, const std::string& input, std::optional<int> divisor = {}) {
-        Json value{{"parameter", name}, {"input", input}, {"activation_policy", "AllowA4"}};
+        Json value{{"parameter", name}, {"input", input}, {"activation_policy", "A16Only"}};
         if (divisor) {
             value["auxiliaries"] = {
                 {"activation_input_divisor",
@@ -102,7 +99,8 @@ struct ModelFixture {
         const std::string p = "text/layers/0/";
         parameter(p + "input_norm", {128});
         parameter(p + "post_attention_norm", {128});
-        tensor("mixer-storage", {128, 128}, QType::NVFP4, QuantLayout::BlockScaleK16M128x4);
+        tensor("mixer-storage", {128, 128}, QType::FP8_E4M3FN_BLOCK128X128_BF16,
+               QuantLayout::BlockScaleM128K128);
         tensor("calibration", {2}, QType::FP32);
         const auto calibration = file.root["objects"].back()["offset"].get<std::size_t>();
         put_word(file.payload, calibration, 0x40000000, 4);
@@ -237,62 +235,39 @@ void logical_data_and_instances() {
 }
 
 void native_uses() {
-    const std::array<std::uint64_t, 2> shape{128, 64};
-    const auto geometry = weight_geometry(QType::NVFP4, QuantLayout::BlockScaleK16M128x4, shape);
+    const std::array<std::uint64_t, 2> shape{256, 128};
+    const auto geometry = weight_geometry(QType::FP8_E4M3FN_BLOCK128X128_BF16,
+                                          QuantLayout::BlockScaleM128K128, shape);
     std::vector<std::byte> bytes(geometry.bytes);
-    const std::array divisors{8.0F};
-    const WeightParent parent{geometry, Device::cpu(), bytes.data(), divisors};
-    const WeightView gate{{64, 64}, {{&parent, 0, 4096}}};
-    const WeightView up{{64, 64}, {{&parent, 4096, 8192}}};
-    const auto joined = ops::prepare_linear_swiglu_weight({gate, ops::LinearPolicy::AllowA4, 2.0F},
-                                                          {up, ops::LinearPolicy::AllowA8, 2.0F});
+    const WeightParent parent{geometry, Device::cpu(), bytes.data(), {}};
+    const WeightView gate{{128, 128}, {{&parent, 0, 16384}}};
+    const WeightView up{{128, 128}, {{&parent, 16384, 32768}}};
+    const auto joined = ops::prepare_linear_swiglu_weight({gate, ops::LinearPolicy::AllowA8},
+                                                          {up, ops::LinearPolicy::AllowA8});
     require(joined.policy == ops::LinearPolicy::AllowA8 && joined.weight.payload == bytes.data() &&
-                joined.weight.n == 128 && joined.weight.weight_scale_divisor == 8.0F &&
-                joined.weight.input_scale_divisor == 2.0F,
-            "shared quantization did not intersect Uses or preserve the complete parent");
-    const WeightView full{{128, 64}, {{&parent, 0, 8192}}};
+                joined.weight.n == 256,
+            "shared quantization did not keep its Use policy or preserve the complete parent");
+    const WeightView full{{256, 128}, {{&parent, 0, 32768}}};
     for (const auto policy : {ops::LinearPolicy::A16Only, ops::LinearPolicy::AllowA8}) {
-        const auto no_aux = ops::prepare_linear_weight({full, policy});
-        require(no_aux.policy == policy && no_aux.weight.payload == bytes.data(),
-                "non-A4 NVFP4 use required an unused activation divisor");
-        const auto mixed = ops::prepare_linear_swiglu_weight(
-            {gate, ops::LinearPolicy::AllowA4, 2.0F}, {up, policy});
-        require(mixed.policy == policy, "combined use required an unused child auxiliary");
-        rejects<std::invalid_argument>(
-            [&] { (void)ops::prepare_linear_weight({full, policy, 0.0F}); },
-            "present activation divisor was accepted without value validation");
+        const auto single = ops::prepare_linear_weight({full, policy});
+        require(single.policy == policy && single.weight.payload == bytes.data(),
+                "native use altered its policy or lost the complete parent");
+        const auto mixed = ops::prepare_linear_swiglu_weight({gate, ops::LinearPolicy::AllowA8},
+                                                             {up, policy});
+        require(mixed.policy == policy, "combined use did not intersect the Use policies");
     }
     rejects<std::invalid_argument>(
-        [&] { (void)ops::prepare_linear_weight({full, ops::LinearPolicy::AllowA4}); },
-        "A4 NVFP4 use accepted a missing activation divisor");
-    const auto a16 = ops::prepare_linear_swiglu_weight({gate, ops::LinearPolicy::A16Only, 2.0F},
-                                                       {up, ops::LinearPolicy::AllowA4, 3.0F});
-    require(a16.policy == ops::LinearPolicy::A16Only && a16.weight.input_scale_divisor == 2.0F,
-            "A16-only use intersection rejected independent unused activation divisors");
-    const auto second = ops::prepare_linear_weight({full, ops::LinearPolicy::A16Only, 3.0F});
-    const auto first  = ops::prepare_linear_weight({full, ops::LinearPolicy::AllowA4, 2.0F});
-    require(first.weight.input_scale_divisor == 2.0F && second.weight.input_scale_divisor == 3.0F &&
-                first.policy == ops::LinearPolicy::AllowA4 &&
-                second.policy == ops::LinearPolicy::A16Only && parent.weight_divisors[0] == 8.0F,
-            "preparing one use modified another use or its shared parent");
-    rejects<std::invalid_argument>(
         [&] {
-            (void)ops::prepare_linear_swiglu_weight({gate, ops::LinearPolicy::AllowA4, 2.0F},
-                                                    {up, ops::LinearPolicy::AllowA4, 3.0F});
-        },
-        "one native activation silently used differing divisors");
-    rejects<std::invalid_argument>(
-        [&] {
-            (void)ops::prepare_linear_swiglu_weight({up, ops::LinearPolicy::A16Only, 2.0F},
-                                                    {gate, ops::LinearPolicy::A16Only, 2.0F});
+            (void)ops::prepare_linear_swiglu_weight({up, ops::LinearPolicy::A16Only},
+                                                    {gate, ops::LinearPolicy::A16Only});
         },
         "reordered parent regions silently changed fused gate/up row order");
-    const WeightView short_gate{{64, 64}, {{&parent, 0, 4032}}};
-    const WeightView long_up{{64, 64}, {{&parent, 4032, 8192}}};
+    const WeightView short_gate{{128, 128}, {{&parent, 0, 16320}}};
+    const WeightView long_up{{128, 128}, {{&parent, 16320, 32768}}};
     rejects<std::invalid_argument>(
         [&] {
-            (void)ops::prepare_linear_swiglu_weight({short_gate, ops::LinearPolicy::A16Only, 2.0F},
-                                                    {long_up, ops::LinearPolicy::A16Only, 2.0F});
+            (void)ops::prepare_linear_swiglu_weight({short_gate, ops::LinearPolicy::A16Only},
+                                                    {long_up, ops::LinearPolicy::A16Only});
         },
         "combined coverage hid an incorrect gate/up boundary");
 }
@@ -323,26 +298,12 @@ void invalid_model_data() {
     bad([](Json& root) { root["components"]["text"]["config"]["vocab_size"] = 264; });
 }
 
-void cold_matrix_profile() {
-    const auto geometry = weight_geometry(QType::NVFP4, QuantLayout::BatchedBlockScaleK16M128x4,
-                                          std::array<std::uint64_t, 3>{2, 256, 128});
-    const WeightParent parent{geometry};
-    const WeightView matrix{{128, 128}, {{&parent, 256 * 128, 384 * 128}}};
-    const std::array inputs{ops::WeightInput{matrix, ops::LinearPolicy::AllowA4, 2.0F}};
-    const auto profile = ops::describe_linear_weight(inputs);
-    require(profile.qtype == QType::NVFP4 && profile.n == 128 && profile.k == 128 &&
-                profile.layout == QuantLayout::BlockScaleK16M128x4 &&
-                profile.policy == ops::LinearPolicy::AllowA4,
-            "cold matrix profile did not preserve the local NVFP4 matrix layout");
-}
-
 } // namespace
 
 int main() {
     try {
         logical_data_and_instances();
         native_uses();
-        cold_matrix_profile();
         invalid_model_data();
         std::cout << "model config, binding, resources and Use checks passed\n";
         return 0;

@@ -15,10 +15,8 @@ struct Weights {
         } else {
             if (o.format == "q8")
                 first = make_row_split_weight(QType::Q8_G32_FP16, o.n, o.k, o.k, 501U);
-            else if (o.format == "fp8")
-                first = make_fp8_weight(o.n, o.k, 501U);
             else
-                first = make_nvfp4_weight(o.n, o.k, 501U);
+                first = make_fp8_weight(o.n, o.k, 501U);
             native = ops::SingleProjectionWeight{first.weight, policy(o)};
         }
     }

@@ -31,7 +31,6 @@ void add_two_output_cases(Suite& suite) {
                         {4096 + tail, tail},
                         {{0, 2048}, {2048, 2048}, {4096, tail}, {4096 + tail, tail}},
                         a16,
-                        1.0 / 256.0,
                         Binding::ProjectionInputs,
                         {2048, 2048, tail, tail}};
         const std::vector<int> points =
@@ -51,24 +50,6 @@ void add_two_output_cases(Suite& suite) {
     }
     {
         Profile profile{5120,
-                        {{QType::NVFP4,
-                          16384,
-                          607U,
-                          {.weight_scale_divisor = 0.125F, .input_scale_divisor = 3.5F}}},
-                        {10240, 6144},
-                        {{0, 2048}, {2048, 2048}, {4096, 6144}, {10240, 6144}},
-                        paired_a16,
-                        4.0e-3};
-        std::vector<Invocation> calls{
-            {.t = 1, .input_seed = 601U, .columns = Columns::Seven},
-            {.t = 4, .policy = Policy::AllowA8, .input_seed = 601U, .columns = Columns::Seven}};
-        for (int t : {1, 2, 17, 1023, 1024, 1025})
-            calls.push_back(
-                {.t = t, .policy = Policy::AllowA4, .input_seed = 601U, .columns = Columns::Seven});
-        add_profile(suite, profile, std::move(calls));
-    }
-    {
-        Profile profile{5120,
                         {{QType::FP8_E4M3FN_ROW_BF16, 16384, 613U}},
                         {10240, 6144},
                         {{0, 2048}, {2048, 2048}, {4096, 6144}, {10240, 6144}},
@@ -76,10 +57,10 @@ void add_two_output_cases(Suite& suite) {
         std::vector<Invocation> calls;
         for (int t : {5, 8, 16, 24, 32, 33, 64, 65, 96, 97, 128, 129, 1, 2})
             calls.push_back({.t = t, .input_seed = 617U, .columns = Columns::Seven});
-        for (int t : {1,   2,   4,   8,   16,  17,  18,  32,  33,  48,  64,  65,  127,  128, 129,
+        for (int t : {1,   2,   4,   8,   16,  18,  32,  33,  48,  64,  65,  127,  128, 129,
                       191, 192, 193, 255, 256, 257, 383, 384, 385, 511, 512, 513, 1024, 1025})
             calls.push_back({.t           = t,
-                             .policy      = t == 17 ? Policy::AllowA4 : Policy::AllowA8,
+                             .policy      = Policy::AllowA8,
                              .input_seed  = 617U,
                              .columns     = Columns::Seven,
                              .sample_rows = t >= 17 ? 31 : 7});

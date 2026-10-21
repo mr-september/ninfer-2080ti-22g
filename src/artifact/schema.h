@@ -63,7 +63,7 @@ struct Binding {
     std::uint64_t elements = 0;
 };
 
-enum class ActivationPolicy { A16Only, AllowA8, AllowA4 };
+enum class ActivationPolicy { A16Only, AllowA8 };
 
 struct Use {
     std::string parameter;

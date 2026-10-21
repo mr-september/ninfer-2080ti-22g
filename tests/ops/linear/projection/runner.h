@@ -74,7 +74,5 @@ void add_q6_cases(Suite& suite);
 void add_q8_cases(Suite& suite);
 
 void add_fp8_cases(Suite& suite);
-void add_nvfp4_cases(Suite& suite);
-void add_bank_cases(Suite& suite);
 
 } // namespace ninfer::test::linear

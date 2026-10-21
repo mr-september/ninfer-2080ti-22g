@@ -40,7 +40,6 @@ constexpr std::size_t kOutputScanWords    = 1U << 20;
 constexpr int kOracleTBlock               = 8;
 constexpr double kBf16UnitRoundoff        = 1.0 / 256.0;
 constexpr double kA8QuantizationAllowance = 0.04;
-constexpr double kA4QuantizationAllowance = 0.16;
 
 // Precision follows the public policy, including when a more accurate route is selected.
 constexpr ReductionCriterion tolerance_for(ops::LinearPolicy policy) {
@@ -49,8 +48,6 @@ constexpr ReductionCriterion tolerance_for(ops::LinearPolicy policy) {
         return {kBf16UnitRoundoff, kBf16UnitRoundoff, 2.0 * kBf16UnitRoundoff};
     case ops::LinearPolicy::AllowA8:
         return {kA8QuantizationAllowance, kBf16UnitRoundoff, 1.5 * kA8QuantizationAllowance};
-    case ops::LinearPolicy::AllowA4:
-        return {kA4QuantizationAllowance, kBf16UnitRoundoff, kA4QuantizationAllowance};
     }
     throw std::invalid_argument("linear test: unknown Linear policy");
 }
@@ -437,8 +434,7 @@ void add_workspace_cases(Suite& suite, QType format, int n, int k) {
 
 int verify_workspace_envelopes(QType qtype, std::int32_t n, std::int32_t k) {
     int failures = 0;
-    for (auto policy :
-         {ops::LinearPolicy::A16Only, ops::LinearPolicy::AllowA8, ops::LinearPolicy::AllowA4}) {
+    for (auto policy : {ops::LinearPolicy::A16Only, ops::LinearPolicy::AllowA8}) {
         for (auto [first, last] : {std::pair{1, 4}, std::pair{2, 4}, std::pair{1, 128},
                                    std::pair{9, 25}, std::pair{24, 129}}) {
             const auto capacity =

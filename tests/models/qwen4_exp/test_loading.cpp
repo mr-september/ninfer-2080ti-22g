@@ -11,20 +11,20 @@ using namespace test::artifact_fixture;
 
 void bank_binding() {
     Fixture f;
-    constexpr std::size_t gu_bytes = 55308, dn_bytes = 27660, dn_offset = 55552;
+    constexpr std::size_t gu_bytes = 98316, dn_bytes = 49158, dn_offset = 98560;
     f.payload.assign(dn_offset + dn_bytes, std::byte{0});
     f.root["objects"]    = Json::array({{{"id", "gu"},
                                          {"kind", "tensor"},
                                          {"shape", {3, 256, 128}},
-                                         {"format", "nvfp4"},
-                                         {"layout", "batched_block_scale_k16_m128x4_v1"},
+                                         {"format", "fp8_e4m3fn_block128x128_bf16"},
+                                         {"layout", "block_scale_m128_k128_v1"},
                                          {"offset", 0},
                                          {"bytes", gu_bytes}},
                                         {{"id", "dn"},
                                          {"kind", "tensor"},
                                          {"shape", {3, 128, 128}},
-                                         {"format", "nvfp4"},
-                                         {"layout", "batched_block_scale_k16_m128x4_v1"},
+                                         {"format", "fp8_e4m3fn_block128x128_bf16"},
+                                         {"layout", "block_scale_m128_k128_v1"},
                                          {"offset", dn_offset},
                                          {"bytes", dn_bytes}}});
     f.root["components"] = {{"text", {{"config", Json::object()}}}};
@@ -42,11 +42,6 @@ void bank_binding() {
         }
         f.root["bindings"][role] = {{"parts", parts}};
     }
-    for (unsigned e = 0; e < 3; ++e) {
-        put_word(f.payload, 55296 + e * 4, std::bit_cast<std::uint32_t>(float(1U << e)), 4);
-        put_word(f.payload, dn_offset + 27648 + e * 4, std::bit_cast<std::uint32_t>(float(8U << e)),
-                 4);
-    }
     f.write();
     artifact::Reader reader(f.entry);
     artifact::Binder binder(reader);
@@ -54,10 +49,10 @@ void bank_binding() {
     auto u          = binder.parameter("up", {3, 128, 128});
     auto d          = binder.parameter("down", {3, 128, 128});
     const auto bank = models::moe::describe_bank(reader, models::moe::ExpertBinding{g, u, d});
-    require(bank.gate_up.layout.codes.expert_stride == 16384 &&
-                bank.gate_up.layout.scales.expert_stride == 2048 &&
-                bank.gate_up.layout.divisor_stride == 1 &&
-                bank.down.layout.codes.expert_stride == 8192,
+    require(bank.gate_up.layout.codes.expert_stride == 32768 &&
+                bank.gate_up.layout.scales.expert_stride == 4 &&
+                !bank.gate_up.layout.has_divisors &&
+                bank.down.layout.codes.expert_stride == 16384,
             "rank-3 bank plane strides");
     const std::array requests{artifact::PlacementRequest{bank.gate_up.object, Device::cpu()},
                               artifact::PlacementRequest{bank.down.object, Device::cpu()}};
@@ -67,12 +62,12 @@ void bank_binding() {
     for (unsigned e = 0; e < 3; ++e) {
         const auto gu = matrix_weight(sources[0].gate_up, e);
         const auto dn = matrix_weight(sources[0].down, e);
-        require(gu.weight_scale_divisor == float(1U << e) &&
-                    dn.weight_scale_divisor == float(8U << e),
-                "per-expert divisors collapsed");
         require(static_cast<const std::byte*>(gu.qdata) - sources[0].gate_up.parent->data ==
-                    e * 16384,
+                    e * 32768,
                 "expert codes offset");
+        require(static_cast<const std::byte*>(dn.qdata) - sources[0].down.parent->data ==
+                    e * 16384,
+                "expert down codes offset");
     }
     std::swap(u.binding.parts[0], u.binding.parts[1]);
     rejects([&] { (void)models::moe::describe_bank(reader, models::moe::ExpertBinding{g, u, d}); },

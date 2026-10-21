@@ -19,12 +19,6 @@ if(NINFER_TARGET STREQUAL "rtx5090")
   set_tests_properties(ninfer_moe_cpu_groupwise_int_test PROPERTIES
     ENVIRONMENT "CUDA_VISIBLE_DEVICES=-1" RESOURCE_LOCK cpu_team)
 
-  ninfer_add_op_test(ninfer_moe_cpu_nvfp4_test
-    SOURCES "${CMAKE_CURRENT_LIST_DIR}/cpu/test_nvfp4.cpp"
-    LIBRARIES ninfer_moe_cpu ninfer_cpu_executor)
-  set_tests_properties(ninfer_moe_cpu_nvfp4_test PROPERTIES
-    ENVIRONMENT "CUDA_VISIBLE_DEVICES=-1" RESOURCE_LOCK cpu_team)
-
   # Qualify every compiled arithmetic route through the public CPU entry. Restricted
   # dispatch belongs only to these test archives, never to the production interface.
   get_target_property(moe_cpu_sources ninfer_moe_cpu SOURCES)
@@ -41,11 +35,6 @@ if(NINFER_TARGET STREQUAL "rtx5090")
       SOURCES "${CMAKE_CURRENT_LIST_DIR}/cpu/test_groupwise_int.cpp"
       LIBRARIES ninfer_moe_cpu_${isa}_qualification ninfer_cpu_executor)
     set_tests_properties(ninfer_moe_cpu_groupwise_int_${isa}_test PROPERTIES
-      ENVIRONMENT "CUDA_VISIBLE_DEVICES=-1" RESOURCE_LOCK cpu_team)
-    ninfer_add_op_test(ninfer_moe_cpu_nvfp4_${isa}_test
-      SOURCES "${CMAKE_CURRENT_LIST_DIR}/cpu/test_nvfp4.cpp"
-      LIBRARIES ninfer_moe_cpu_${isa}_qualification ninfer_cpu_executor)
-    set_tests_properties(ninfer_moe_cpu_nvfp4_${isa}_test PROPERTIES
       ENVIRONMENT "CUDA_VISIBLE_DEVICES=-1" RESOURCE_LOCK cpu_team)
   endforeach()
 endif()

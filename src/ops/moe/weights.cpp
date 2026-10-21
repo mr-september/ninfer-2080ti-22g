@@ -13,11 +13,6 @@ std::int32_t dimension(std::uint64_t value) {
     }
     return static_cast<std::int32_t>(value);
 }
-
-QuantLayout matrix_layout(QuantLayout layout) {
-    return layout == QuantLayout::BatchedBlockScaleK16M128x4 ? QuantLayout::BlockScaleK16M128x4
-                                                             : layout;
-}
 } // namespace
 
 void ExpertInputUsage::include(const WeightInput& input) {
@@ -41,12 +36,7 @@ void ExpertInputUsage::include(const WeightInput& input) {
         divisor_ = value;
 }
 
-std::optional<float> ExpertInputUsage::activation_divisor(QType format) const {
-    if (format != QType::NVFP4) return std::nullopt;
-    if (allows_a4(policy_) && (!divisor_ || missing_divisor_ || unequal_divisors_))
-        throw std::invalid_argument("NVFP4 expert A4 requires a common activation divisor");
-    return unequal_divisors_ || missing_divisor_ ? std::nullopt : divisor_;
-}
+std::optional<float> ExpertInputUsage::activation_divisor(QType) const { return std::nullopt; }
 
 SwiGLUProfile swiglu_profile(const SwiGLUWeights& weights) {
     return swiglu_profile(linear_profile(weights.gate_up), linear_profile(weights.down));
@@ -69,7 +59,7 @@ RoutedSwiGLUProfile routed_swiglu_profile(const WeightBankLayout& gu, const Weig
         throw std::invalid_argument("routed SwiGLU banks have inconsistent geometry or policy");
     }
     return {{dimension(gu.columns), dimension(dn.columns), gu.format, dn.format,
-             matrix_layout(gu.layout), matrix_layout(dn.layout), gate_up_policy, down_policy},
+             gu.layout, dn.layout, gate_up_policy, down_policy},
             dimension(gu.region.count),
             top_k};
 }

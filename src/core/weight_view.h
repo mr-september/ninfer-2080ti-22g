@@ -99,15 +99,12 @@ struct WeightRowPlanes {
     std::uint64_t high_row_bytes   = 0;
     std::uint64_t scale_row_bytes  = 0;
     std::uint64_t scale_block_rows = 1;
-    // NVFP4 keeps the parent scale base; use its row origin and block geometry.
-    bool swizzled_scales = false;
 };
 
 [[nodiscard]] WeightRowPlanes weight_row_planes(const WeightRegion& region);
 [[nodiscard]] Tensor weight_tensor(const WeightView& view,
                                    std::initializer_list<std::int32_t> internal_shape);
-// A matrix view preserves K and scale-block boundaries. NVFP4 views stay within one
-// matrix divisor domain; block scales are rebased to the view's local coordinates.
+// A matrix view preserves K and scale-block boundaries.
 [[nodiscard]] Weight native_weight(const WeightView& view, float input_divisor = 0.0F);
 
 } // namespace ninfer

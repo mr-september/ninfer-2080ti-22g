@@ -28,10 +28,6 @@ void validate_weight(const Weight& w) {
         (void)common::validate_fp8_weight(w, kOp);
         return;
     }
-    if (w.qtype == QType::NVFP4) {
-        (void)common::validate_nvfp4_weight(w, kOp);
-        return;
-    }
     require(operand::aligned(w.qdata, 16), "weight data must be 16-byte aligned");
     if (w.qtype == QType::BF16) {
         require(w.layout == QuantLayout::Contiguous && w.group == 0 && w.group_size == 0 &&
@@ -71,10 +67,6 @@ std::array<operand::Range, 4> weight_ranges(const Weight& w) {
         break;
     case QType::FP8_E4M3FN_ROW_BF16:
         scales = std::uint64_t(w.n) * 2;
-        break;
-    case QType::NVFP4:
-        codes  = elements / 2;
-        scales = elements / 16;
         break;
     default:
         throw std::logic_error("linear_split: invalid admitted weight format");

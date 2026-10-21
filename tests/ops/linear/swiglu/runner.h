@@ -16,7 +16,7 @@ namespace ninfer::test::linear_swiglu {
 
 using linear_suite::Suite;
 
-enum class CallForm { Policy, Convenience, RejectA16Extent };
+enum class CallForm { Policy, Convenience };
 
 struct Invocation {
     int tokens;
@@ -43,9 +43,6 @@ void add_negative_gate(Suite& suite, const Profile& profile, std::span<const std
 
 void add_q4_cases(Suite& suite);
 void add_q8_cases(Suite& suite);
-void add_nvfp4_cases(Suite& suite);
 void add_fp8_cases(Suite& suite);
-
-void add_bank_cases(Suite& suite);
 
 } // namespace ninfer::test::linear_swiglu

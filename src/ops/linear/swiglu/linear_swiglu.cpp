@@ -2,7 +2,6 @@
 #include "ninfer/ops/linear_swiglu.h"
 
 #include "ops/linear/swiglu/fp8/dispatch.h"
-#include "ops/linear/swiglu/nvfp4/dispatch.h"
 #include "ops/linear/swiglu/dispatch.h"
 #include "ops/common/host/operands.h"
 
@@ -16,7 +15,6 @@ void validate_policy(LinearPolicy policy) {
     switch (policy) {
     case LinearPolicy::A16Only:
     case LinearPolicy::AllowA8:
-    case LinearPolicy::AllowA4:
         return;
     }
     throw std::invalid_argument("linear_swiglu: invalid compute policy");
@@ -41,9 +39,6 @@ std::size_t linear_swiglu_workspace_capacity_bytes(QType qtype, std::int32_t gat
     if (qtype == QType::Q4_G64_FP16) {
         return detail::q4_linear_swiglu_capacity_workspace_bytes(gate_up_rows, input_rows,
                                                                  min_tokens, max_tokens);
-    }
-    if (qtype == QType::NVFP4) {
-        return detail::nvfp4_linear_swiglu_workspace_capacity_bytes(policy, min_tokens, max_tokens);
     }
     if (qtype == QType::FP8_E4M3FN_ROW_BF16) {
         return detail::fp8_linear_swiglu_workspace_capacity_bytes(policy, min_tokens, max_tokens);
@@ -80,10 +75,9 @@ void linear_swiglu(const Tensor& x, const Weight& gate_up_weight, Tensor& out, L
         !common::operand::aligned(out.data, 16))
         throw std::invalid_argument("linear_swiglu: x/out must be contiguous and 16-byte aligned");
 
-    const bool q8_weight    = w.qtype == QType::Q8_G32_FP16;
-    const bool fp8_weight   = w.qtype == QType::FP8_E4M3FN_ROW_BF16;
-    const bool nvfp4_weight = w.qtype == QType::NVFP4;
-    if (!fp8_weight && !nvfp4_weight) {
+    const bool q8_weight  = w.qtype == QType::Q8_G32_FP16;
+    const bool fp8_weight = w.qtype == QType::FP8_E4M3FN_ROW_BF16;
+    if (!fp8_weight) {
         const int group = q8_weight ? 32 : 64;
         if (w.layout != QuantLayout::RowSplit || w.scale_dtype != DType::FP16 || w.ndim != 2 ||
             w.shape[0] != w.n || w.shape[1] != w.k || w.group_size != group || w.group != group ||
@@ -95,13 +89,6 @@ void linear_swiglu(const Tensor& x, const Weight& gate_up_weight, Tensor& out, L
     if (fp8_weight) {
         (void)common::validate_fp8_weight(gate_up_weight, "fp8 linear_swiglu");
         detail::fp8_linear_swiglu_dispatch(x, gate_up_weight, out, policy, ws, execution.stream());
-        return;
-    }
-
-    if (nvfp4_weight) {
-        (void)common::validate_nvfp4_weight(gate_up_weight, "nvfp4 linear_swiglu");
-        detail::nvfp4_linear_swiglu_dispatch(x, gate_up_weight, out, policy, ws,
-                                             execution.stream());
         return;
     }
 

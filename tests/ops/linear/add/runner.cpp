@@ -36,7 +36,6 @@ constexpr ReductionCriterion kA16Tolerance{
     2.0 * kBf16UnitRoundoff,
 };
 constexpr ReductionCriterion kA8Tolerance{0.04, kBf16UnitRoundoff, 0.06};
-constexpr ReductionCriterion kA4Tolerance{0.16, kBf16UnitRoundoff, 0.16};
 
 const ReductionCriterion& criterion(ops::LinearPolicy policy) {
     switch (policy) {
@@ -44,8 +43,6 @@ const ReductionCriterion& criterion(ops::LinearPolicy policy) {
         return kA16Tolerance;
     case ops::LinearPolicy::AllowA8:
         return kA8Tolerance;
-    case ops::LinearPolicy::AllowA4:
-        return kA4Tolerance;
     }
     throw std::invalid_argument("linear_add test: unknown Linear policy");
 }
@@ -144,10 +141,7 @@ HostWeight make_weight(QType format, const InvocationCase& shape) {
         return direct_bf16_weight::make_patterned(shape.n, shape.k, shape.seed);
     }
     quantized_weight::PatternedWeightOptions options;
-    if (format == QType::NVFP4) {
-        options.weight_scale_divisor = 0.125F;
-        options.input_scale_divisor  = 3.5F;
-    } else if (format != QType::FP8_E4M3FN_ROW_BF16) {
+    if (format != QType::FP8_E4M3FN_ROW_BF16) {
         options.row_split_scale = (format == QType::Q4_G64_FP16 || format == QType::Q5_G64_FP16)
                                       ? quantized_weight::RowSplitScalePattern::Small
                                       : quantized_weight::RowSplitScalePattern::Tiny;
@@ -495,8 +489,8 @@ void add_shape(Suite& suite, QType format, const ShapeCase& shape) {
         invocations.push_back(Invocation{
             .tokens          = t,
             .graph           = graph ? GraphReplay::OriginalZeroOriginal : GraphReplay::None,
-            .graph_policy    = graph ? std::optional(ops::LinearPolicy::AllowA4) : std::nullopt,
-            .followup_policy = graph ? std::optional(ops::LinearPolicy::AllowA8) : std::nullopt,
+            .graph_policy    = graph ? std::optional(ops::LinearPolicy::AllowA8) : std::nullopt,
+            .followup_policy = graph ? std::optional(ops::LinearPolicy::A16Only) : std::nullopt,
         });
     }
     add_cases(suite, format,

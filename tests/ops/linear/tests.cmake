@@ -27,21 +27,20 @@ endfunction()
 
 ninfer_linear_suite(projection
   test.cpp runner.cpp cases_bf16.cpp cases_q4.cpp cases_q5.cpp cases_q6.cpp cases_q8.cpp
-  cases_fp8.cpp cases_nvfp4.cpp cases_bank.cpp)
-ninfer_linear_format_tests(projection bf16 q4 q5 q6 q8 fp8 nvfp4)
+  cases_fp8.cpp)
+ninfer_linear_format_tests(projection bf16 q4 q5 q6 q8 fp8)
 
 ninfer_linear_suite(split
-  test.cpp runner.cpp cases_segmented.cpp cases_two_output.cpp cases_multi_output.cpp cases_bank.cpp)
-ninfer_linear_format_tests(split bf16 q4_q5 q8 fp8 nvfp4)
+  test.cpp runner.cpp cases_segmented.cpp cases_two_output.cpp cases_multi_output.cpp)
+ninfer_linear_format_tests(split bf16 q4_q5 q8 fp8)
 
 ninfer_linear_suite(add
-  test.cpp runner.cpp cases_bf16.cpp cases_q4.cpp cases_q5.cpp cases_q8.cpp cases_fp8.cpp
-  cases_nvfp4.cpp cases_bank.cpp)
-ninfer_linear_format_tests(add bf16 q4 q5 q8 fp8 nvfp4)
+  test.cpp runner.cpp cases_bf16.cpp cases_q4.cpp cases_q5.cpp cases_q8.cpp cases_fp8.cpp)
+ninfer_linear_format_tests(add bf16 q4 q5 q8 fp8)
 
 ninfer_linear_suite(swiglu
-  test.cpp runner.cpp cases_q4.cpp cases_q8.cpp cases_nvfp4.cpp cases_fp8.cpp cases_bank.cpp)
-ninfer_linear_format_tests(swiglu q4 q8 fp8 nvfp4)
+  test.cpp runner.cpp cases_q4.cpp cases_q8.cpp cases_fp8.cpp)
+ninfer_linear_format_tests(swiglu q4 q8 fp8)
 
 ninfer_linear_suite(pair test.cpp)
 ninfer_linear_format_tests(pair q8)

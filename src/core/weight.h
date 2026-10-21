@@ -15,7 +15,6 @@ enum class QType : std::uint16_t {
     BF16                         = 4,
     FP32                         = 5,
     INT32                        = 6,
-    NVFP4                        = 7,
     FP8_E4M3FN_ROW_BF16          = 8,
     NF4_G16_E4M3FN               = 9,
     FP8_E4M3FN_BLOCK128X128_BF16 = 10,
@@ -24,10 +23,8 @@ enum class QType : std::uint16_t {
 enum class QuantLayout : std::uint16_t {
     RowSplit                   = 0,
     Contiguous                 = 1,
-    BlockScaleK16M128x4        = 2,
     RowScale                   = 3,
     RowPagedG16_4K             = 4,
-    BatchedBlockScaleK16M128x4 = 5,
     BlockScaleM128K128         = 6,
 };
 

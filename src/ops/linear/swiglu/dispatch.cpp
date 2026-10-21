@@ -6,7 +6,7 @@ void validate_swiglu_geometry(QType type, int rows, int k) {
     if (type == QType::Q8_G32_FP16 && rows == 12288 && k == 2048) return;
     if (rows == 34816 && k == 5120 &&
         (type == QType::Q4_G64_FP16 || type == QType::Q8_G32_FP16 ||
-         type == QType::FP8_E4M3FN_ROW_BF16 || type == QType::NVFP4))
+         type == QType::FP8_E4M3FN_ROW_BF16))
         return;
     throw std::invalid_argument("linear_swiglu: unsupported weight geometry");
 }

@@ -37,8 +37,6 @@ constexpr ReductionCriterion tolerance_for(ops::LinearPolicy policy) {
         // Both independently A8-quantized projections feed the nonlinear product, so this profile
         // allows twice Linear's relative-L2 quantization allowance plus a bounded gross tail.
         return {8.0e-2, 1.0e-2, 1.2e-1};
-    case ops::LinearPolicy::AllowA4:
-        return {1.6e-1, 1.0e-2, 1.6e-1};
     }
     throw std::invalid_argument("linear_swiglu test: unknown activation compute profile");
 }
@@ -58,8 +56,7 @@ std::vector<std::uint16_t> make_activation(const Profile& profile, std::int32_t 
     // Later tokens use exact zeros plus a rotating set of nonzeros. This keeps a full-output,
     // full-formula oracle practical at large registered T boundaries without adopting any
     // production staging or reduction behavior.
-    const bool native_float_weight =
-        profile.qtype == QType::NVFP4 || profile.qtype == QType::FP8_E4M3FN_ROW_BF16;
+    const bool native_float_weight = profile.qtype == QType::FP8_E4M3FN_ROW_BF16;
     const float dense_scale =
         profile.qtype == QType::Q4_G64_FP16 ? 1.25e-4F : (native_float_weight ? 1.0e-3F : 1.0e-5F);
     for (std::int32_t column = 0; column < profile.input_rows; ++column) {
@@ -219,13 +216,8 @@ static int run_profile(std::string_view label, const Profile& profile,
         maximum_tokens = std::max(maximum_tokens, call.tokens);
         has_graph |= call.graph;
     }
-    quantized_weight::PatternedWeightOptions weight_options;
-    if (profile.qtype == QType::NVFP4) {
-        weight_options.weight_scale_divisor = 0.125F;
-        weight_options.input_scale_divisor  = 3.5F;
-    }
     quantized_weight::PackedWeight host_weight = quantized_weight::make_patterned_weight(
-        profile.qtype, profile.gate_up_rows, profile.input_rows, profile.seed, weight_options);
+        profile.qtype, profile.gate_up_rows, profile.input_rows, profile.seed);
     const std::vector<std::uint16_t> host_activation = make_activation(profile, maximum_tokens);
     const std::vector<double> reference =
         linear_swiglu_oracle_fp64(profile, host_weight, host_activation, maximum_tokens);
@@ -250,9 +242,7 @@ static int run_profile(std::string_view label, const Profile& profile,
 
     const ops::LinearPolicy policy = profile.policy;
     int admitted_maximum           = 0;
-    for (const auto& call : calls)
-        if (call.form != CallForm::RejectA16Extent)
-            admitted_maximum = std::max(admitted_maximum, call.tokens);
+    for (const auto& call : calls) admitted_maximum = std::max(admitted_maximum, call.tokens);
     const auto interval_capacity = admitted_maximum == 0
                                        ? 0
                                        : ops::linear_swiglu_workspace_capacity_bytes(
@@ -266,30 +256,12 @@ static int run_profile(std::string_view label, const Profile& profile,
         test::GuardedDeviceBuffer output(elements * sizeof(std::uint16_t));
         Tensor x(device_activation.span(), DType::BF16, {profile.input_rows, tokens});
         Tensor destination(output.span(), DType::BF16, {profile.output_rows, tokens});
-        const auto capacity = call.form == CallForm::RejectA16Extent
-                                           ? 0
-                                           : ops::linear_swiglu_workspace_capacity_bytes(
-                                        profile.qtype, profile.gate_up_rows, profile.input_rows,
-                                        policy, tokens, tokens);
+        const auto capacity = ops::linear_swiglu_workspace_capacity_bytes(
+            profile.qtype, profile.gate_up_rows, profile.input_rows, policy, tokens, tokens);
         if (capacity > interval_capacity)
             throw std::runtime_error("SwiGLU interval capacity is insufficient");
         GuardedDeviceBuffer scratch(capacity);
         MemoryArena workspace(scratch.span());
-        if (call.form == CallForm::RejectA16Extent) {
-            for (bool convenience : {false, true}) {
-                try {
-                    if (convenience)
-                        ops::linear_swiglu(x, weight, destination, workspace,
-                                                    cuda_environment().default_execution);
-                    else
-                        ops::linear_swiglu(x, weight, destination, policy, workspace,
-                                                    cuda_environment().default_execution);
-                    std::cerr << call.id << ": accepted NVFP4 A16 T=17\n";
-                    ++failures;
-                } catch (const std::invalid_argument&) {}
-            }
-            return;
-        }
         workspace.reset();
         workspace.reset_peak();
         const auto cuda =
@@ -425,17 +397,12 @@ void add_profile(Suite& suite, const Profile& profile, std::span<const std::int3
     std::vector<Invocation> calls;
     for (int t : tokens) calls.push_back({t});
     for (int t : graphs) calls.push_back({t, true});
-    if (profile.policy == ops::LinearPolicy::A16Only) {
-        calls.push_back(
-            {profile.qtype == QType::NVFP4 ? 16 : tokens.front(), false, CallForm::Convenience});
-        if (profile.qtype == QType::NVFP4) calls.push_back({17, false, CallForm::RejectA16Extent});
-    }
+    if (profile.policy == ops::LinearPolicy::A16Only)
+        calls.push_back({tokens.front(), false, CallForm::Convenience});
     std::vector<linear_suite::Case> cases;
     for (auto& call : calls) {
         const std::string recipe = "s" + std::to_string(profile.seed) + "/dense-sparse/" +
-                                   (call.form == CallForm::Convenience       ? "convenience"
-                                    : call.form == CallForm::RejectA16Extent ? "reject-extent"
-                                                                             : "policy");
+                                   (call.form == CallForm::Convenience ? "convenience" : "policy");
         auto test = linear_suite::make_case(
             linear_suite::format_name(profile.qtype), profile.gate_up_rows, profile.input_rows,
             call.tokens, profile.policy,

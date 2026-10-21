@@ -310,8 +310,6 @@ void parse_uses(Directory& out, const Json& values) {
                 use.activation_policy = ActivationPolicy::A16Only;
             } else if (policy == "AllowA8") {
                 use.activation_policy = ActivationPolicy::AllowA8;
-            } else if (policy == "AllowA4") {
-                use.activation_policy = ActivationPolicy::AllowA4;
             } else {
                 throw ArtifactError(label + ": unknown activation policy " + policy);
             }

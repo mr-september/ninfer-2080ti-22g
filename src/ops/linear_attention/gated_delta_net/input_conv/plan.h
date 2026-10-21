@@ -4,7 +4,7 @@
 
 namespace ninfer::ops::detail::gdn_input {
 
-enum class Compute { A16, A8, A4 };
+enum class Compute { A16, A8 };
 enum class ConvKernel {
     Materialized,
     Q4Q5Fused,
@@ -13,8 +13,6 @@ enum class ConvKernel {
     Q8Window,
     Q8Aggregate,
     Fp8Fused,
-    Nvfp4Decode,
-    Nvfp4Window,
     Q8TmaBatch,
 };
 enum class ProjectedConvKernel { Sequential, TokenParallel, TokenParallel8 };

@@ -92,11 +92,8 @@ WeightGeometry weight_geometry(QType format, QuantLayout layout,
         }
         return out;
     }
-    const bool nvfp4_bank = layout == QuantLayout::BatchedBlockScaleK16M128x4;
-    const bool fp8_block  = layout == QuantLayout::BlockScaleM128K128;
-    if ((nvfp4_bank && shape.size() != 3) ||
-        (fp8_block && shape.size() != 2 && shape.size() != 3) ||
-        (!nvfp4_bank && !fp8_block && shape.size() != 2)) {
+    const bool fp8_block = layout == QuantLayout::BlockScaleM128K128;
+    if ((fp8_block && shape.size() != 2 && shape.size() != 3) || (!fp8_block && shape.size() != 2)) {
         throw std::invalid_argument("quantized weight rank differs from its layout");
     }
     const auto n        = shape[shape.size() - 2];
@@ -170,25 +167,11 @@ WeightGeometry weight_geometry(QType format, QuantLayout layout,
         out.scale_row_bytes    = mul(k / 128, 2);
         out.code_bytes         = out.elements;
         out.scale_offset       = aligned(out.code_bytes, 256);
-    } else if (layout == QuantLayout::BlockScaleK16M128x4 || nvfp4_bank) {
-        if (format != QType::NVFP4 || n % 128 || k % 64) {
-            throw std::invalid_argument("NVFP4 BlockScale requires N%128=0 and K%64=0");
-        }
-        out.group_size         = 16;
-        out.code_bytes_per_row = k / 2;
-        out.scale_row_bytes    = k / 16;
-        out.code_bytes         = out.elements / 2;
-        out.scale_offset       = aligned(out.code_bytes, 256);
     } else {
         throw std::invalid_argument("unknown quantized weight layout");
     }
     out.scale_bytes = mul(mul(matrices, n / out.scale_block_rows), out.scale_row_bytes);
     out.bytes       = add(out.scale_offset, out.scale_bytes);
-    if (format == QType::NVFP4) {
-        out.divisor_offset = out.bytes;
-        out.divisor_count  = matrices;
-        out.bytes          = add(out.bytes, mul(matrices, 4));
-    }
     return out;
 }
 
@@ -240,13 +223,6 @@ std::uint64_t weight_scale_offset(const WeightGeometry& geometry, std::uint64_t 
     if (geometry.layout == QuantLayout::RowPagedG16_4K) {
         return weight_paged_row_offset(geometry, row) + geometry.code_bytes_per_row + group;
     }
-    if (geometry.layout == QuantLayout::BlockScaleK16M128x4 ||
-        geometry.layout == QuantLayout::BatchedBlockScaleK16M128x4) {
-        const auto inner = row % 128;
-        return geometry.scale_offset +
-               (row / 128 * (geometry.shape.back() / 64) + group / 4) * 512 + inner % 32 * 16 +
-               inner / 32 * 4 + group % 4;
-    }
     return geometry.scale_offset + row / geometry.scale_block_rows * geometry.scale_row_bytes +
            group * 2;
 }
@@ -274,12 +250,9 @@ WeightRowPlanes weight_row_planes(const WeightRegion& region) {
     if (g.high_bytes) {
         out.high = parent.data + g.high_offset + out.row_begin * out.high_row_bytes;
     }
-    out.swizzled_scales = g.layout == QuantLayout::BlockScaleK16M128x4 ||
-                          g.layout == QuantLayout::BatchedBlockScaleK16M128x4;
     if (g.scale_bytes) {
-        out.scales =
-            parent.data + g.scale_offset +
-            (out.swizzled_scales ? 0 : out.row_begin / out.scale_block_rows * out.scale_row_bytes);
+        out.scales = parent.data + g.scale_offset +
+                     out.row_begin / out.scale_block_rows * out.scale_row_bytes;
     }
     return out;
 }
@@ -326,7 +299,7 @@ Weight native_weight(const WeightView& view, float input_divisor) {
     if (g.layout == QuantLayout::RowScale && !is_complete_weight(view)) {
         throw std::invalid_argument("row-scaled FP8 native input requires a complete parent");
     }
-    const auto row_alignment = g.format == QType::NVFP4 ? 128 : g.scale_block_rows;
+    const auto row_alignment = g.scale_block_rows;
     if (planes.row_begin % row_alignment || planes.row_count % row_alignment) {
         throw std::invalid_argument("native weight view splits a scale tile");
     }
@@ -370,10 +343,6 @@ Weight native_weight(const WeightView& view, float input_divisor) {
         out.scale_nb[0] = 2;
         out.scale_nb[1] = static_cast<std::int64_t>(g.scale_row_bytes);
         out.scale_nb[2] = out.scale_nb[3] = out.scale_nb[1] * out.scale_ne[1];
-    } else if (planes.swizzled_scales) {
-        out.layout      = QuantLayout::BlockScaleK16M128x4;
-        out.scale_dtype = DType::FP8_E4M3FN;
-        out.scales = region.parent->data + g.scale_offset + planes.row_begin * g.scale_row_bytes;
     }
     return out;
 }

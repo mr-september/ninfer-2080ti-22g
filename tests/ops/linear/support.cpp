@@ -8,8 +8,6 @@ unsigned policy_bit(ops::LinearPolicy policy) {
         return 1;
     case ops::LinearPolicy::AllowA8:
         return 2;
-    case ops::LinearPolicy::AllowA4:
-        return 4;
     }
     throw std::invalid_argument("unknown Linear policy");
 }
@@ -20,8 +18,6 @@ std::string_view policy_name(ops::LinearPolicy policy) {
         return "a16";
     case ops::LinearPolicy::AllowA8:
         return "a8";
-    case ops::LinearPolicy::AllowA4:
-        return "a4";
     }
     throw std::invalid_argument("unknown Linear policy");
 }
@@ -40,8 +36,6 @@ std::string_view format_name(QType type) {
         return "q8";
     case QType::FP8_E4M3FN_ROW_BF16:
         return "fp8";
-    case QType::NVFP4:
-        return "nvfp4";
     default:
         throw std::invalid_argument("unknown Linear fixture format");
     }
@@ -76,8 +70,7 @@ int Suite::main(int argc, char** argv) const {
                           {"shape", std::to_string(test.n) + " " + std::to_string(test.k)},
                           {"t", std::to_string(test.t)},
                           {"execution", test.execution == Execution::Graph ? "graph" : "eager"}}};
-            for (auto policy : {ops::LinearPolicy::A16Only, ops::LinearPolicy::AllowA8,
-                                ops::LinearPolicy::AllowA4})
+            for (auto policy : {ops::LinearPolicy::A16Only, ops::LinearPolicy::AllowA8})
                 if (test.policies & policy_bit(policy))
                     entry.tags.emplace_back("policy", policy_name(policy));
             cases.push_back(std::move(entry));

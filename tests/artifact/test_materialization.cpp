@@ -236,7 +236,6 @@ void file_roundtrip(DeviceContext& device, const std::filesystem::path& path, bo
                 (void)binder.resource(name, role);
             }
         }
-        if (writer_fixture) { requests.push_back({reader.find("nvfp4"), Device::cpu()}); }
         auto plan = plan_materialization(reader, requests, std::move(binder).finish());
         for (const auto& placement : plan.device_objects) {
             auto bytes = reader.read_object(placement.object);
@@ -255,17 +254,6 @@ void file_roundtrip(DeviceContext& device, const std::filesystem::path& path, bo
             require(paged.geometry.bytes == 8196 && paged.weight_divisors.size() == 1 &&
                         paged.weight_divisors[0] == 2.0F,
                     "NF4 materialization lost paged geometry or the FP32 divisor");
-            const auto& bank = storage->device_parent(reader.find("nvfp4"));
-            require(bank.weight_divisors.size() == 3 && bank.weight_divisors[0] == 2 &&
-                        bank.weight_divisors[1] == 3 && bank.weight_divisors[2] == 5,
-                    "NVFP4 materialization lost independent matrix divisors");
-            require(bank.weight_divisors.data() ==
-                        storage->host_parent(reader.find("nvfp4")).weight_divisors.data(),
-                    "Host and CUDA parents do not share their owned divisor metadata");
-            const auto slice = native_weight({{128, 128}, {{&bank, 384 * 128, 512 * 128}}});
-            require(slice.weight_scale_divisor == 3 && slice.qdata == bank.data + 24576 &&
-                        slice.scales == bank.data + 52224,
-                    "materialized NVFP4 slice used a different expert");
         }
     }
     for (const auto& [index, bytes] : expected) {

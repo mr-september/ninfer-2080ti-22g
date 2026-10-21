@@ -1,5 +1,4 @@
 include("${CMAKE_CURRENT_LIST_DIR}/fp8/sources.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/nvfp4/sources.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/q4/sources.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/q5/sources.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/q6/sources.cmake")

@@ -2,7 +2,6 @@
 #include "ops/common/host/operands.h"
 #include "ops/linear/add/dispatch.h"
 #include "ops/linear/add/fp8/dispatch.h"
-#include "ops/linear/add/nvfp4/dispatch.h"
 
 #include <stdexcept>
 
@@ -14,7 +13,6 @@ void validate_policy(LinearPolicy policy) {
     switch (policy) {
     case LinearPolicy::A16Only:
     case LinearPolicy::AllowA8:
-    case LinearPolicy::AllowA4:
         return;
     }
     throw std::invalid_argument("linear_add: invalid compute policy");
@@ -56,10 +54,6 @@ void validate_operands(const Tensor& x, const Weight& w, const Tensor& residual,
         (void)common::validate_fp8_weight(w, "linear_add");
         return;
     }
-    if (w.qtype == QType::NVFP4) {
-        (void)common::validate_nvfp4_weight(w, "linear_add");
-        return;
-    }
     if (!operand::aligned(w.qdata, 16))
         throw std::invalid_argument("linear_add: weight codes must be 16-byte aligned");
     if (w.qtype == QType::BF16) {
@@ -85,8 +79,6 @@ std::size_t linear_add_workspace_capacity_bytes(QType type, std::int32_t rows, s
         throw std::invalid_argument("linear_add: invalid token interval");
     if (type == QType::FP8_E4M3FN_ROW_BF16)
         return detail::fp8_linear_add_workspace_capacity_bytes(rows, k, policy, first, last);
-    if (type == QType::NVFP4)
-        return detail::nvfp4_linear_add_workspace_capacity_bytes(rows, k, policy, first, last);
     (void)select_a16(type, rows, k, first);
     (void)select_a16(type, rows, k, last);
     return 0;
@@ -107,9 +99,6 @@ void linear_add(const Tensor& x, const Weight& w, Tensor& residual, LinearPolicy
     if (w.qtype == QType::FP8_E4M3FN_ROW_BF16)
         return detail::fp8_linear_add_dispatch(x, w, residual, policy, workspace,
                                                execution.stream());
-    if (w.qtype == QType::NVFP4)
-        return detail::nvfp4_linear_add_dispatch(x, w, residual, policy, workspace,
-                                                 execution.stream());
     select_a16(w.qtype, w.n, w.k, x.ne[1])(x, w, residual, execution.stream());
 }
 

@@ -49,29 +49,19 @@ void integers() {
 }
 
 void block_scales() {
-    for (const auto nv : {false, true}) {
-        const auto g = weight_geometry(nv ? QType::NVFP4 : QType::FP8_E4M3FN_BLOCK128X128_BF16,
-                                       nv ? QuantLayout::BatchedBlockScaleK16M128x4
-                                          : QuantLayout::BlockScaleM128K128,
-                                       std::array<std::uint64_t, 3>{3, 256, 384});
-        HostBuffer bytes(g.bytes);
-        std::array<float, 3> divisors{2, 3, 5};
-        WeightParent parent{g, Device::cpu(), static_cast<const std::byte*>(bytes.data()),
-                            nv ? std::span<const float>(divisors) : std::span<const float>{}};
-        const auto bank = bind_weight_bank(parent, describe_weight_bank(g, {128, 3, 128, 256}));
-        for (unsigned e = 0; e < 3; ++e) {
-            const auto w = matrix_weight(bank, e, 7);
-            require(w.qdata == parent.data + (e * 256 + 128) * (nv ? 192 : 384));
-            require(w.scales ==
-                    parent.data + (nv ? 147456 + (e * 256 + 128) * 24 : 294912 + (e * 2 + 1) * 6));
-            require(!nv || (w.weight_scale_divisor == divisors[e] && w.input_scale_divisor == 7));
-            require(bank.divisor(e) == (nv ? divisors[e] : 1));
-        }
-        rejects([&] { (void)describe_weight_bank(g, {64, 1, 128, 256}); });
-        if (nv) {
-            rejects([&] { (void)describe_weight_bank(g, {128, 2, 256, 256}); });
-        }
+    const auto g = weight_geometry(QType::FP8_E4M3FN_BLOCK128X128_BF16,
+                                   QuantLayout::BlockScaleM128K128,
+                                   std::array<std::uint64_t, 3>{3, 256, 384});
+    HostBuffer bytes(g.bytes);
+    WeightParent parent{g, Device::cpu(), static_cast<const std::byte*>(bytes.data())};
+    const auto bank = bind_weight_bank(parent, describe_weight_bank(g, {128, 3, 128, 256}));
+    for (unsigned e = 0; e < 3; ++e) {
+        const auto w = matrix_weight(bank, e, 7);
+        require(w.qdata == parent.data + (e * 256 + 128) * 384);
+        require(w.scales == parent.data + (294912 + (e * 2 + 1) * 6));
+        require(bank.divisor(e) == 1);
     }
+    rejects([&] { (void)describe_weight_bank(g, {64, 1, 128, 256}); });
 }
 } // namespace
 
