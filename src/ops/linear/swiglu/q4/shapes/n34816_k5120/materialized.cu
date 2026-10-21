@@ -46,12 +46,8 @@ LinearSwiGluLaunch select_projection(int tokens) {
 
 void launch_q4_swiglu_materialized_projection(const Tensor& x, const Weight& w, Tensor& out,
                                               cudaStream_t stream) {
-#if defined(NINFER_SM75)
     // Turing: the tuned plain-projection routes (FP16-mantissa GEMV at T=1, SIMT up to T=4, the
     // single-buffered MMA tiles for prefill) beat this table, which is tuned for the 5090.
     select_q4_n34816_k5120(x.ne[1])(x, w, out, stream);
-#else
-    select_projection(x.ne[1])(x, w, out, stream);
-#endif
 }
 } // namespace ninfer::ops::detail

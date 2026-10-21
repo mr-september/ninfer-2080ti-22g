@@ -89,13 +89,8 @@ void launch_matrix(const Tensor& x, const Weight& first, const Weight& second,
     if (x.ne[1] <= 64)
         return launch_grouped<GemmCfg<32, 64, 64, 16, 16, 4, 1, false, true, true>>(
             x, first, second, out[0], out[1], stream);
-#if defined(NINFER_SM75)
     // Turing: eight-warp single-stage tiles, two resident per SM, so one tile's MMA overlaps the
     // other's loads (cp.async is unavailable); faster than the 5090 tile from 65 columns up.
     launch_grouped<TuringPrefillCfg>(x, first, second, out[0], out[1], stream);
-#else
-    launch_grouped<GemmCfg<64, 128, 64, 64, 16, 2, 1, false, true, true>>(x, first, second, out[0],
-                                                                          out[1], stream);
-#endif
 }
 } // namespace ninfer::ops::detail::linear_split::q4_q5_n4096_n12288_k5120
