@@ -75,32 +75,6 @@
         "NINFER_BUILD_ENGINE": "OFF",
         "NINFER_BUILD_APPS": "OFF"
       }
-    },
-    {
-      "name": "rtx5090-release",
-      "displayName": "RTX 5090 product binaries",
-      "inherits": "product",
-      "cacheVariables": {
-        "NINFER_TARGET": "rtx5090"
-      }
-    },
-    {
-      "name": "rtx5090-dev",
-      "displayName": "RTX 5090 products, tests and benchmarks",
-      "inherits": "rtx5090-release",
-      "cacheVariables": {
-        "BUILD_TESTING": "ON",
-        "NINFER_BUILD_BENCHMARKS": "ON"
-      }
-    },
-    {
-      "name": "rtx5090-ops",
-      "displayName": "RTX 5090 Core, Artifact and Ops development",
-      "inherits": "rtx5090-dev",
-      "cacheVariables": {
-        "NINFER_BUILD_ENGINE": "OFF",
-        "NINFER_BUILD_APPS": "OFF"
-      }
     }
   ],
   "buildPresets": [
@@ -123,18 +97,6 @@
     {
       "name": "turing-windows-dev",
       "configurePreset": "turing-windows-dev"
-    },
-    {
-      "name": "rtx5090-release",
-      "configurePreset": "rtx5090-release"
-    },
-    {
-      "name": "rtx5090-dev",
-      "configurePreset": "rtx5090-dev"
-    },
-    {
-      "name": "rtx5090-ops",
-      "configurePreset": "rtx5090-ops"
     }
   ],
   "testPresets": [
@@ -155,20 +117,6 @@
     {
       "name": "turing-windows-dev",
       "configurePreset": "turing-windows-dev",
-      "output": {
-        "outputOnFailure": true
-      }
-    },
-    {
-      "name": "rtx5090-dev",
-      "configurePreset": "rtx5090-dev",
-      "output": {
-        "outputOnFailure": true
-      }
-    },
-    {
-      "name": "rtx5090-ops",
-      "configurePreset": "rtx5090-ops",
       "output": {
         "outputOnFailure": true
       }
