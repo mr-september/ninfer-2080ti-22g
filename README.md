@@ -132,7 +132,7 @@ Checked on one 2080 Ti 22 GB with Qwen3.8-27B `groupwise-int` on native Windows 
 
 ## Known limitations
 
-- Turing only: the `rtx5090` target in the tree is upstream's and is neither built nor tested here. FP8 weights and KV are unavailable.
+- Turing only. FP8 weights and KV are unavailable.
 - Qwen3.8-27B is the only tested model.
 - Greedy output is not bit-identical to the fork's build from before the port onto upstream `dev`: on 5 of 8 test prompts the text diverges at a near-tied token, while log-probabilities agree to 0.19 nats at most and perplexity to 0.045% ([details](docs/turing-port.md#port-onto-upstream-dev-2026-10-18)).
 - The 64k default context leaves little VRAM headroom; other programs using the GPU can force a smaller context at startup.
@@ -157,7 +157,7 @@ On native Windows, `scripts\build.ps1` does everything below. The two platforms 
 
 The `zlib` and `dav1d` features in `vcpkg.json` provide the PNG and AV1 decoders; without `zlib` image prompts fail with "media codec is not supported".
 
-Presets are named `<target>-release`, `<target>-dev` (adds tests and benchmarks) and `<target>-ops` (Core, Artifact and Ops only), and each builds in `build/<preset-name>/`; the Windows presets are `turing-windows`, `turing-windows-dev` and `turing-windows-ops`. The default `NINFER_TARGET` of this fork is `turing`, which requires `CMAKE_CUDA_ARCHITECTURES=75`. Machine-specific compiler and Python paths belong in the ignored `CMakeUserPresets.json`. On Linux the executables find the shared libraries in the same build's `lib/` directory through a relative RPATH, so keep it beside `apps/` when moving build outputs. See [build organization](docs/maintainer/build-system.md).
+Presets are named `turing-release`, `turing-dev` (adds tests and benchmarks) and `turing-ops` (Core, Artifact and Ops only), and each builds in `build/<preset-name>/`; the Windows presets are `turing-windows`, `turing-windows-dev` and `turing-windows-ops`. The build requires `CMAKE_CUDA_ARCHITECTURES=75`. Machine-specific compiler and Python paths belong in the ignored `CMakeUserPresets.json`. On Linux the executables find the shared libraries in the same build's `lib/` directory through a relative RPATH, so keep it beside `apps/` when moving build outputs. See [build organization](docs/maintainer/build-system.md).
 
 The Q8 split-K kernels make the build slow: it took 10.6 minutes on 16 logical cores at full parallelism with FFmpeg already in vcpkg's cache (measured on the previous base). On a machine with little free RAM the default parallelism can make `nvcc` run out of memory; set `CMAKE_BUILD_PARALLEL_LEVEL=4` (or pass `-j4`) and rerun, the build resumes.
 

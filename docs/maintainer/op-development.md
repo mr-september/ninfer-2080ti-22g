@@ -352,16 +352,16 @@ silently change RDC mode, architecture, compiler precision options or device-lin
 
 ### 4.4 Execution-target ownership
 
-The build selects one native execution target; see [Build system](build-system.md). Keep the
-mathematical interface and caller-owned resources independent of that selection. A small portable
-Op stays in its existing source. Split only where target-specific dispatch, instantiation or launch
-requirements need independent ownership; not every family needs platform subdirectories.
+The build targets Turing only; see [Build system](build-system.md). Keep the mathematical interface
+and caller-owned resources independent of tuning. A small portable Op stays in its existing source.
+Split only where dispatch, instantiation or launch requirements need independent ownership; not every
+family needs subdirectories.
 
-Within an affected Op, `rtx5090/` owns its private shape catalogs, schedules and
-launch bindings. CMake includes the selected source manifest. Shared kernel templates, codecs,
-operand contracts and mathematical oracles remain outside those directories when useful to both.
-Each target owns its tuning independently. The compiled Op defines its supported inputs;
-workspace queries and execution use the same admission rules and report unsupported calls there.
+Within an affected Op, the shape directories own its private shape catalogs, schedules and launch
+bindings, and CMake includes their source manifests. Shared kernel templates, codecs, operand
+contracts and mathematical oracles stay outside those directories when useful to both. The compiled Op
+defines its supported inputs; workspace queries and execution use the same admission rules and report
+unsupported calls there.
 
 Keep a compatible implementation shared until a target actually needs independent selection or
 launch policy. Creating target directories must not remove an existing supported route. Workspace

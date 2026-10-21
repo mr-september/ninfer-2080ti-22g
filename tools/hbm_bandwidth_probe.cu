@@ -1,6 +1,6 @@
 // Sustained device-memory bandwidth probe.
 //
-// Built as bench/ninfer_memory_bandwidth_bench with the selected NINFER_TARGET.
+// Built as bench/ninfer_memory_bandwidth_bench.
 //
 // The "bus GB/s" column counts logical streaming traffic: N bytes for a
 // read or write and 2N bytes for a copy (N read + N written). This is the

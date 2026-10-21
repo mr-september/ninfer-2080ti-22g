@@ -5,47 +5,36 @@ CUDA 13.4 is the validated development toolkit. Product commands and prerequisit
 [README](../../README.md#quick-start); test and measurement workflows live in
 [tests](../../tests/README.md) and [benchmarks](../../bench/README.md).
 
-## Execution targets
+## Target
 
-`NINFER_TARGET` selects one execution target for the entire build directory:
+The build targets NVIDIA Turing (`sm_75`) on Linux x86-64 or native Windows x86-64, and
+`CMAKE_CUDA_ARCHITECTURES` is fixed at `75`. Sources sit directly in their Op directories.
+`src/ops/CMakeLists.txt` filters the Blackwell-only Op sources (FP8 weights and KV, TMA, block-scaled
+MoE, QSA sparse attention, Kimi delta attention, hyper-connection mix) out of the manifests, and
+`src/ops/unsupported/turing_unsupported.cpp` links throwing stubs for the declarations that remain, so
+these Ops report unsupported at their capacity/execution entries. `NINFER_SM75` is defined for device
+code that differs on sm_75.
 
-| Target | System | CUDA architecture |
-|---|---|---|
-| `turing` (default in this fork) | Linux x86-64 or native Windows x86-64 | `75` |
-| `rtx5090` | Linux x86-64 | `120a` |
-
-`turing` composes its sources from the `rtx5090` trees: `NINFER_SOURCE_TARGET` is `rtx5090` and keys the
-source directories, while `NINFER_TARGET` stays `turing` for behavior that must differ (no CPU expert
-executor, `NINFER_EXPERT_OFFLOAD` 0). `src/ops/CMakeLists.txt` filters the Blackwell-only Op sources
-(FP8 weights and KV, TMA, block-scaled MoE, QSA sparse attention, Kimi delta attention,
-hyper-connection mix) out of those manifests, and `src/ops/unsupported/turing_unsupported.cpp` links
-throwing stubs for the declarations that remain, so these Ops report unsupported at their capacity/execution
-entries. `NINFER_SM75` is defined for device code that differs on sm_75.
-
-[`cmake/NinferPlatform.cmake`](../../cmake/NinferPlatform.cmake) resolves the target and validates
+[`cmake/NinferPlatform.cmake`](../../cmake/NinferPlatform.cmake) fixes and validates
 `CMAKE_CUDA_ARCHITECTURES` before `project()` detects CUDA. After toolchain initialization it checks
 `CMAKE_SYSTEM_NAME` and `CMAKE_SYSTEM_PROCESSOR`, so a cross toolchain is checked against its target
-system. Unknown targets, conflicting CUDA architectures and target changes within an existing
-build directory are configuration errors. Compiler changes also require a fresh build directory.
-Libraries and executables retain their logical names across targets; their build trees are separate.
+system. A conflicting CUDA architecture is a configuration error. Compiler changes also require a fresh
+build directory.
 
-The same selection generates `<build-dir>/generated/core/platform.h` from
+The same step generates `<build-dir>/generated/core/platform.h` from
 [`src/core/platform.h.in`](../../src/core/platform.h.in). Internal consumers explicitly include
-`core/platform.h`; `ninfer_internal_includes()` supplies its private include root. `NINFER_TARGET_TURING`,
-and `NINFER_TARGET_RTX5090` are defined as 0 or 1, so test them with `#if`.
-These definitions do not propagate into public headers or third-party targets.
+`core/platform.h`; `ninfer_internal_includes()` supplies its private include root. It defines the
+capabilities `NINFER_EXPERT_OFFLOAD` (0) and `NINFER_HOST_MAPPED_EMBEDDING` (1); model offload entry
+points use the former. These definitions do not propagate into public headers or third-party targets.
 
-Target identity and capabilities are distinct. The platform header maps each target to
-`NINFER_EXPERT_OFFLOAD` and `NINFER_HOST_MAPPED_EMBEDDING` independently; model offload entry points
-use the former. CMake still owns
-target-private translation units and dependencies; macros handle small differences within shared
-sources, not whole implementation catalogs. Benchmark reference data belongs to
-[`bench/common/roofline.h`](../../bench/common/roofline.h), selected by target identity.
+CMake owns translation units and dependencies; macros handle small differences within shared sources,
+not whole implementation catalogs. Benchmark reference data belongs to
+[`bench/common/roofline.h`](../../bench/common/roofline.h).
 
-Target selection owns source composition and compilation, not model mathematics or artifact
-capability admission. Ops retain the same public interfaces and report unsupported implementations
-at their own capacity/execution entries. Models do not receive a target key or reproduce Op shape
-catalogs. Runtime input-dependent dispatch and worker ISA selection remain inside the owning Op.
+The build does not own model mathematics or artifact capability admission. Ops retain the same public
+interfaces and report unsupported implementations at their own capacity/execution entries. Models do
+not receive a target key or reproduce Op shape catalogs. Runtime input-dependent dispatch and worker
+ISA selection remain inside the owning Op.
 
 ## Configuration
 
@@ -55,7 +44,6 @@ composition. The default configuration is Release. Ninja links and archives shar
 
 | Cache option | Default | Scope |
 |---|---|---|
-| `NINFER_TARGET` | `turing` | Execution target and native architecture |
 | `NINFER_BUILD_ENGINE` | ON | Frontend, media decode, models and Engine |
 | `NINFER_BUILD_APPS` | ON | CLI, HTTP server and perplexity evaluator; requires Engine |
 | `BUILD_TESTING` | OFF | Tests for the selected components |
@@ -68,9 +56,7 @@ spdlog. A Python 3 interpreter is found when tests are enabled. Standalone Pytho
 conversion/evaluation scripts run separately from CMake and CTest.
 
 Shared CPU topology, affinity, worker startup and `TaskPool` belong to the ordinary C++
-`ninfer_cpu` library, linked with hwloc >= 2.5 and Threads. The x86 collective executor and CPUID
-implementation belong to `ninfer_cpu_executor`, compiled only for `rtx5090`. CPU MoE, the model runtime
-when built with offload, and executor tests/benchmarks link it explicitly. Artifact Host page population uses shared
+`ninfer_cpu` library, linked with hwloc >= 2.5 and Threads. Artifact Host page population uses shared
 worker startup/affinity facilities directly, without depending on the arithmetic executor.
 Core's direct-file I/O uses liburing >= 2.5.
 Its registered files and buffers are caller-owned; the queue creates no CUDA resources or threads.
@@ -81,10 +67,9 @@ FFmpeg is discovered without a version floor. The libcurl 7.85 minimum follows t
 
 The checked-in presets use independent `build/<preset-name>/` directories:
 
-- `rtx5090-release`: product binaries;
-- `rtx5090-dev`: products, tests and benchmarks;
-- `rtx5090-ops`: Core, Artifact and Ops with their tests and benchmarks;
-- `turing-release`, `turing-dev`, `turing-ops`: the same three presets for Turing on Linux;
+- `turing-release`: product binaries;
+- `turing-dev`: products, tests and benchmarks;
+- `turing-ops`: Core, Artifact and Ops with their tests and benchmarks (Linux);
 - `turing-windows`, `turing-windows-dev`, `turing-windows-ops`: native Windows with MSVC and the vcpkg
   toolchain file (`VCPKG_ROOT`), building in `build/turing-windows/` and so on. The `vcpkg.json` manifest
   supplies FFmpeg, hwloc and curl on Windows, whose direct-file I/O uses an I/O completion port instead of
@@ -93,9 +78,9 @@ The checked-in presets use independent `build/<preset-name>/` directories:
 Each has a matching build preset; development presets also have test presets. For example:
 
 ```bash
-cmake --preset rtx5090-dev
-cmake --build build/rtx5090-dev -j
-ctest --preset rtx5090-dev
+cmake --preset turing-dev
+cmake --build build/turing-dev -j
+ctest --preset turing-dev
 ```
 
 Keep compiler, Python, pkg-config and dependency paths in ignored `CMakeUserPresets.json`.
@@ -188,7 +173,7 @@ with `CMAKE_CURRENT_LIST_DIR`; `include()` does not change `CMAKE_CURRENT_SOURCE
   and Program manifests own architecture code; `common/qwen/sources.cmake` owns shared Frontend
   and Vision sources. Shared bindings and context/MoE mechanisms have explicit target entries.
   `common/moe/execution.*` owns the shared GPU calls; `schedule.*` bounds model-facing offload
-  planning and traversal. `common/moe/offload/` is compiled only for `rtx5090`.
+  planning and traversal. `common/moe/offload/` is not built.
   Runtime startup orchestration links model runtime; native startup planners only depend on
   runtime support/contracts. Checkpoints/recipes do not define additional compile owners.
 - New files require an explicit manifest edit. New families require an explicit parent include.
@@ -197,8 +182,8 @@ with `CMAKE_CURRENT_LIST_DIR`; `include()` does not change `CMAKE_CURRENT_SOURCE
 Adding a source manifest does not require another library. Add a target only for a meaningful
 dependency, reuse or compilation boundary. Shape semantics, supported domains and finite
 dispatch remain in C++; CMake only selects translation units. A family may explicitly include
-`${NINFER_TARGET}/sources.cmake` where target-private implementations exist. Shared sources are
-registered once in the parent; a target must not include another target's private route catalog.
+a nested `sources.cmake` where an implementation directory has one. Shared sources are
+registered once in the parent.
 No automatic directory scan, missing-file fallback or global shape registry selects implementations.
 
 ## CUDA compilation boundaries
@@ -226,9 +211,8 @@ consumers. Tests explicitly name their linked libraries; public-header and pure-
 their isolated include/link requirements.
 
 Base builds register Core, Artifact and Op tests/benchmarks. Engine builds add frontend, model,
-runtime and product checks. CPU executor/MoE and mixed CPU/GPU checks are registered only for
-`rtx5090`; GPU MoE qualification has a separate executable. Target-specific Op cases are registered
-only where the implementation is present.
+runtime and product checks. GPU MoE qualification has a separate executable. Op cases are registered only where the
+implementation is present.
 Independent mathematical oracles and shared fixtures do not split with target tuning.
 
 Tests can reuse compiled support libraries. Oracle options apply to the libraries containing

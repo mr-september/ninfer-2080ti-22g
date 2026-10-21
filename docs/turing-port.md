@@ -1,6 +1,6 @@
 # Turing (sm_75) port
 
-This fork builds NInfer for NVIDIA Turing (RTX 2080 Ti 22 GB, `CMAKE_CUDA_ARCHITECTURES=75`) through the `NINFER_TARGET=turing` build target of the upstream engine. The engine, the Qwen3.5-family runtime, frontend, serving and scheduling are unchanged; only the CUDA layer differs. This page records what differs and why. The `turing` target follows upstream by compiling its `rtx5090` source trees with `NINFER_SM75` defined.
+This fork builds NInfer for NVIDIA Turing (RTX 2080 Ti 22 GB, `CMAKE_CUDA_ARCHITECTURES=75`) as the only build target of the engine. The engine, the Qwen3.5-family runtime, frontend, serving and scheduling are unchanged; only the CUDA layer differs. This page records what differs and why. Device code that differs on sm_75 sits behind `NINFER_SM75`.
 
 ## Status of this tree
 
@@ -16,7 +16,7 @@ This fork builds NInfer for NVIDIA Turing (RTX 2080 Ti 22 GB, `CMAKE_CUDA_ARCHIT
 | Speculation | MTP (tested); DFlash is untested and tied to 35B-A3B |
 | Kimi delta attention | not built into the sm_75 test set (needs more than the 64 KiB CTA limit) |
 
-Unsupported formats are not stubbed one symbol at a time inside upstream sources. `src/ops/CMakeLists.txt` filters the FP8/NVFP4/K8V4 sources out of the manifests of the `rtx5090` trees that the `turing` target reuses (`NINFER_SOURCE_TARGET`), and `src/ops/unsupported/turing_unsupported.cpp` defines the declarations the shared wrappers still name. Upstream manifests therefore stay byte-identical.
+Unsupported formats are not stubbed one symbol at a time inside upstream sources. `src/ops/CMakeLists.txt` filters the Blackwell-only sources (FP8 and the TMA kernels) out of the source manifests, and `src/ops/unsupported/turing_unsupported.cpp` defines the declarations the shared wrappers still name.
 
 ## Hardware differences and how each is handled
 
@@ -425,8 +425,8 @@ Everything here was run on the sources of `master` after the port (`7923b62f`, p
 
 Facts and decisions that outlive any one change:
 
-- **Where Turing code lives.** The `turing` target (`NINFER_TARGET=turing`) composes upstream's `rtx5090` source trees with `NINFER_SM75` defined. Behaviour that exists only for Turing sits behind that macro, and the unsupported Blackwell-only routes are throwing definitions in `src/ops/unsupported/turing_unsupported.cpp`.
-- **Only sm_75 is supported.** The `turing` target requires `CMAKE_CUDA_ARCHITECTURES=75` (`cmake/NinferPlatform.cmake`). An Ampere (sm_86) build is not supported and was never tested: the upstream trees the target reuses contain TMA kernels (`cp.async.bulk.tensor` in `src/ops/common/cuda/pipeline.cuh` and others), which need sm_90, and the Turing builds avoid them through `NINFER_SM75` guards. Supporting another architecture means adding a no-TMA path under its own guard and a preset.
+- **Where Turing code lives.** The build targets Turing only. Behaviour that exists only for Turing sits behind `NINFER_SM75`, and the unsupported Blackwell-only routes are throwing definitions in `src/ops/unsupported/turing_unsupported.cpp`.
+- **Only sm_75 is supported.** The build requires `CMAKE_CUDA_ARCHITECTURES=75` (`cmake/NinferPlatform.cmake`). An Ampere (sm_86) build is not supported and was never tested: the tree contains TMA kernels (`cp.async.bulk.tensor` in `src/ops/common/cuda/pipeline.cuh` and others), which need sm_90, and the Turing builds avoid them through `NINFER_SM75` guards. Supporting another architecture means adding a no-TMA path under its own guard and a preset.
 - **FP16 range.** On Turing every BF16 operand becomes FP16 before a tensor-core GEMM at 5 or more tokens, so values beyond 65504 saturate. Measured maxima (see the FP16 range section) leave at least 4x headroom to 16384 and no pre-scaling exists. If a new model or workload reaches 16384 at some GEMM input, add an exact power-of-two pre-scale while staging and fold it back into the FP32 epilogue, then require perplexity not to get worse.
 - **Decode depth and MTP.** MTP depth is fixed at startup because the draft count shapes the captured CUDA graphs and round buffers (51 references), so an adaptive depth is a larger change than tuning; depth 3 is the default (best for code, 1 to 2 for prose).
 - **Output head.** A keep-list output head would make a few percent of tokens impossible to generate (see "Not done: a keep-list output head" above); a Q6 head saves memory but not time.
