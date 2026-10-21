@@ -18,5 +18,5 @@ target_sources(ninfer_ops PRIVATE
   "${CMAKE_CURRENT_LIST_DIR}/q8/sliced_k.cu"
 )
 
-include("${CMAKE_CURRENT_LIST_DIR}/${NINFER_SOURCE_TARGET}/sources.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/q8/${NINFER_SOURCE_TARGET}/sources.cmake")
+target_sources(ninfer_ops PRIVATE "${CMAKE_CURRENT_LIST_DIR}/projected_conv_parallel.cu")
+include("${CMAKE_CURRENT_LIST_DIR}/q8/sources.cmake")
