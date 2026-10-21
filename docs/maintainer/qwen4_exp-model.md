@@ -118,7 +118,7 @@ LayerNorm 和 `gelu_pytorch_tanh` MLP；merger 在 2×2 合并前做 LayerNorm�
 
 ## 3. Flash Next 量化 recipe
 
-转换器中的 `qwen3_8_flash_next` recipe 已随 NVFP4 一并移除（它导入 NVIDIA 的 NVFP4 expert bank）；Qwen4 系列需要新的 recipe。本节记录该 recipe 实现的量化设计。
+转换器中的 `qwen3_8_flash_next` recipe 保留了 Q8 投影、MTP 的 FP8 block expert bank 和分页 NF4 PLE；Main routed expert 原本导入 NVIDIA 的 NVFP4 bank，随 NVFP4 一并移除，recipe 在分配完其余权重后抛出 `NotImplementedError`，Qwen4 系列需要为 Main routed expert 补充新的格式和 recipe。该 recipe 尚未在真实 checkpoint 上端到端运行。本节记录它实现的量化设计。
 
 `qwen3_8_flash_next` 使用 BF16 主 checkpoint 提供 config、资源、Main 非 routed
 权重、Vision 和 PLE。
