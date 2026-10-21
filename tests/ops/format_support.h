@@ -6,10 +6,6 @@ namespace ninfer::test {
 // sm_120a instructions. Turing builds link throwing definitions for them (see
 // src/ops/unsupported), so their qualification cases are skipped there.
 inline constexpr bool kSm120Formats =
-#if defined(NINFER_SM75)
     false;
-#else
-    true;
-#endif
 
 } // namespace ninfer::test

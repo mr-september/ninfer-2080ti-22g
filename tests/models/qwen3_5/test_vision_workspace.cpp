@@ -158,13 +158,9 @@ int main() {
             options.max_context         = max_context;
             options.kv_capacity         = ninfer::KvCapacityPolicy::explicit_capacity(max_context);
             options.prefill_chunk       = 1024;
-#if defined(NINFER_SM75)
             // Turing builds have no FP8 KV; INT8 group-64 is the product default there. KV storage
             // does not enter the Vision encode extent, which dominates the workspace checked below.
             options.kv_cache            = ninfer::KvCacheStorage::Int8Group64;
-#else
-            options.kv_cache            = ninfer::KvCacheStorage::Fp8E4M3Row256;
-#endif
             options.speculative.backend = ninfer::SpeculativeBackend::Mtp;
             options.speculative.draft_tokens         = 3;
             options.speculative.proposal_head        = ninfer::ProposalHead::Optimized;

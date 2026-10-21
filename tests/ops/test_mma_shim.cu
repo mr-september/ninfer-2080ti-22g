@@ -45,9 +45,7 @@ __global__ void kernel16(const float* A, const float* B, float* C, int kind) {
     float c0 = 0, c1 = 0, c2 = 0, c3 = 0;
     if (kind == 0) mma_f16(c0, c1, c2, c3, a0, a1, a2, a3, b0, b1);
     else if (kind == 1) mma_bf16(c0, c1, c2, c3, a0, a1, a2, a3, b0, b1);
-#if defined(NINFER_SM75)
     else mma_bf16_simt(c0, c1, c2, c3, a0, a1, a2, a3, b0, b1);
-#endif
     C[g * 8 + 2 * t] = c0; C[g * 8 + 2 * t + 1] = c1;
     C[(g + 8) * 8 + 2 * t] = c2; C[(g + 8) * 8 + 2 * t + 1] = c3;
 }
@@ -98,11 +96,7 @@ int main() {
     if (cudaGetDeviceCount(&device_count) != cudaSuccess || device_count == 0) return 77;
     srand(1);
     int failures = 0;
-#if defined(NINFER_SM75)
     constexpr int kKinds = 3;
-#else
-    constexpr int kKinds = 2;
-#endif
     // Operand magnitudes: unit, large (still inside FP16's range) and small-but-normal.
     const float scales[] = {1.0f, 2048.0f, 1.0f / 1024.0f};
     for (int kind = 0; kind < kKinds; ++kind) {
@@ -136,9 +130,7 @@ int main() {
             // The Turing BF16 route feeds FP16 tensor cores, whose subnormals (|x| < 2^-14) carry
             // fewer than BF16's 8 mantissa bits; everything else is exact with FP32 accumulation.
             double limit = 1e-6;
-#if defined(NINFER_SM75)
             if (kind == 1 && scale < 1.0f) limit = 2e-5;
-#endif
             const char* name = kind == 0 ? "f16 " : kind == 1 ? "bf16" : "bf16-simt";
             printf("%-9s m16n8k16 scale %-10g: worst relative error %.3g %s\n", name, scale, worst,
                    worst < limit ? "OK" : "FAIL");
