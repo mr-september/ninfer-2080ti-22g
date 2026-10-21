@@ -7,12 +7,6 @@ if(NINFER_BUILD_ENGINE)
   include(models/qwen4_exp/benchmarks.cmake)
 endif()
 
-if(NINFER_TARGET STREQUAL "rtx5090")
-  add_executable(ninfer_cpu_execution_bench cpu/execution_bench.cpp)
-  ninfer_internal_includes(ninfer_cpu_execution_bench)
-  target_link_libraries(ninfer_cpu_execution_bench PRIVATE ninfer_cpu_executor)
-endif()
-
 add_executable(ninfer_expert_cache_bench core/expert_cache.cu)
 ninfer_internal_includes(ninfer_expert_cache_bench)
 target_link_libraries(ninfer_expert_cache_bench PRIVATE ninfer_artifact ninfer_core)

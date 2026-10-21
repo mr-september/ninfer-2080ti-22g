@@ -51,10 +51,6 @@ ninfer_add_op_bench(ninfer_prepare_masked_block_bench
 ninfer_add_op_bench(ninfer_sampling_select_bench SOURCES "${CMAKE_CURRENT_LIST_DIR}/sampling_select_bench.cu")
 ninfer_add_op_bench(ninfer_moe_bench SOURCES "${CMAKE_CURRENT_LIST_DIR}/moe/main.cu")
 ninfer_add_op_bench(ninfer_moe_block_scaled_bench SOURCES "${CMAKE_CURRENT_LIST_DIR}/moe/block_scaled.cu")
-if(NINFER_TARGET STREQUAL "rtx5090")
-  ninfer_add_op_bench(ninfer_moe_cpu_bench SOURCES "${CMAKE_CURRENT_LIST_DIR}/moe/cpu.cpp")
-  target_link_libraries(ninfer_moe_cpu_bench PRIVATE ninfer_cpu_executor)
-endif()
 ninfer_add_op_bench(ninfer_linear_pair_bench SOURCES "${CMAKE_CURRENT_LIST_DIR}/linear_pair_bench.cu")
 ninfer_add_op_bench(ninfer_context_kv_materialize_bench
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/context_kv_materialize_bench.cu")
@@ -71,21 +67,19 @@ include("${CMAKE_CURRENT_LIST_DIR}/gated_residual/benchmarks.cmake")
 
 # Fork-only Turing developer tool: forces every Q4/Q5/Q6/Q8 launcher of a shape and reports the
 # fastest (see turing_route_sweep.cu). Its candidate list is generated from the launch headers.
-if(NINFER_TARGET STREQUAL "turing")
-  set(_ninfer_route_registry "")
-  foreach(_format q4 q5 q6 q8)
-    set(_header "${PROJECT_SOURCE_DIR}/src/ops/linear/kernels/${_format}/${_format}_launch.h")
-    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_header}")
-    file(STRINGS "${_header}" _declarations REGEX "^void launch_${_format}_")
-    foreach(_declaration IN LISTS _declarations)
-      string(REGEX MATCH "launch_${_format}_[A-Za-z0-9_]+" _launcher "${_declaration}")
-      string(APPEND _ninfer_route_registry "NINFER_ROUTE_CANDIDATE(${_format}, ${_launcher})\n")
-    endforeach()
+set(_ninfer_route_registry "")
+foreach(_format q4 q5 q6 q8)
+  set(_header "${PROJECT_SOURCE_DIR}/src/ops/linear/kernels/${_format}/${_format}_launch.h")
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_header}")
+  file(STRINGS "${_header}" _declarations REGEX "^void launch_${_format}_")
+  foreach(_declaration IN LISTS _declarations)
+    string(REGEX MATCH "launch_${_format}_[A-Za-z0-9_]+" _launcher "${_declaration}")
+    string(APPEND _ninfer_route_registry "NINFER_ROUTE_CANDIDATE(${_format}, ${_launcher})\n")
   endforeach()
-  file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/route_registry.inc"
-       CONTENT "${_ninfer_route_registry}" NEWLINE_STYLE UNIX)
-  ninfer_add_op_bench(ninfer_turing_route_sweep
-    SOURCES "${CMAKE_CURRENT_LIST_DIR}/turing_route_sweep.cu")
-  target_include_directories(ninfer_turing_route_sweep PRIVATE
-    "${CMAKE_CURRENT_BINARY_DIR}/generated")
-endif()
+endforeach()
+file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/generated/route_registry.inc"
+     CONTENT "${_ninfer_route_registry}" NEWLINE_STYLE UNIX)
+ninfer_add_op_bench(ninfer_turing_route_sweep
+  SOURCES "${CMAKE_CURRENT_LIST_DIR}/turing_route_sweep.cu")
+target_include_directories(ninfer_turing_route_sweep PRIVATE
+  "${CMAKE_CURRENT_BINARY_DIR}/generated")
