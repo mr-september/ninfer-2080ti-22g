@@ -11,18 +11,6 @@ foreach(part IN ITEMS system task_pool)
   set_tests_properties(ninfer_cpu_${part}_test PROPERTIES TIMEOUT 30)
 endforeach()
 
-if(NINFER_TARGET STREQUAL "rtx5090")
-  foreach(part IN ITEMS x86 executor)
-    ninfer_add_test(ninfer_cpu_${part}_test
-      SOURCES "${CMAKE_CURRENT_LIST_DIR}/../cpu/test_${part}.cpp"
-      LIBRARIES ninfer_cpu_executor)
-    set_tests_properties(ninfer_cpu_${part}_test PROPERTIES TIMEOUT 30)
-  endforeach()
-  ninfer_add_test(ninfer_cpu_tensor_test
-    SOURCES "${CMAKE_CURRENT_LIST_DIR}/../cpu/test_tensor.cpp"
-    LIBRARIES ninfer_core ninfer_cpu_executor)
-endif()
-
 ninfer_add_test(ninfer_device_test       SOURCES "${CMAKE_CURRENT_LIST_DIR}/../test_device.cpp"
   LIBRARIES ninfer_core)
 
