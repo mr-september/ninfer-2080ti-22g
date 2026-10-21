@@ -180,7 +180,7 @@ int exercise_mixed_row_geometry() {
     const auto device =
         ninfer::plan_device_kv_page_pool(builder, {.page_group_count = 3, .geometry = geometry});
     const auto host = ninfer::plan_host_kv_page_layout(geometry);
-    // Literal NVFP4-G16 K/V + BF16 compressed-key geometry, independent of the layout helper.
+    // Literal packed-U8 g16 K/V + BF16 compressed-key geometry, independent of the layout helper.
     constexpr std::array<std::array<std::int32_t, 4>, 5> shapes{{
         {128, 64, 2, 3},
         {128, 64, 2, 3},
@@ -639,7 +639,7 @@ int main() {
                         {ninfer::DType::U8, 16, 2, 256},
                     },
             },
-            "K8V4 asymmetric PageMajor", {4, 4, 4, 4});
+            "Asymmetric FP8-key packed-U8-value PageMajor", {4, 4, 4, 4});
         failures += exercise_layout_and_transfer(
             context,
             ninfer::KVPageGeometry{
@@ -685,7 +685,7 @@ int main() {
         };
         failures += exercise_layout_and_transfer(context, mixed_grouped,
                                                  "Mixed-row grouped PageMajor", {2, 4, 5, 6});
-        const ninfer::KVPageGeometry mixed_k8v4{
+        const ninfer::KVPageGeometry mixed_asymmetric{
             .planes =
                 {
                     {ninfer::DType::FP8_E4M3FN, 256, 2, 256},
@@ -695,7 +695,7 @@ int main() {
                     index_plane,
                 },
         };
-        failures += exercise_layout_and_transfer(context, mixed_k8v4, "Mixed-row K8V4 PageMajor",
+        failures += exercise_layout_and_transfer(context, mixed_asymmetric, "Mixed-row asymmetric PageMajor",
                                                  {5, 5, 5, 5});
         if (failures != 0) {
             std::cerr << failures << " Paged KV physical-container checks failed\n";

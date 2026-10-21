@@ -221,8 +221,7 @@ int main(int argc, char** argv) {
                         multi.kv_capacity     = KvCapacityPolicy::automatic();
                         for (const auto format :
                              {KvCacheStorage::BFloat16, KvCacheStorage::Int8Group64,
-                              KvCacheStorage::Fp8E4M3Row256, KvCacheStorage::Nvfp4Group16,
-                              KvCacheStorage::Fp8KeyNvfp4Value}) {
+                              KvCacheStorage::Fp8E4M3Row256}) {
                             multi.kv_cache = format;
                             auto plan =
                                 plan_for(profile, load.ple_table().geometry(), multi, available);

@@ -25,7 +25,7 @@ bool supported_on_target(const std::string& id) {
     while (begin <= id.size()) {
         const std::size_t end = std::min(id.find('/', begin), id.size());
         const std::string part = id.substr(begin, end - begin);
-        if (part == "fp8" || part == "nvfp4" || part == "k8v4") return false;
+        if (part == "fp8" || part == "nvfp4") return false;
         begin = end + 1;
     }
     return true;

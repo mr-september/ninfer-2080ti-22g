@@ -174,22 +174,6 @@ int main() {
     failures += check(server.at("server").at("default_thinking_budget") == 512,
                       "server thinking budget missing");
     failures += check(server.at("engine").at("kv_cache") == "fp8-e4m3-row256", "KV type missing");
-    options.kv_cache        = ninfer::KvCacheStorage::Nvfp4Group16;
-    engine_options.kv_cache = options.kv_cache;
-    memory.kv_cache         = options.kv_cache;
-    const Json nvfp4_server = Json::parse(format_server_start_json(
-        "serve-test", 1000, options, engine_options, sampling_defaults, "deployment-alias", load,
-        memory, environment, std::uint64_t{123456}));
-    failures +=
-        check(nvfp4_server.at("engine").at("kv_cache") == "nvfp4", "NVFP4 KV report name missing");
-    options.kv_cache        = ninfer::KvCacheStorage::Fp8KeyNvfp4Value;
-    engine_options.kv_cache = options.kv_cache;
-    memory.kv_cache         = options.kv_cache;
-    const Json k8v4_server  = Json::parse(format_server_start_json(
-        "serve-test", 1000, options, engine_options, sampling_defaults, "deployment-alias", load,
-        memory, environment, std::uint64_t{123456}));
-    failures +=
-        check(k8v4_server.at("engine").at("kv_cache") == "k8v4", "K8V4 KV report name missing");
     failures += check(server.at("engine").at("vision") == false, "Vision state missing");
     failures += check(server.at("engine").at("speculative_backend") == "mtp",
                       "speculative backend missing");

@@ -66,39 +66,6 @@ DeviceCache::DeviceCache(const HostCache& cache, MappingPattern mapping,
         v_.copy_from_host(v_physical.data(), v_physical.size());
         k_scale_.copy_from_host(ks_physical.data(), ks_physical.size() * sizeof(std::uint16_t));
         v_scale_.copy_from_host(vs_physical.data(), vs_physical.size() * sizeof(std::uint16_t));
-    } else if (storage_ == KvCacheStorage::Fp8KeyNvfp4Value) {
-        const auto k_physical = scatter_paged(cache.k_fp8, kHeadDim, geometry_, logical_capacity_,
-                                              block_table_host_, physical_pages_);
-        const auto v_physical =
-            scatter_paged(cache.v_nvfp4, kNvfp4CodeBytes, geometry_, logical_capacity_,
-                          block_table_host_, physical_pages_);
-        const auto ks_physical =
-            scatter_paged(cache.k_scale, kFp8QuantGroups, geometry_, logical_capacity_,
-                          block_table_host_, physical_pages_);
-        const auto vs_physical =
-            scatter_paged(cache.v_nvfp4_scale, kNvfp4QuantGroups, geometry_, logical_capacity_,
-                          block_table_host_, physical_pages_);
-        k_.copy_from_host(k_physical.data(), k_physical.size());
-        v_.copy_from_host(v_physical.data(), v_physical.size());
-        k_scale_.copy_from_host(ks_physical.data(), ks_physical.size() * sizeof(std::uint16_t));
-        v_scale_.copy_from_host(vs_physical.data(), vs_physical.size());
-    } else {
-        const auto k_physical =
-            scatter_paged(cache.k_nvfp4, kNvfp4CodeBytes, geometry_, logical_capacity_,
-                          block_table_host_, physical_pages_);
-        const auto v_physical =
-            scatter_paged(cache.v_nvfp4, kNvfp4CodeBytes, geometry_, logical_capacity_,
-                          block_table_host_, physical_pages_);
-        const auto ks_physical =
-            scatter_paged(cache.k_nvfp4_scale, kNvfp4QuantGroups, geometry_, logical_capacity_,
-                          block_table_host_, physical_pages_);
-        const auto vs_physical =
-            scatter_paged(cache.v_nvfp4_scale, kNvfp4QuantGroups, geometry_, logical_capacity_,
-                          block_table_host_, physical_pages_);
-        k_.copy_from_host(k_physical.data(), k_physical.size());
-        v_.copy_from_host(v_physical.data(), v_physical.size());
-        k_scale_.copy_from_host(ks_physical.data(), ks_physical.size());
-        v_scale_.copy_from_host(vs_physical.data(), vs_physical.size());
     }
 }
 
@@ -176,32 +143,6 @@ HostCache DeviceCache::snapshot() const {
                                                     logical_capacity_, block_table_host_);
         cache.v_scale = gather_paged<std::uint16_t>(vs_physical, kFp8QuantGroups, geometry_,
                                                     logical_capacity_, block_table_host_);
-    } else if (storage_ == KvCacheStorage::Fp8KeyNvfp4Value) {
-        const auto k_physical  = copy_from_guarded<std::uint8_t>(k_, k_code_elements_);
-        const auto v_physical  = copy_from_guarded<std::uint8_t>(v_, v_code_elements_);
-        const auto ks_physical = copy_from_guarded<std::uint16_t>(k_scale_, k_scale_elements_);
-        const auto vs_physical = copy_from_guarded<std::uint8_t>(v_scale_, v_scale_elements_);
-        cache.k_fp8 = gather_paged<std::uint8_t>(k_physical, kHeadDim, geometry_, logical_capacity_,
-                                                 block_table_host_);
-        cache.v_nvfp4       = gather_paged<std::uint8_t>(v_physical, kNvfp4CodeBytes, geometry_,
-                                                         logical_capacity_, block_table_host_);
-        cache.k_scale       = gather_paged<std::uint16_t>(ks_physical, kFp8QuantGroups, geometry_,
-                                                          logical_capacity_, block_table_host_);
-        cache.v_nvfp4_scale = gather_paged<std::uint8_t>(vs_physical, kNvfp4QuantGroups, geometry_,
-                                                         logical_capacity_, block_table_host_);
-    } else {
-        const auto k_physical  = copy_from_guarded<std::uint8_t>(k_, k_code_elements_);
-        const auto v_physical  = copy_from_guarded<std::uint8_t>(v_, v_code_elements_);
-        const auto ks_physical = copy_from_guarded<std::uint8_t>(k_scale_, k_scale_elements_);
-        const auto vs_physical = copy_from_guarded<std::uint8_t>(v_scale_, v_scale_elements_);
-        cache.k_nvfp4          = gather_paged<std::uint8_t>(k_physical, kNvfp4CodeBytes, geometry_,
-                                                            logical_capacity_, block_table_host_);
-        cache.v_nvfp4          = gather_paged<std::uint8_t>(v_physical, kNvfp4CodeBytes, geometry_,
-                                                            logical_capacity_, block_table_host_);
-        cache.k_nvfp4_scale = gather_paged<std::uint8_t>(ks_physical, kNvfp4QuantGroups, geometry_,
-                                                         logical_capacity_, block_table_host_);
-        cache.v_nvfp4_scale = gather_paged<std::uint8_t>(vs_physical, kNvfp4QuantGroups, geometry_,
-                                                         logical_capacity_, block_table_host_);
     }
     return cache;
 }
@@ -433,58 +374,6 @@ int BatchDeviceCache::verify(const std::string& label, std::span<const HostCache
         failures += verify_exact((label + " cache-v-scale").c_str(),
                                  copy_from_guarded<std::uint16_t>(v_scale_, v_scale_elements_),
                                  expected_vs);
-    } else if (storage_ == KvCacheStorage::Fp8KeyNvfp4Value) {
-        std::vector<std::uint8_t> expected_k(k_code_elements_, 0);
-        std::vector<std::uint8_t> expected_v(v_code_elements_, 0);
-        std::vector<std::uint16_t> expected_ks(k_scale_elements_, 0);
-        std::vector<std::uint8_t> expected_vs(v_scale_elements_, 0);
-        for (std::size_t row = 0; row < rows_; ++row) {
-            const std::span<const std::int32_t> table = row_table(row);
-            scatter_paged_into(expected[row].k_fp8, kHeadDim, geometry_, logical_capacity_, table,
-                               expected_k);
-            scatter_paged_into(expected[row].v_nvfp4, kNvfp4CodeBytes, geometry_, logical_capacity_,
-                               table, expected_v);
-            scatter_paged_into(expected[row].k_scale, kFp8QuantGroups, geometry_, logical_capacity_,
-                               table, expected_ks);
-            scatter_paged_into(expected[row].v_nvfp4_scale, kNvfp4QuantGroups, geometry_,
-                               logical_capacity_, table, expected_vs);
-        }
-        failures += verify_exact((label + " cache-k-code").c_str(),
-                                 copy_from_guarded<std::uint8_t>(k_, k_code_elements_), expected_k);
-        failures += verify_exact((label + " cache-v-code").c_str(),
-                                 copy_from_guarded<std::uint8_t>(v_, v_code_elements_), expected_v);
-        failures += verify_exact((label + " cache-k-scale").c_str(),
-                                 copy_from_guarded<std::uint16_t>(k_scale_, k_scale_elements_),
-                                 expected_ks);
-        failures +=
-            verify_exact((label + " cache-v-scale").c_str(),
-                         copy_from_guarded<std::uint8_t>(v_scale_, v_scale_elements_), expected_vs);
-    } else {
-        std::vector<std::uint8_t> expected_k(k_code_elements_, 0);
-        std::vector<std::uint8_t> expected_v(v_code_elements_, 0);
-        std::vector<std::uint8_t> expected_ks(k_scale_elements_, 0);
-        std::vector<std::uint8_t> expected_vs(v_scale_elements_, 0);
-        for (std::size_t row = 0; row < rows_; ++row) {
-            const std::span<const std::int32_t> table = row_table(row);
-            scatter_paged_into(expected[row].k_nvfp4, kNvfp4CodeBytes, geometry_, logical_capacity_,
-                               table, expected_k);
-            scatter_paged_into(expected[row].v_nvfp4, kNvfp4CodeBytes, geometry_, logical_capacity_,
-                               table, expected_v);
-            scatter_paged_into(expected[row].k_nvfp4_scale, kNvfp4QuantGroups, geometry_,
-                               logical_capacity_, table, expected_ks);
-            scatter_paged_into(expected[row].v_nvfp4_scale, kNvfp4QuantGroups, geometry_,
-                               logical_capacity_, table, expected_vs);
-        }
-        failures += verify_exact((label + " cache-k-code").c_str(),
-                                 copy_from_guarded<std::uint8_t>(k_, k_code_elements_), expected_k);
-        failures += verify_exact((label + " cache-v-code").c_str(),
-                                 copy_from_guarded<std::uint8_t>(v_, v_code_elements_), expected_v);
-        failures +=
-            verify_exact((label + " cache-k-scale").c_str(),
-                         copy_from_guarded<std::uint8_t>(k_scale_, k_scale_elements_), expected_ks);
-        failures +=
-            verify_exact((label + " cache-v-scale").c_str(),
-                         copy_from_guarded<std::uint8_t>(v_scale_, v_scale_elements_), expected_vs);
     }
     failures +=
         verify_exact((label + " block tables unchanged").c_str(),
@@ -571,47 +460,6 @@ void BatchDeviceCache::upload_rows(std::span<const HostCache> rows) {
         v_scale_.copy_from_host(physical_vs.data(), physical_vs.size() * sizeof(std::uint16_t));
         return;
     }
-    if (storage_ == KvCacheStorage::Fp8KeyNvfp4Value) {
-        std::vector<std::uint8_t> physical_k(k_code_elements_, 0);
-        std::vector<std::uint8_t> physical_v(v_code_elements_, 0);
-        std::vector<std::uint16_t> physical_ks(k_scale_elements_, 0);
-        std::vector<std::uint8_t> physical_vs(v_scale_elements_, 0);
-        for (std::size_t row = 0; row < rows_; ++row) {
-            const std::span<const std::int32_t> table = row_table(row);
-            scatter_paged_into(rows[row].k_fp8, kHeadDim, geometry_, logical_capacity_, table,
-                               physical_k);
-            scatter_paged_into(rows[row].v_nvfp4, kNvfp4CodeBytes, geometry_, logical_capacity_,
-                               table, physical_v);
-            scatter_paged_into(rows[row].k_scale, kFp8QuantGroups, geometry_, logical_capacity_,
-                               table, physical_ks);
-            scatter_paged_into(rows[row].v_nvfp4_scale, kNvfp4QuantGroups, geometry_,
-                               logical_capacity_, table, physical_vs);
-        }
-        k_.copy_from_host(physical_k.data(), physical_k.size());
-        v_.copy_from_host(physical_v.data(), physical_v.size());
-        k_scale_.copy_from_host(physical_ks.data(), physical_ks.size() * sizeof(std::uint16_t));
-        v_scale_.copy_from_host(physical_vs.data(), physical_vs.size());
-        return;
-    }
-    std::vector<std::uint8_t> physical_k(k_code_elements_, 0);
-    std::vector<std::uint8_t> physical_v(v_code_elements_, 0);
-    std::vector<std::uint8_t> physical_ks(k_scale_elements_, 0);
-    std::vector<std::uint8_t> physical_vs(v_scale_elements_, 0);
-    for (std::size_t row = 0; row < rows_; ++row) {
-        const std::span<const std::int32_t> table = row_table(row);
-        scatter_paged_into(rows[row].k_nvfp4, kNvfp4CodeBytes, geometry_, logical_capacity_, table,
-                           physical_k);
-        scatter_paged_into(rows[row].v_nvfp4, kNvfp4CodeBytes, geometry_, logical_capacity_, table,
-                           physical_v);
-        scatter_paged_into(rows[row].k_nvfp4_scale, kNvfp4QuantGroups, geometry_, logical_capacity_,
-                           table, physical_ks);
-        scatter_paged_into(rows[row].v_nvfp4_scale, kNvfp4QuantGroups, geometry_, logical_capacity_,
-                           table, physical_vs);
-    }
-    k_.copy_from_host(physical_k.data(), physical_k.size());
-    v_.copy_from_host(physical_v.data(), physical_v.size());
-    k_scale_.copy_from_host(physical_ks.data(), physical_ks.size());
-    v_scale_.copy_from_host(physical_vs.data(), physical_vs.size());
 }
 
 } // namespace ninfer::test::causal_attention

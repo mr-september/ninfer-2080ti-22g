@@ -11,8 +11,6 @@ inline constexpr int kPageMask    = kPagedKVPageSize - 1;
 inline constexpr int kHeadDim     = 256;
 inline constexpr int kInt8Group   = 64;
 inline constexpr int kInt8Groups  = kHeadDim / kInt8Group;
-inline constexpr int kNvfp4Group  = 16;
-inline constexpr int kNvfp4Groups = kHeadDim / kNvfp4Group;
 
 static_assert(kPagedKVPageSize == (1 << kPageShift));
 
@@ -123,7 +121,5 @@ template <int Heads>
 using Int8G64Layout = QuantizedRowLayout<Heads, 256, 4>;
 template <int Heads>
 using Fp8RowLayout = QuantizedRowLayout<Heads, 256, 1>;
-template <int Heads>
-using Nvfp4G16Layout = QuantizedRowLayout<Heads, 128, 16, 2>;
 
 } // namespace ninfer::ops::detail::kv

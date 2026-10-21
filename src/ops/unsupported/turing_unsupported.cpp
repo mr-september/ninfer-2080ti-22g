@@ -26,10 +26,6 @@
 #include "ops/moe/topk_softmax_swiglu_moe/dispatch.h"
 #include "ops/softmax_attention/dense/causal_cache/fp8/launch.h"
 #include "ops/softmax_attention/dense/causal_cache/fp8/plan.h"
-#include "ops/softmax_attention/dense/causal_cache/k8v4/launch.h"
-#include "ops/softmax_attention/dense/causal_cache/k8v4/plan.h"
-#include "ops/softmax_attention/dense/causal_cache/nvfp4/launch.h"
-#include "ops/softmax_attention/dense/causal_cache/nvfp4/plan.h"
 
 namespace {
 [[noreturn]] void unsupported(const char* what) {
@@ -114,12 +110,6 @@ std::size_t fp8_linear_workspace_capacity_bytes(std::int32_t output_rows,
                                                               LinearPolicy policy,
                                                               std::int32_t min_tokens,
                                                               std::int32_t max_tokens) { unsupported("fp8_linear_workspace_capacity_bytes"); }
-std::size_t k8v4_kv_workspace_bytes(int heads, int batch, int min_width, int max_width,
-                                    CausalAttentionExecutionEnvelope envelope,
-                                    int multiprocessor_count) { unsupported("k8v4_kv_workspace_bytes"); }
-std::size_t nvfp4_kv_workspace_bytes(int heads, int batch, int min_width, int max_width,
-                                     CausalAttentionExecutionEnvelope envelope,
-                                     int multiprocessor_count) { unsupported("nvfp4_kv_workspace_bytes"); }
 std::size_t nvfp4_linear_add_workspace_capacity_bytes(std::int32_t rows, std::int32_t k,
                                                       LinearPolicy policy, std::int32_t first,
                                                       std::int32_t last) { unsupported("nvfp4_linear_add_workspace_capacity_bytes"); }
@@ -146,15 +136,6 @@ void fp8_linear_add_dispatch(const Tensor&, const Weight&, Tensor&, LinearPolicy
                              cudaStream_t) { unsupported("fp8_linear_add_dispatch"); }
 void fp8_linear_swiglu_dispatch(const Tensor& x, const Weight& weight, Tensor& out,
                                 LinearPolicy policy, MemoryArena& workspace, cudaStream_t stream) { unsupported("fp8_linear_swiglu_dispatch"); }
-void k8v4_kv_append_attention(const Tensor& q, const Tensor& k, const Tensor& v,
-                              const Tensor& positions, const Tensor& valid, const Tensor& rows,
-                              float scale, PagedKVBatchLayerView cache,
-                              CausalAttentionExecutionEnvelope envelope, MemoryArena& workspace,
-                              Tensor& out, CudaExecutionView execution) { unsupported("k8v4_kv_append_attention"); }
-void k8v4_kv_cached_attention(const Tensor& q, const Tensor& positions, float scale,
-                              const PagedKVLayerView& cache,
-                              CausalAttentionExecutionEnvelope envelope, MemoryArena& workspace,
-                              Tensor& out, CudaExecutionView execution) { unsupported("k8v4_kv_cached_attention"); }
 void launch_fp8_gdn_input_a8(const Tensor& x, const Weight& weight, Tensor& qkv, Tensor& z,
                              Fp8A8Workspace workspace, cudaStream_t stream) { unsupported("launch_fp8_gdn_input_a8"); }
 void launch_fp8_gdn_input_decode(const Tensor& x, const Weight& weight, Tensor& qkv, Tensor& z,
@@ -191,15 +172,6 @@ void launch_nvfp4_gdn_snapshot_small_t(const Tensor& x, const Weight& weight,
                                        Tensor& value, Tensor& z, cudaStream_t stream) { unsupported("launch_nvfp4_gdn_snapshot_small_t"); }
 void nvfp4_dispatch(const Tensor& x, const Weight& weight, Tensor& out, LinearPolicy policy,
                     MemoryArena* workspace, cudaStream_t stream) { unsupported("nvfp4_dispatch"); }
-void nvfp4_kv_append_attention(const Tensor& q, const Tensor& k, const Tensor& v,
-                               const Tensor& positions, const Tensor& valid, const Tensor& rows,
-                               float scale, PagedKVBatchLayerView cache,
-                               CausalAttentionExecutionEnvelope envelope, MemoryArena& workspace,
-                               Tensor& out, CudaExecutionView execution) { unsupported("nvfp4_kv_append_attention"); }
-void nvfp4_kv_cached_attention(const Tensor& q, const Tensor& positions, float scale,
-                               const PagedKVLayerView& cache,
-                               CausalAttentionExecutionEnvelope envelope, MemoryArena& workspace,
-                               Tensor& out, CudaExecutionView execution) { unsupported("nvfp4_kv_cached_attention"); }
 void nvfp4_linear_add_dispatch(const Tensor&, const Weight&, Tensor&, LinearPolicy, MemoryArena&,
                                cudaStream_t) { unsupported("nvfp4_linear_add_dispatch"); }
 void nvfp4_linear_swiglu_dispatch(const Tensor& x, const Weight& weight, Tensor& out,

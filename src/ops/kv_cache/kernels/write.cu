@@ -4,8 +4,6 @@
 #include "ops/kv_cache/kernels/write/bf16.cuh"
 #include "ops/kv_cache/kernels/write/fp8.cuh"
 #include "ops/kv_cache/kernels/write/int8.cuh"
-#include "ops/kv_cache/kernels/write/k8v4.cuh"
-#include "ops/kv_cache/kernels/write/nvfp4.cuh"
 
 #include <stdexcept>
 #include <type_traits>
@@ -48,33 +46,20 @@ void launch_quantized(const WriteArguments& a, Metadata metadata, cudaStream_t s
                 return write_i8_page_kernel<G, Metadata>;
             else
                 return write_i8_kernel<G, Metadata, Batch>;
-        } else if constexpr (Storage == KvCacheStorage::Fp8E4M3Row256) {
+        } else {
+            static_assert(Storage == KvCacheStorage::Fp8E4M3Row256);
             if constexpr (Page)
                 return write_fp8_page_kernel<G, Metadata>;
             else if constexpr (Batch)
                 return write_fp8_batch_kernel<G, Metadata::masked>;
             else
                 return write_fp8_kernel<G, Metadata>;
-        } else if constexpr (Storage == KvCacheStorage::Nvfp4Group16) {
-            if constexpr (Page)
-                return write_nvfp4_page_kernel<G, Metadata>;
-            else
-                return write_nvfp4_kernel<G, Metadata, Batch>;
-        } else {
-            static_assert(Storage == KvCacheStorage::Fp8KeyNvfp4Value);
-            if constexpr (Page)
-                return write_k8v4_page_kernel<G, Metadata>;
-            else
-                return write_k8v4_kernel<G, Metadata, Batch>;
         }
     }();
     using Code =
         std::conditional_t<Storage == KvCacheStorage::Int8Group64, std::int8_t, std::uint8_t>;
-    using KeyScale =
-        std::conditional_t<Storage == KvCacheStorage::Nvfp4Group16, std::uint8_t, __half>;
-    using ValueScale = std::conditional_t<Storage == KvCacheStorage::Nvfp4Group16 ||
-                                              Storage == KvCacheStorage::Fp8KeyNvfp4Value,
-                                          std::uint8_t, __half>;
+    using KeyScale   = __half;
+    using ValueScale = __half;
     const dim3 grid  = Page ? dim3(common::div_up(a.width + 7, 8), G::KVHeads)
                             : dim3(common::div_up(a.width * G::KVHeads, 8), 1, Batch ? a.batch : 1);
     kernel<<<grid, 256, 0, stream>>>(
@@ -126,10 +111,6 @@ void storage_dispatch(KvCacheStorage storage, PagedWriteInstance instance, const
         return launch_instance<KvCacheStorage::Int8Group64, G>(instance, a, metadata, stream);
     case KvCacheStorage::Fp8E4M3Row256:
         return launch_instance<KvCacheStorage::Fp8E4M3Row256, G>(instance, a, metadata, stream);
-    case KvCacheStorage::Nvfp4Group16:
-        return launch_instance<KvCacheStorage::Nvfp4Group16, G>(instance, a, metadata, stream);
-    case KvCacheStorage::Fp8KeyNvfp4Value:
-        return launch_instance<KvCacheStorage::Fp8KeyNvfp4Value, G>(instance, a, metadata, stream);
     }
     throw std::logic_error("KV write: unsupported storage");
 }

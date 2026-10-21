@@ -121,45 +121,6 @@ void test_decoder_layout() {
            "FP8 MTP KV has row-scaled code and scale planes");
     expect(fp8.kv_payload_bytes() == fp8.text_kv.payload_bytes() + fp8.mtp_kv->payload_bytes(),
            "FP8 Text/MTP KV payload accounting");
-
-    ninfer::LayoutBuilder nvfp4_builder;
-    const q36::DecoderStateLayout nvfp4 = q36::plan_decoder_state(
-        nvfp4_builder, decoder_spec(ninfer::KvCacheStorage::Nvfp4Group16, true));
-    (void)nvfp4_builder.finish(256);
-    expect(nvfp4.text_kv.pages.planes.size() == 8 &&
-               nvfp4.text_kv.pages.planes[0].geometry.dtype == ninfer::DType::U8 &&
-               nvfp4.text_kv.pages.planes[0].geometry.leading_extent == 128 &&
-               nvfp4.text_kv.pages.planes[2].geometry.dtype == ninfer::DType::U8 &&
-               nvfp4.text_kv.pages.planes[2].geometry.leading_extent == 16,
-           "NVFP4 Text KV has packed E2M1 code and E4M3 scale planes");
-    constexpr std::size_t nvfp4_vector_bytes = 128 + 16;
-    constexpr std::size_t text_vectors       = 2ULL * 5ULL * 64ULL * 2ULL;
-    constexpr std::size_t mtp_vectors        = 1ULL * 4ULL * 64ULL * 2ULL;
-    expect(nvfp4.text_kv.payload_bytes() == 2ULL * nvfp4_vector_bytes * text_vectors &&
-               nvfp4.mtp_kv &&
-               nvfp4.mtp_kv->payload_bytes() == 2ULL * nvfp4_vector_bytes * mtp_vectors,
-           "NVFP4 Text/MTP physical payload bytes");
-
-    ninfer::LayoutBuilder k8v4_builder;
-    const q36::DecoderStateLayout k8v4 = q36::plan_decoder_state(
-        k8v4_builder, decoder_spec(ninfer::KvCacheStorage::Fp8KeyNvfp4Value, true));
-    (void)k8v4_builder.finish(256);
-    expect(k8v4.text_kv.pages.planes.size() == 8 &&
-               k8v4.text_kv.pages.planes[0].geometry.dtype == ninfer::DType::FP8_E4M3FN &&
-               k8v4.text_kv.pages.planes[0].geometry.leading_extent == 256 &&
-               k8v4.text_kv.pages.planes[1].geometry.dtype == ninfer::DType::U8 &&
-               k8v4.text_kv.pages.planes[1].geometry.leading_extent == 128 &&
-               k8v4.text_kv.pages.planes[2].geometry.dtype == ninfer::DType::FP16 &&
-               k8v4.text_kv.pages.planes[2].geometry.leading_extent == 1 &&
-               k8v4.text_kv.pages.planes[3].geometry.dtype == ninfer::DType::U8 &&
-               k8v4.text_kv.pages.planes[3].geometry.leading_extent == 16,
-           "K8V4 Text KV preserves independent key/value code and scale geometry");
-    constexpr std::size_t k8_vector_bytes = 256 + 2;
-    constexpr std::size_t v4_vector_bytes = 128 + 16;
-    expect(k8v4.text_kv.payload_bytes() == (k8_vector_bytes + v4_vector_bytes) * text_vectors &&
-               k8v4.mtp_kv &&
-               k8v4.mtp_kv->payload_bytes() == (k8_vector_bytes + v4_vector_bytes) * mtp_vectors,
-           "K8V4 Text/MTP asymmetric physical payload bytes");
 }
 
 void test_round_layout() {

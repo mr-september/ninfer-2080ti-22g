@@ -146,13 +146,4 @@ template <bool Writable>
 using Int8KvCacheView = QuantizedCausalCacheView<std::int8_t, __half, __half, Writable>;
 using Int8KvReadView  = Int8KvCacheView<false>;
 
-template <bool Writable>
-using Nvfp4KvCacheView =
-    QuantizedCausalCacheView<std::uint8_t, std::uint8_t, std::uint8_t, Writable>;
-using Nvfp4KvReadView = Nvfp4KvCacheView<false>;
-
-template <bool Writable>
-using K8V4KvCacheView = QuantizedCausalCacheView<std::uint8_t, __half, std::uint8_t, Writable>;
-using K8V4KvReadView  = K8V4KvCacheView<false>;
-
 } // namespace ninfer::ops::detail

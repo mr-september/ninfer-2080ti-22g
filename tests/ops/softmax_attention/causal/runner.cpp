@@ -160,15 +160,6 @@ int run_append_case(CudaExecutionView execution, const Geometry& geometry, KvCac
                                         output_bits, kHeadDim * geometry.q_heads, oracle_queries)),
                                     reference, attention_criterion(storage));
     failures += verify_cache(label, cache.snapshot(), expected);
-    if (storage == KvCacheStorage::Nvfp4Group16 || storage == KvCacheStorage::Fp8KeyNvfp4Value) {
-        DeviceCache standalone(initial, mapping, max_context);
-        ops::kv_cache_append(tk, tv, tp, standalone.view(),
-                             ninfer::test::cuda_environment().default_execution);
-        cuda_synchronize();
-        failures += verify_cache(label + " fused/standalone byte parity", cache.snapshot(),
-                                 standalone.snapshot());
-        failures += standalone.verify_guards(label + " standalone append");
-    }
     failures += verify_input(label + " q unchanged", dq, q_bits);
     failures += verify_input(label + " k unchanged", dk, k_bits);
     failures += verify_input(label + " v unchanged", dv, v_bits);

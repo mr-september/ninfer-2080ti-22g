@@ -36,9 +36,6 @@ constexpr std::int32_t kQuantGroup       = 64;
 constexpr std::int32_t kQuantGroups      = kHeadDim / kQuantGroup;
 constexpr std::int32_t kFp8QuantGroup    = kHeadDim;
 constexpr std::int32_t kFp8QuantGroups   = 1;
-constexpr std::int32_t kNvfp4QuantGroup  = 16;
-constexpr std::int32_t kNvfp4QuantGroups = kHeadDim / kNvfp4QuantGroup;
-constexpr std::int32_t kNvfp4CodeBytes   = kHeadDim / 2;
 constexpr float kAttentionScale          = 0.0625f;
 constexpr std::uint16_t kOutputCanary    = 0x7fc1u;
 
@@ -62,18 +59,6 @@ constexpr ReductionCriterion kAttentionInt8Criterion{
 constexpr ReductionCriterion kAttentionFp8Criterion{
     /*relative_l2*/ 8.0e-2,
     /*gross_absolute*/ 4.0e-3,
-    /*gross_relative_to_max_reference*/ 1.1e-1,
-};
-
-constexpr ReductionCriterion kAttentionNvfp4Criterion{
-    /*relative_l2*/ 1.5e-2,
-    /*gross_absolute*/ 5.0e-3,
-    /*gross_relative_to_max_reference*/ 1.1e-2,
-};
-
-constexpr ReductionCriterion kAttentionK8V4Criterion{
-    /*relative_l2*/ 8.0e-2,
-    /*gross_absolute*/ 5.0e-3,
     /*gross_relative_to_max_reference*/ 1.1e-1,
 };
 
@@ -252,10 +237,6 @@ struct HostCache {
     std::vector<std::uint8_t> v_fp8;
     std::vector<std::uint16_t> k_scale;
     std::vector<std::uint16_t> v_scale;
-    std::vector<std::uint8_t> k_nvfp4;
-    std::vector<std::uint8_t> v_nvfp4;
-    std::vector<std::uint8_t> k_nvfp4_scale;
-    std::vector<std::uint8_t> v_nvfp4_scale;
 };
 
 void encode_group(std::span<const float> source, std::size_t source_base,
@@ -265,10 +246,6 @@ void encode_group(std::span<const float> source, std::size_t source_base,
 void normalized_hadamard_d256(std::array<float, kHeadDim>& values);
 
 void normalized_hadamard_d256(std::array<double, kHeadDim>& values);
-
-void encode_nvfp4_rotated_row(std::span<const float> source, std::size_t source_base,
-                              std::vector<std::uint8_t>& codes, std::size_t code_base,
-                              std::vector<std::uint8_t>& scales, std::size_t scale_base);
 
 void encode_fp8_row(const std::array<float, kHeadDim>& values, std::vector<std::uint8_t>& codes,
                     std::size_t code_base, std::vector<std::uint16_t>& scales,

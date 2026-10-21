@@ -12,7 +12,7 @@ ninfer_add_op_test(ninfer_softmax_attention_test
           "${CMAKE_CURRENT_LIST_DIR}/plain_and_packed.cpp"
           "${CMAKE_CURRENT_LIST_DIR}/context.cpp"
   LIBRARIES ninfer_ops
-  FORMATS bf16 int8 fp8 nvfp4 k8v4)
+  FORMATS bf16 int8 fp8)
 
 if(NOT NINFER_TARGET STREQUAL "turing") # Sparse QSA attention is not built for Turing.
   include("${CMAKE_CURRENT_LIST_DIR}/qsa/tests.cmake")

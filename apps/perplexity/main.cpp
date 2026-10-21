@@ -58,7 +58,7 @@ std::string usage_text() {
     return "usage: ninfer-perplexity <model.ninfer> "
            "(--corpus <manifest.json> [--quick] | --text <utf8-file>)\n"
            "       [--context N] [--stride N] [--device N]\n"
-           "       [--kv-dtype bf16|int8|fp8|nvfp4|k8v4] [--output <directory>]\n"
+           "       [--kv-dtype bf16|int8|fp8] [--output <directory>]\n"
            "       [--log-level trace|debug|info|warning|error|critical|off]\n";
 }
 
@@ -111,12 +111,8 @@ Options parse_options(int argc, char** argv) {
                 out.kv = ninfer::KvCacheStorage::Int8Group64;
             } else if (dtype == "fp8") {
                 out.kv = ninfer::KvCacheStorage::Fp8E4M3Row256;
-            } else if (dtype == "nvfp4") {
-                out.kv = ninfer::KvCacheStorage::Nvfp4Group16;
-            } else if (dtype == "k8v4") {
-                out.kv = ninfer::KvCacheStorage::Fp8KeyNvfp4Value;
             } else {
-                usage_error("--kv-dtype must be bf16, int8, fp8, nvfp4, or k8v4");
+                usage_error("--kv-dtype must be bf16, int8, or fp8");
             }
         } else if (option == "--output") {
             out.output = std::filesystem::path(value("--output"));
@@ -144,10 +140,6 @@ std::string kv_name(ninfer::KvCacheStorage value) {
         return "int8-g64";
     case ninfer::KvCacheStorage::Fp8E4M3Row256:
         return "fp8-e4m3-r256";
-    case ninfer::KvCacheStorage::Nvfp4Group16:
-        return "nvfp4";
-    case ninfer::KvCacheStorage::Fp8KeyNvfp4Value:
-        return "k8v4";
     }
     throw std::logic_error("unknown KV dtype");
 }

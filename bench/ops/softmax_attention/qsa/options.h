@@ -39,10 +39,6 @@ inline const char* name(KvCacheStorage storage) {
         return "int8";
     case KvCacheStorage::Fp8E4M3Row256:
         return "fp8";
-    case KvCacheStorage::Nvfp4Group16:
-        return "nvfp4";
-    case KvCacheStorage::Fp8KeyNvfp4Value:
-        return "k8v4";
     }
     throw std::invalid_argument("invalid QSA KV storage");
 }
@@ -85,7 +81,7 @@ inline Options parse_options(int argc, char** argv) {
                          "  --entry split|linear|both\n"
                          "  --tokens M[,M...] or --sweep START:END[:STEP] --rounds N\n"
                          "Prepare: --tokens T[,T...] --batch B --axes 1|3 --inplace\n"
-                         "  --kv-cache bf16|int8|fp8|nvfp4|k8v4 (default bf16)\n"
+                         "  --kv-cache bf16|int8|fp8 (default bf16)\n"
                          "  --base-positions F[,F...] --valid dense|N[,N...] --layout "
                          "contiguous|layered|unaligned\n"
                          "Indexer: --tokens T[,T...] --batch B --contexts L[,L...]\n"
@@ -94,7 +90,7 @@ inline Options parse_options(int argc, char** argv) {
                          "Sparse GQA: --tokens T[,T...] --batch B --contexts L[,L...]\n"
                          "  --selection random|shared|contiguous --selected-blocks 0..512\n"
                          "  --context-capacity N (default maximum L)\n"
-                         "  --kv-cache bf16|int8|fp8|nvfp4|k8v4 (default bf16)\n"
+                         "  --kv-cache bf16|int8|fp8 (default bf16)\n"
                          "  --valid dense|N[,N...] --layout contiguous|layered|unaligned\n"
                          "Tail extraction:\n"
                          "  --capacity R[,R...] --batch B --base-positions F0[,F0...]\n"
@@ -136,13 +132,12 @@ inline Options parse_options(int argc, char** argv) {
         } else if (flag == "--kv-cache") {
             bool matched = false;
             for (auto storage : {KvCacheStorage::BFloat16, KvCacheStorage::Int8Group64,
-                                 KvCacheStorage::Fp8E4M3Row256, KvCacheStorage::Nvfp4Group16,
-                                 KvCacheStorage::Fp8KeyNvfp4Value})
+                                 KvCacheStorage::Fp8E4M3Row256})
                 if (value == name(storage)) {
                     o.storage = storage;
                     matched   = true;
                 }
-            if (!matched) throw std::invalid_argument("kv-cache: bf16|int8|fp8|nvfp4|k8v4");
+            if (!matched) throw std::invalid_argument("kv-cache: bf16|int8|fp8");
         } else if (flag == "--axes")
             o.axes = measurement::integer(value);
         else if (flag == "--capacity")

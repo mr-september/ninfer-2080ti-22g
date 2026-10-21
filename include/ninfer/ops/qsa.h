@@ -154,13 +154,12 @@ qsa_sparse_gqa_workspace_capacity_bytes(KvCacheStorage storage, std::int32_t min
  * There is no attention-output BF16 rounding before the gate. Indexer scores do not enter
  * the logits. Logical token j addresses tables[j/64,table_rows[b]], row j%64.
  * Empty J and inert queries produce exact +0, without reading query/gate/cache values.
- * Quantized keys represent R*K, R=H256/16; logits use R*query and decoded keys. NVFP4 and
- * K8V4 values represent R*V, so apply R^T to the fully reduced attention before the gate.
+ * Quantized keys represent R*K, R=H256/16; logits use R*query and decoded keys.
  *
  * Domain / numeric:
  * T>0, B=1..8. Query, gate and out are contiguous, 16-byte-aligned BF16 [256,24,T,B].
- * Cache supports BFloat16 (BF16 K / FP16 V), Fp8E4M3Row256, Int8Group64, Nvfp4Group16 and
- * Fp8KeyNvfp4Value. Data/scale planes follow paged_kv_storage_layout(storage,256), with
+ * Cache supports BFloat16 (BF16 K / FP16 V), Fp8E4M3Row256 and Int8Group64. Data/scale planes
+ * follow paged_kv_storage_layout(storage,256), with
  * [leading_extent,64,2,G] geometry. Features are contiguous; naturally aligned positive,
  * non-overlapping page-major outer strides are used. Q and softmax probabilities are not
  * quantized to low-bit operands. The A16 numerical policy applies to the complete attention
@@ -209,8 +208,8 @@ void qsa_sparse_gqa(const Tensor& query, const Tensor& output_gate,
  *   v                   = projected.value[:,h,t,b].
  * BFloat16 main caches store BF16(k) and FP16_RNE(v). For quantized main caches, k enters
  * the fixed FP32 H256/16 Hadamard and storage encoder directly from norm/RoPE, with no
- * intermediate BF16 rounding. INT8-G64 and FP8 transform K only; NVFP4-G16 and K8V4 transform
- * both K and V. V enters from the represented BF16 projection. Codes, represented scales,
+ * intermediate BF16 rounding. INT8-G64 and FP8 transform K only. V enters from the represented
+ * BF16 projection. Codes, represented scales,
  * zero and saturation rules are those of kv_cache_append; its BF16 K input boundary does not
  * apply to this fused computation. Q/index-Q and the compressed index cache remain BF16 and
  * do not receive this main-cache Hadamard. The attention consumer owns the corresponding Q
@@ -236,8 +235,6 @@ void qsa_sparse_gqa(const Tensor& query, const Tensor& output_gate,
  *   BFloat16: BF16 K / FP16 V [256,64,2,G]; no scales.
  *   Int8Group64: I8 K/V [256,64,2,G]; FP16 scales [4,64,2,G].
  *   Fp8E4M3Row256: FP8_E4M3FN K/V [256,64,2,G]; FP16 scales [1,64,2,G].
- *   Nvfp4Group16: packed U8 K/V [128,64,2,G]; U8 E4M3 scales [16,64,2,G].
- *   Fp8KeyNvfp4Value: the FP8 key planes and NVFP4 value planes above.
  * Cache planes are page-major with contiguous features and non-overlapping positive outer
  * strides; tables have contiguous I32 page entries and a non-overlapping row stride.
  * Both caches share G and the identical block_tables view. R and the state pool size are positive.

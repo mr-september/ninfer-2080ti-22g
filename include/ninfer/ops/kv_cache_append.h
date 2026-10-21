@@ -45,15 +45,8 @@ struct KVCacheAppendPrefixExecutionEnvelope {
  *           code[i]    = E4M3FN_RNE_SATFINITE(FP32(x[i]) * inv)
  *   decode[i] = FP32(E4M3FN(code[i])) * s.
  *
- * NVFP4-G16 encodes a D256 row as sixteen independent groups. Each group stores sixteen E2M1
- * codes in eight U8 bytes (lower d in the low nibble) plus one UE4M3 scale byte. Its scale is
- * UE4M3_RNE_SATFINITE(clamp(absmax/6, 2^-9, 448)); an all-zero group stores zero scale and codes.
- * Codes are E2M1_RNE_SATFINITE(x/scale). There is no matrix-level divisor. Thus one represented
- * vector occupies 128 code bytes plus 16 scale bytes. K8V4 uses the existing 256-byte row-scaled
- * FP8 K code plus one FP16 scale, and the 144-byte NVFP4 representation for V.
- *
- * INT8 and FP8 apply the fixed normalized D256 Hadamard preparation to K; NVFP4 and K8V4 apply it
- * to both K and V. Every transform is evaluated in FP32 from represented BF16 source values. The
+ * INT8 and FP8 apply the fixed normalized D256 Hadamard preparation to K. Every transform is
+ * evaluated in FP32 from represented BF16 source values. The
  * paired Q and output interpretation belongs to the causal softmax_attention contract. Transform
  * results and raw code/scale bytes are not standalone mathematical outputs. Standalone and fused
  * append produce byte-identical cache representations. Every addressed code/value and scale is

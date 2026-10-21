@@ -82,7 +82,7 @@ inline constexpr std::uint32_t kDefaultDraftTokens = 3;
 
 [[nodiscard]] constexpr KvCacheStorage default_kv_cache() noexcept {
 #if defined(NINFER_SM75)
-    // Turing has no FP8/NVFP4 KV; INT8 group-64 halves BF16 with no measured quality change.
+    // Turing has no FP8 KV route; INT8 group-64 halves BF16 with no measured quality change.
     return KvCacheStorage::Int8Group64;
 #else
     return KvCacheStorage::BFloat16;
