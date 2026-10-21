@@ -21,7 +21,4 @@ target_sources(ninfer_ops PRIVATE
   "${CMAKE_CURRENT_LIST_DIR}/routed_swiglu/cuda/q8_q8/shapes/h2048_i512_e256_k8/dispatch.cpp"
 )
 include("${CMAKE_CURRENT_LIST_DIR}/routed_swiglu/cpu/sources.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/kernels/cuda/block_scaled/fp8/rtx5090/sources.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/routed_swiglu/cuda/fp8/rtx5090/sources.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/topk_softmax_swiglu_moe/fp8/rtx5090/sources.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/topk_softmax_route/bf16/sources.cmake")

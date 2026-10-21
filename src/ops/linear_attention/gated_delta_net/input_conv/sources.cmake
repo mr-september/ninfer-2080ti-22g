@@ -1,9 +1,5 @@
 target_sources(ninfer_ops PRIVATE
   "${CMAKE_CURRENT_LIST_DIR}/execute.cpp"
-  "${CMAKE_CURRENT_LIST_DIR}/fp8/convolution.cu"
-  "${CMAKE_CURRENT_LIST_DIR}/fp8/projection_a16.cu"
-  "${CMAKE_CURRENT_LIST_DIR}/fp8/projection_a8.cu"
-  "${CMAKE_CURRENT_LIST_DIR}/fp8/projection_decode.cu"
   "${CMAKE_CURRENT_LIST_DIR}/input_conv.cpp"
   "${CMAKE_CURRENT_LIST_DIR}/operands.cpp"
   "${CMAKE_CURRENT_LIST_DIR}/plan.cpp"

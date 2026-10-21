@@ -3,9 +3,6 @@ target_sources(ninfer_ops PRIVATE
   "${CMAKE_CURRENT_LIST_DIR}/dense/causal_cache/causal_softmax_attention.cpp"
   "${CMAKE_CURRENT_LIST_DIR}/dense/causal_cache/bf16/launch.cu"
   "${CMAKE_CURRENT_LIST_DIR}/dense/causal_cache/bf16/plan.cpp"
-  "${CMAKE_CURRENT_LIST_DIR}/dense/causal_cache/fp8/launch.cu"
-  "${CMAKE_CURRENT_LIST_DIR}/dense/causal_cache/fp8/tiled_launch.cu"
-  "${CMAKE_CURRENT_LIST_DIR}/dense/causal_cache/fp8/plan.cpp"
   "${CMAKE_CURRENT_LIST_DIR}/dense/causal_cache/int8/launch.cu"
   "${CMAKE_CURRENT_LIST_DIR}/dense/causal_cache/int8/plan.cpp"
   "${CMAKE_CURRENT_LIST_DIR}/dense/packed/packed_softmax_attention.cpp"
@@ -19,4 +16,3 @@ target_sources(ninfer_ops PRIVATE
   "${CMAKE_CURRENT_LIST_DIR}/sliding_window/plan.cpp"
 )
 
-include("${CMAKE_CURRENT_LIST_DIR}/qsa/sources.cmake")
