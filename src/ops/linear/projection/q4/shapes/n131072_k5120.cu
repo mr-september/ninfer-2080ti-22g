@@ -2,12 +2,10 @@
 
 namespace ninfer::ops::detail {
 Q4Launch select_q4_n131072_k5120(std::int32_t tokens) {
-#if defined(NINFER_SM75)
     // Turing: the SIMT/direct decode kernels beat the tensor-core small-T routes (tuned on
     // RTX 5090) at the MTP verify widths, measured per shape with the 2080 Ti.
     if (tokens <= 1) return launch_q4_a16_gemv_r4_w1_direct;
     if (tokens <= 4) return launch_q4_a16_simt_r4_t4_w2_g8_s2;
-#endif
     // Selected with complete-Op cold CUDA Graph measurements on RTX 5090.
     if (tokens <= 1) return launch_q4_a16_gemv_r4_w1_direct;
     if (tokens <= 4) return launch_q4_a16_sliced_k5120_t4;
