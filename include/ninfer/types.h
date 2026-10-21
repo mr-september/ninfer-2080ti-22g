@@ -133,11 +133,7 @@ struct StartupObserver {
 
 // Host KV budget of the default context cache. Turing builds target desktops that share RAM with
 // other programs, so they pin less by default; --host-context-mib raises it.
-#if defined(NINFER_SM75)
 inline constexpr std::size_t kDefaultHostKvBytes = 2ULL * 1024 * 1024 * 1024;
-#else
-inline constexpr std::size_t kDefaultHostKvBytes = 8ULL * 1024 * 1024 * 1024;
-#endif
 
 struct ContextCacheOptions {
     // Controls cross-request history reads and writes. Request pause/replay resources remain
