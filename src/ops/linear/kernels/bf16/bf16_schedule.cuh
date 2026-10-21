@@ -203,7 +203,6 @@ struct Bf16A16SlicedKMmaSchedule {
     static_assert(kSharedBytes <= kBf16MaxSharedBytes);
 };
 
-#if defined(NINFER_SM75)
 // Turing has no TMA or mbarrier. The TMA tuning keeps its tile geometry and runs through the
 // cp.async-protocol MMA kernel (plain loads on sm_75) with the Xor64 shared-memory swizzle.
 template <int BlockRows, int BlockTokens, int BlockK, int WarpRows, int WarpTokens, int Stages,
@@ -213,27 +212,6 @@ struct Bf16A16TmaMmaSchedule
     : Bf16A16MmaSchedule<BlockRows, BlockTokens, BlockK, WarpRows, WarpTokens, Stages,
                          MinBlocksPerSm, Cache::cg, Cache::cg, Bf16MmaFragmentPipeline::PingPong,
                          Raster, Bf16MmaSwizzle::Xor64, RasterGroupRows> {};
-#else
-template <int BlockRows, int BlockTokens, int BlockK, int WarpRows, int WarpTokens, int Stages,
-          int MinBlocksPerSm = 1, Bf16MmaRaster Raster = Bf16MmaRaster::TokenFast,
-          int RasterGroupRows = 1, int ConsumerKUnroll = 1>
-struct Bf16A16TmaMmaSchedule
-    : Bf16A16MmaSchedule<BlockRows, BlockTokens, BlockK, WarpRows, WarpTokens, Stages,
-                         MinBlocksPerSm, Cache::cg, Cache::cg, Bf16MmaFragmentPipeline::PingPong,
-                         Raster, Bf16MmaSwizzle::Tma128, RasterGroupRows> {
-    static constexpr int kProducerThreads = 32;
-    static constexpr int kConsumerWarps   = (BlockRows / WarpRows) * (BlockTokens / WarpTokens);
-    static constexpr int kThreads         = kProducerThreads + kConsumerWarps * 32;
-    static constexpr int kTensorBytes     = Stages * (BlockRows + BlockTokens) * BlockK * 2;
-    static constexpr int kBarrierBytes    = Stages * 2 * sizeof(std::uint64_t);
-    static constexpr int kSharedBytes     = kTensorBytes + kBarrierBytes;
-    static constexpr int kConsumerKUnroll = ConsumerKUnroll;
-    static_assert(kThreads <= 1024 && kSharedBytes <= 99 * 1024);
-    static_assert(BlockRows <= 256 && BlockTokens <= 256 && BlockK <= 16384);
-    static_assert(ConsumerKUnroll > 0);
-};
-
-#endif
 
 // Row predicates preserve the compact physical matrix; full-tile schedules keep their fast path.
 template <class Schedule>

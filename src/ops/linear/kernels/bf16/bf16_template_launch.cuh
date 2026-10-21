@@ -128,12 +128,10 @@ void launch_bf16_a16_sliced_k_mma(const Bf16A16Operands& p, Output output, Epilo
     });
 }
 
-#if defined(NINFER_SM75)
 template <class Schedule, class Output, class Epilogue>
 void launch_bf16_a16_tma_mma(const Bf16A16Operands& p, Output output, Epilogue epilogue,
                              cudaStream_t stream) {
     launch_bf16_a16_mma<Schedule>(p, output, epilogue, stream);
 }
-#endif
 
 } // namespace ninfer::ops::detail

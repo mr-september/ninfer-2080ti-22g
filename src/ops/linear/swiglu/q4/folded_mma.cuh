@@ -151,7 +151,6 @@ __launch_bounds__(Cfg::THREADS, Cfg::MIN_BLOCKS) void q4_linear_swiglu_mma_split
         stage_load_quant(stage, kt);
     };
 
-#if defined(NINFER_SM75)
     // Turing has no cp.async, so a stage is a global load followed by a shared store. With a single
     // stage the next tile is loaded into registers before the current tile's MMAs and stored after
     // them, which overlaps its global-memory latency with the MMAs and issues a thread's loads
@@ -219,7 +218,6 @@ __launch_bounds__(Cfg::THREADS, Cfg::MIN_BLOCKS) void q4_linear_swiglu_mma_split
         }
         if (tid < BM) { *reinterpret_cast<std::uint32_t*>(&Sr[stage][tid * SB]) = scale_reg; }
     };
-#endif
 
     auto dequant_to_As = [&](int stage, int kt) {
         const int scale_off = ((kt * BK >> 6) & 1) * 2;
@@ -244,11 +242,9 @@ __launch_bounds__(Cfg::THREADS, Cfg::MIN_BLOCKS) void q4_linear_swiglu_mma_split
         dequant_to_As(stage, it);
         __syncthreads();
 
-#if defined(NINFER_SM75)
         if constexpr (kRegPrefetch) {
             if (it + 1 < NKT) { prefetch_to_regs(it + 1); }
         }
-#endif
 
         unsigned af[MT][4];
         unsigned bf[NT][2];
@@ -284,11 +280,9 @@ __launch_bounds__(Cfg::THREADS, Cfg::MIN_BLOCKS) void q4_linear_swiglu_mma_split
 
         __syncthreads();
         const int next = it + S;
-#if defined(NINFER_SM75)
         if constexpr (kRegPrefetch) {
             if (next < NKT) { store_from_regs(stage); }
         } else
-#endif
         {
             if (next < NKT) { stage_load(stage, next); }
         }

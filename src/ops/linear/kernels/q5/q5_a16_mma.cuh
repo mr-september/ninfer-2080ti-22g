@@ -111,7 +111,6 @@ void q5_a16_mma_kernel(
         }
     };
 
-#if defined(NINFER_SM75)
     // Turing has no cp.async, so staging is a global load followed by a shared store. The next
     // activation tile is loaded into registers before the current tile's MMAs and stored after
     // them, so its global-memory latency overlaps the MMAs instead of stalling in front of the next
@@ -149,7 +148,6 @@ void q5_a16_mma_kernel(
             }
         }
     };
-#endif
 
     auto stage_quant = [&](int stage, int k_tile) {
         const int group0 = (k_tile * BK) / common::Q5RowSplitStorage::kGroupK;
@@ -322,11 +320,9 @@ void q5_a16_mma_kernel(
             common::cp_commit();
         }
 
-#if defined(NINFER_SM75)
         if constexpr (kRegPrefetch) {
             if (k_tile + 1 < k_tiles) { load_activation_regs(k_tile + 1); }
         }
-#endif
 
         auto load_fragments = [&](int k_step, unsigned(&a_frag)[MT][4], unsigned(&b_frag)[NT][2]) {
 #pragma unroll
@@ -394,11 +390,9 @@ void q5_a16_mma_kernel(
             common::cp_commit();
         } else {
             const int next_tile = k_tile + 1;
-#if defined(NINFER_SM75)
             if constexpr (kRegPrefetch) {
                 if (next_tile < k_tiles) { store_activation_regs(0); }
             } else
-#endif
             {
                 if (next_tile < k_tiles) { stage_activation(0, next_tile); }
             }
