@@ -96,10 +96,6 @@ ContextKVMaterializeImplementation select_context_kv_materialize(std::int32_t co
     if (columns <= 64) return implementation<launch_mma<64, 32, 128, 2>, true>();
     if (columns <= 80) return implementation<launch_mma<64, 80, 128, 5>, true>();
     if (columns <= 96) return implementation<launch_mma<64, 96, 128, 6>, true>();
-#if !defined(NINFER_SM75)
-    // The fused 128-row tile stages 66 KiB, over a Turing CTA's 64 KiB.
-    if (columns <= 256) return implementation<launch_mma<128, 64, 128, 2>, false>();
-#endif
     return implementation<launch_mma<64, 64, 64, 2>, true>();
 }
 
