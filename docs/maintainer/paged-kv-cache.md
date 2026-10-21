@@ -78,10 +78,9 @@ Qwen3_5 的 speculative backends 在一个 Engine 内互斥，因此该架构当
 | MTP | MTP persistent K/V、code/scale 及模型声明的压缩 index planes | MTP KV frontier |
 | Draft Full | selected draft 的 full-context K/V | draft context frontier |
 
-Main Text 与 MTP 使用 Engine 选择的 BF16、INT8-G64、FP8-E4M3FN-row256、NVFP4-G16 或 K8V4
+Main Text 与 MTP 使用 Engine 选择的 BF16、INT8-G64 或 FP8-E4M3FN-row256
 KV profile；Draft Full 使用自己的 BF16 profile。`BFloat16` 名称下的物理 layout 为 BF16 K、FP16 V，
-写入端将 BF16 V 一次转换为 FP16。K8V4 是封闭的非对称 profile，不是运行时 bit-width 组合：K 固定为
-FP8-E4M3FN-row256，V 固定为 NVFP4-G16。
+写入端将 BF16 V 一次转换为 FP16。
 
 `PagedKVStorageLayout` 将选定的 closed profile 解析为 K/V data/scale plane schema；target planner 按
 layer 展开该 schema 并确定 plane ordinal。Common pool implementation 仍只接收已展开的
@@ -257,7 +256,6 @@ Main Text 与 MTP 的 K/V planes 使用 PageMajor；DFlash Full 使用 HeadMajor
 - \(X=D\) 表示 K/V 或 quantized code plane；
 - INT8-G64 scale plane 使用 \(X=D/64\)；
 - FP8-E4M3FN-row256 scale plane 使用 \(X=1\)；
-- NVFP4-G16 code plane 使用 packed U8 \(X=D/2\)，scale plane 使用 U8 \(X=D/16\)；
 - \(H\) 是 KV heads；
 - \(N_{physical}\) 是该 pool 的 physical page count。
 
@@ -295,12 +293,10 @@ D256 Main/MTP profile 的单 token/head 物理 payload 为：
 | BF16 | 512 B | 512 B | 1024 B |
 | INT8-G64 | 256 B + 8 B | 256 B + 8 B | 528 B |
 | FP8-E4M3FN-row256 | 256 B + 2 B | 256 B + 2 B | 516 B |
-| NVFP4-G16 | 128 B + 16 B | 128 B + 16 B | 288 B |
-| K8V4 | 256 B + 2 B | 128 B + 16 B | 402 B |
 
 K/V 的 code 和 scale planes 具有各自的 dtype、leading extent 和 group size；它们仍共享 page-group
 identity、frontier 和 lifetime。Capacity curve、Device/Host replica、continuation transfer 和 memory
-summary 均从这一 typed plane inventory 计算，不能用 `2 * vector_bytes` 代替 K8V4 的非对称字节数。
+summary 均从这一 typed plane inventory 计算。
 
 ### 4.4 Logical position domain
 

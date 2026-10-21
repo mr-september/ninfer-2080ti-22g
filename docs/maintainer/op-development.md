@@ -482,7 +482,7 @@ Enforce the boundary in code and build ownership:
 
 The owning family registers its implementation in `src/ops/<family>/sources.cmake`; large families
 delegate to explicit local manifests for their kernel library and semantic implementations.
-Ordinary sources contribute to `ninfer_ops`; NVFP4 sources requiring non-RDC compilation contribute
+Ordinary sources contribute to `ninfer_ops`; sources requiring non-RDC compilation contribute
 to `ninfer_ops_non_rdc` from their owning manifests. Shape files retain their `.cpp` or `.cu`
 language and separate translation units. See [Build system](build-system.md) for the target policy.
 
@@ -573,8 +573,7 @@ Exact outputs and regions compare every observable bit or byte. Each approximate
 uses a suite-owned named criterion for its public numerical policy or representation; tests do not
 define per-case tolerance overrides. Private arithmetic, algorithm selection, target, or a history
 of selected routes must not select a stricter or looser criterion. State storage dtype alone does
-not prescribe the precision of its internal updates. For Linear-family Ops, `A16Only`, `AllowA8`,
-and `AllowA4` select the A16, A8, and A4 criteria respectively, regardless of which arithmetic the implementation
+not prescribe the precision of its internal updates. For Linear-family Ops, `A16Only` and `AllowA8` select the A16 and A8 criteria respectively, regardless of which arithmetic the implementation
 chooses. A permissive policy retains its criterion when a route uses higher precision. Input
 recipes and sampling are separate from that choice; tests must not inspect selectors or infer
 precision from T to select a criterion.

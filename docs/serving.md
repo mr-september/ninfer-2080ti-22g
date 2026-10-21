@@ -9,7 +9,7 @@ See the [CLI example](cli.md) for commands and the
 
 ## Start the server
 
-> **Turing fork.** The commands in this page are upstream's RTX 5090 forms (NVFP4 weights, FP8 KV). On a GeForce RTX 2080 Ti use the `groupwise-int` artifact and the defaults of this build: INT8 KV, 65,536-token context, MTP with three draft tokens and the optimized proposal head when the artifact has one. Drop `--kv-dtype fp8`, or write `--kv-dtype int8`; see the [README](../README.md#defaults).
+> **Turing fork.** The commands in this page are upstream's RTX 5090 forms (FP8 KV). On a GeForce RTX 2080 Ti use the `groupwise-int` artifact and the defaults of this build: INT8 KV, 65,536-token context, MTP with three draft tokens and the optimized proposal head when the artifact has one. Drop `--kv-dtype fp8`, or write `--kv-dtype int8`; see the [README](../README.md#defaults).
 
 On a 2080 Ti the whole command is
 
@@ -22,7 +22,7 @@ On a 2080 Ti the whole command is
 See [CUDA synchronization](cli.md#cuda-synchronization) for the shared `NINFER_CUDA_SYNC` setting.
 
 ```bash
-./build/turing-release/apps/ninfer-serve models/qwen3_8_27b_nvfp4.ninfer \
+./build/turing-release/apps/ninfer-serve models/qwen3_8_27b.ninfer \
   --host 127.0.0.1 \
   --port 8080 \
   --max-context 240000 \
@@ -35,7 +35,7 @@ See [CUDA synchronization](cli.md#cuda-synchronization) for the shared `NINFER_C
   --preserve-thinking
 ```
 
-The command uses Qwen3.8-27B NVFP4. Each request has a 240,000-token logical ceiling. A shared
+The command uses Qwen3.8-27B. Each request has a 240,000-token logical ceiling. A shared
 240,000-token Main Text KV pool serves admitted requests; either request may use the full capacity
 when running alone. Requests acquire KV pages as execution advances; if concurrent growth exhausts
 the pool, the scheduler can pause a request and restore it later.
@@ -600,7 +600,7 @@ The table lists executable defaults. The startup example selects a long-context 
 | `--request-log-jsonl FILE` | append full-precision server/request records | disabled |
 | `--response-store-max-records N` | maximum locally retained Responses objects | `1024` |
 | `--response-store-max-mib N` | total local Response envelope/Item/context budget | `256` |
-| `--kv-dtype bf16\|int8\|fp8\|nvfp4\|k8v4` | KV-cache storage | `int8` on Turing builds, `bf16` otherwise |
+| `--kv-dtype bf16\|int8\|fp8` | KV-cache storage | `int8` on Turing builds, `bf16` otherwise |
 | `--spec none\|mtp\|dflash\|dflash2` | speculative backend | `mtp` |
 | `--draft-tokens N` | MTP `1..5`; DFlash/DFlash2 `1..15` (DFlash needs it explicitly) | `3` |
 | `--lm-head-draft` / `--no-lm-head-draft` | force the optimized or the full proposal head | automatic: optimized when the artifact has one |

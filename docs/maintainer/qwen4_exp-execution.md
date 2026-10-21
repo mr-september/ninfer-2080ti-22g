@@ -16,7 +16,7 @@ PLE 流水、MTP/Vision、CUDA Graph 和完整 continuation 的提交规则。
 | Vision | 图像、视频、多媒体消息；共享 Vision 编码器、MRoPE 和跨 Text chunk 特征交接 |
 | 原生 MTP | draft 数 1–5，支持 Text/Vision、1–8 路、采样 penalty 和约束输出 |
 | CUDA Graph | ordinary、MTP draft/target/Finish、单列 control；Main 使用分段图 |
-| KV 存储 | BF16、INT8-G64、FP8-row256、NVFP4-G16、K8V4；index keys 固定 BF16 |
+| KV 存储 | BF16、INT8-G64、FP8-row256；index keys 固定 BF16 |
 | 上下文复用 | 完整 StateImage 与 Main/MTP 页组、Device 前缀命中、Snapshot/Replay；5090 还提供 Host 副本 |
 | 前端与服务 | thinking、thinking budget、tool call、GBNF/JSON/schema/choice/regex；共用 Qwen Frontend 和现有 HTTP 协议 |
 | CausalScoring | 公共 Engine 的单路 Text 评分；不启用 Vision 或 speculative backend |
@@ -400,8 +400,6 @@ TableGeometry；启动重试不借用已销毁 Model 的 table。
 | BFloat16（BF16 K / FP16 V） | 135168 B | 25344 |
 | Int8Group64 | 71680 B | 13440 |
 | Fp8E4M3Row256 | 70144 B | 13152 |
-| Nvfp4Group16 | 40960 B | 7680 |
-| Fp8KeyNvfp4Value | 55552 B | 10416 |
 
 MTP pool 按一层另计，其容量包含 provisional lead。
 实际分配从 expanded plane schema、StateImage layout 和 workspace 查询产生，

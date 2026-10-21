@@ -4,9 +4,9 @@
 
 The examples use the Qwen3.8-27B `groupwise-int` artifact with this build's INT8 KV storage, which is the default on Turing, so no `--kv-dtype` flag is needed.
 
-> **Turing fork.** Upstream's forms of these commands target an RTX 5090 (NVFP4 weights, `--kv-dtype fp8`); FP8 and NVFP4 are not available on a GeForce RTX 2080 Ti. The defaults of this build are INT8 KV, a 65,536-token context, and MTP with three draft tokens and the optimized proposal head when the artifact has one; see the [README](../README.md#defaults).
+> **Turing fork.** Upstream's forms of these commands target an RTX 5090 (`--kv-dtype fp8`); FP8 is not available on a GeForce RTX 2080 Ti. The defaults of this build are INT8 KV, a 65,536-token context, and MTP with three draft tokens and the optimized proposal head when the artifact has one; see the [README](../README.md#defaults).
 
-The CPU-expert-offload (`NINFER_VRAM_BUDGET_MIB`) and Qwen3.8-Flash-Next (Qwen4Exp) examples below are upstream's. They need CPU expert offload or FP8/NVFP4 weights or KV, none of which the `turing` target provides (`NINFER_EXPERT_OFFLOAD` is 0 there), so they cannot run on a Turing GPU.
+The CPU-expert-offload (`NINFER_VRAM_BUDGET_MIB`) examples below are upstream's. They need CPU expert offload or FP8 weights or KV, none of which the `turing` target provides (`NINFER_EXPERT_OFFLOAD` is 0 there), so they cannot run on a Turing GPU.
 
 For Qwen3.6-35B-A3B, `NINFER_VRAM_BUDGET_MIB` caps the Engine's GPU allocation budget. If the
 model cannot remain fully on GPU, Main MoE experts use CPU/GPU execution with segmented CUDA
@@ -20,37 +20,6 @@ NINFER_VRAM_BUDGET_MIB=16384 ./build/turing-release/apps/ninfer out/qwen3_6_35b_
 `--prefill-chunk N` sets a fixed positive multiple of 128. When omitted, the default is 4096 for
 Qwen4Exp or CPU expert offload, and 1024 otherwise. Serving and offline scoring use the same Engine
 defaults. See [expert execution](maintainer/expert-weight-cache.md) for ownership and scheduling.
-
-Qwen3.8-Flash-Next uses Qwen4Exp Text/Vision/MTP. CUDA Graph decode is enabled by default:
-
-```bash
-./build/turing-release/apps/ninfer out/qwen3_8_flash_next.ninfer \
-  --max-context 32768 --prefill-chunk 4096 --kv-dtype fp8 \
-  --prompt "Explain how sparse attention works." --max-new 256
-```
-
-On RTX 5090, this recipe uses registered Host experts with GPU caching and streaming, requiring
-about 63.3 GiB of Host expert backing plus runtime and system memory. PLE reads its
-NF4 rows from the artifact on disk. Add `--vision` for image/video messages. Native MTP supports
-`--spec mtp --draft-tokens 1..5` with either Text or Vision, using the full shared BF16 head;
-omit `--lm-head-draft`. MTP's own experts remain on GPU. Serving uses the same execution path;
-offline causal scoring remains text-only without speculative decoding. Use `--no-cuda-graph`
-to select eager decode; prefill and Vision encode use the same eager path in both modes.
-The [Qwen4Exp execution reference](maintainer/qwen4_exp-execution.md) records the complete support
-scope, state handling and resource limits.
-
-```bash
-./build/turing-release/apps/ninfer out/qwen3_8_flash_next.ninfer \
-  --spec mtp --draft-tokens 3 \
-  --max-context 32768 --prefill-chunk 4096 --kv-dtype fp8 \
-  --prompt "Explain how sparse attention works." --max-new 256
-```
-
-```bash
-./build/turing-release/apps/ninfer out/qwen3_8_flash_next.ninfer \
-  --vision --max-context 32768 --prefill-chunk 4096 --kv-dtype fp8 \
-  --messages examples/cli/messages/image_chart.json --no-thinking --greedy --max-new 64
-```
 
 ## Text input
 
@@ -229,7 +198,7 @@ For DFlash:
   --spec dflash --draft-tokens 7 --lm-head-draft
 ```
 
-For Qwen3.8-27B artifacts containing the DFlash2 companion weights, select `--spec dflash2 --draft-tokens 7`, optionally with `--lm-head-draft` and `--vision`. DFlash2 accepts every draft count from 1 through 15; seven is the checkpoint recommendation. Both `groupwise-int` and `nvfp4` artifacts use the same Engine route, including CUDA Graph, concurrent requests, sampling penalties, and prefix reuse. An artifact without the companion weights reports a missing DFlash2 component when selected. Vision, MTP and DFlash follow the same rule: their weights are required only when that component is enabled at startup.
+For Qwen3.8-27B artifacts containing the DFlash2 companion weights, select `--spec dflash2 --draft-tokens 7`, optionally with `--lm-head-draft` and `--vision`. DFlash2 accepts every draft count from 1 through 15; seven is the checkpoint recommendation. The `groupwise-int` artifact uses the same Engine route, including CUDA Graph, concurrent requests, sampling penalties, and prefix reuse. An artifact without the companion weights reports a missing DFlash2 component when selected. Vision, MTP and DFlash follow the same rule: their weights are required only when that component is enabled at startup.
 
 Only one speculative backend can be enabled per Engine. The published [performance results](performance.md) use MTP with three draft tokens and DFlash with seven draft tokens (block length eight), both with the optimized proposal head. DFlash accepts one to fifteen draft tokens; seven forms the measured block length eight, while fifteen uses the maximum supported block length sixteen.
 
@@ -244,7 +213,7 @@ The table lists the executable defaults of this build.
 | `--prefill-chunk N` | positive text-prefill chunk, in multiples of 128 | `1024` |
 | `--max-new N` | requested output-token limit | `128` |
 | `--device N` | CUDA device index | `0` |
-| `--kv-dtype bf16\|int8\|fp8\|nvfp4\|k8v4` | KV-cache storage | `int8` on Turing builds, `bf16` otherwise |
+| `--kv-dtype bf16\|int8\|fp8` | KV-cache storage | `int8` on Turing builds, `bf16` otherwise |
 | `--spec none\|mtp\|dflash\|dflash2` | speculative backend | `mtp` |
 | `--draft-tokens N` | MTP `1..5`; DFlash/DFlash2 `1..15` (DFlash needs it explicitly) | `3` |
 | `--lm-head-draft` / `--no-lm-head-draft` | force the optimized or the full proposal head | automatic: optimized when the artifact has one |

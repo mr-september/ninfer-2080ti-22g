@@ -20,7 +20,7 @@ English reference text, English long-form text, Chinese reference text, and NInf
 
 The default evaluation uses a 4,096-token context and a 2,048-token stride. Use `--context` and
 `--stride` to change that protocol, or score one UTF-8 file with `--text FILE`. The available Main
-KV representations are `bf16`, `int8`, `fp8`, `nvfp4`, and `k8v4`; `fp8`, `nvfp4` and `k8v4` are not available on Turing builds.
+KV representations are `bf16`, `int8`, and `fp8`; `fp8` is not available on Turing builds.
 
 ```bash
 ./build/turing-release/apps/ninfer-perplexity models/qwen3_8_27b.ninfer \

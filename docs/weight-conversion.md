@@ -9,14 +9,14 @@ Run the commands below from the repository root.
 
 ## Upgrade an existing v2 artifact
 
-The offline upgrade tool supports the official Qwen3.6/3.8-27B groupwise-int and NVFP4 artifacts,
+The offline upgrade tool supports the official Qwen3.6/3.8-27B groupwise-int artifacts,
 and Qwen3.6-35B-A3B groupwise-int. Update your checkout to the current `master` and
 [rebuild NInfer](../README.md#quick-start), then run with Python 3.11:
 
 ```bash
 python3 tools/upgrade_ninfer_v2_to_v3.py \
-  models/qwen3_8_27b_nvfp4.ninfer \
-  models/qwen3_8_27b_nvfp4.v3.ninfer
+  models/qwen3_8_27b.ninfer \
+  models/qwen3_8_27b.v3.ninfer
 ```
 
 The output must use a new path. After upgrading, use it directly or rename it to replace the
@@ -55,62 +55,15 @@ The built-in recipes are ordinary Python functions in
 | `qwen3_6_27b` | Q4/Q5 projections, Q6 vocabulary weights | None |
 | `qwen3_8_27b` | Q4/Q5 projections, Q8 vocabulary weights | None |
 | `qwen3_6_35b_a3b` | Q4 experts, Q5/Q6 expert down, Q8 shared/projection weights | None |
-| `qwen3_6_27b_nvfp4` | Imported NVFP4, selected BF16 projections, Q8 vocabulary weights | `quantized` |
-| `qwen3_8_27b_nvfp4` | Imported NVFP4/FP8, FP8 embedding generated from BF16 | `quantized` |
-| `qwen3_8_flash_next` | Q8 main projections, NVIDIA NVFP4 expert banks, NVIDIA block-FP8 MTP experts, paged NF4 PLE, BF16 auxiliary projections/Vision | `nvidia` |
 
 These names select conversion choices. Runtime execution is selected from the architecture,
 configuration and actual bindings stored in the artifact. `--name` sets the public model name;
 it does not select kernels.
 
-For a Qwen3.8-27B NVFP4/FP8 artifact with DFlash2:
-
-```bash
-python3 -m tools.convert \
-  --model /path/to/Qwen3.8-27B \
-  --recipe qwen3_8_27b_nvfp4 \
-  --source quantized=/path/to/Qwen3.8-27B-NVFP4 \
-  --source dflash2=/path/to/Qwen3.8-27B-DFlash2 \
-  --components text,vision,mtp,dflash2 \
-  --resource chat_template.jinja=tools/chat_templates/qwen3_8.jinja \
-  --proposal \
-  --name qwen3.8-27b \
-  --out models/qwen3_8_27b_nvfp4.ninfer
-```
-
 MTP and Vision use the main source. DFlash and DFlash2 use the corresponding named source, supplied
 as `--source dflash=PATH` or `--source dflash2=PATH`. An artifact may contain several optional
 components; the Engine loads only the ones selected at startup, including at most one speculative
 backend. Component availability and startup selection are independent.
-
-For Qwen3.8-Flash-Next, select the complete NVIDIA checkpoint for Main experts and MTP:
-
-```bash
-OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 python3 -m tools.convert \
-  --model /path/to/Qwen3.8-Flash-Next/base-hf-bf16 \
-  --recipe qwen3_8_flash_next \
-  --source nvidia=/path/to/Qwen3.8-Flash-Next/nvidia-nvfp4 \
-  --components text,vision,mtp \
-  --rows-per-chunk 16384 \
-  --name qwen3.8-flash-next \
-  --out out/qwen3_8_flash_next.ninfer
-```
-
-The Qwen4Exp adapter selects the dedicated
-[`qwen3_8_flash_next.jinja`](../tools/chat_templates/qwen3_8_flash_next.jinja) by default;
-`--resource chat_template.jinja=PATH` explicitly replaces it. The 27B template is independent.
-
-The Qwen4Exp adapter and Engine support Text, Vision and native MTP. MTP uses the full shared head;
-omit `--proposal`. DFlash/DFlash2 and indexed proposal execution are unsupported for Qwen4Exp.
-CUDA self-quantization compiles
-the SM120 encoder on first use and requires a CUDA toolkit, C++ compiler and Ninja.
-PLE uses two bounded passes per shard, with no full-table materialization. The complete recipe
-contains about 100.67 GiB of weight/control payload, split by the existing V3 writer.
-Main experts use two NVFP4 banks per layer with independent matrix divisors. MTP uses two
-128×128 block-FP8 banks, preserving NVIDIA E4M3FN codes and BF16 multipliers; its other private
-parameters also come from the NVIDIA source. PLE alone uses the BF16-to-NF4 stored-scale method.
-See the [model and weight contract](maintainer/qwen4_exp-model.md) for layouts and precision, and
-the [execution reference](maintainer/qwen4_exp-execution.md) for runtime support and memory use.
 
 ## Change part of a recipe
 
@@ -185,20 +138,17 @@ The converter currently writes these formats:
 | `q4_g64_fp16`, `q5_g64_fp16`, `q6_g64_fp16`, `q8_g32_fp16` | `grouped_absmax` | Supply a custom method/source if needed |
 | `fp8_e4m3fn_row_bf16` | `fp8_row_maxabs` | `import_encoded` |
 | `fp8_e4m3fn_block128x128_bf16` | None | `import_encoded` |
-| `nvfp4` | `stored_scale_mse` | `import_encoded` |
 | `nf4_g16_e4m3fn` | `stored_scale_mse` | Supply encoded words through `TensorOutput` |
 
 `grouped_absmax` stores one FP16 scale per group and signed integer codes. `fp8_row_maxabs` first
 rounds input values to BF16, then produces E4M3FN codes and one BF16 multiplier per row.
-`import_encoded` preserves compatible code and scale words, including NVFP4's matrix weight divisor.
+`import_encoded` preserves compatible code and scale words.
 It does not dequantize and requantize them.
-Rank-three NVFP4 targets select `batched_block_scale_k16_m128x4_v1` explicitly; each matrix owns
-its divisor. Block-FP8 uses `block_scale_m128_k128_v1` for matrices and banks.
+Block-FP8 uses `block_scale_m128_k128_v1` for matrices and banks.
 
 `stored_scale_mse` computes one FP32 divisor from the complete parent amax, then searches stored
-E4M3FN scales per G16 group using FP64 reconstruction error. NF4 uses the fixed codebook;
-NVFP4 uses E2M1. The method provides no activation calibration. ModelOpt import preserves
-packed codes and scale bytes while converting FP32 global multipliers to stored reciprocals.
+E4M3FN scales per G16 group using FP64 reconstruction error. NF4 uses the fixed codebook.
+The method provides no activation calibration.
 
 The exact numeric and packing rules are in [numeric formats](maintainer/tensor-formats.md) and
 [storage layouts](maintainer/storage-layouts.md). Source format names alone do not establish
@@ -210,17 +160,11 @@ Activation permissions are independent of the stored weight format:
 |---|---|
 | `A16Only` | A16 |
 | `AllowA8` | A16, A8 |
-| `AllowA4` | A16, A8, A4 |
 
 They permit choices; they do not force a kernel to use the lowest precision. A fused operation that
 shares one activation across several projections must respect the intersection of their
 permissions. `recipe.use(parameter, input_name, ...)` can set one mathematical input independently;
 the names are available in `parameter.inputs`.
-
-An NVFP4 A4 input requires a positive finite activation divisor. `import_encoded` obtains it from
-the selected source, or a recipe supplies it through
-`recipe.use(..., auxiliaries={"activation_input_divisor": value})`. Shared weights retain separate
-Use records; sharing weights does not share calibration implicitly.
 
 ## Fused parents and logical projections
 
@@ -255,7 +199,7 @@ For explicit organization, `recipe.group([names...])` concatenates compatible se
 given order, `recipe.separate(names)` disables automatic grouping for those parameters, and
 `recipe.share(parameter, target)` binds equal-shaped parameters to the same physical data.
 Explicit groups must be disjoint and use unsplit selections with matching format, layout, method
-and method parameters. NVFP4 parents also require a common weight divisor. Automatic grouping is
+and method parameters. Automatic grouping is
 limited to built-in methods; custom methods can request explicit groups.
 
 Grouping chooses storage. Model execution code chooses the supported fused implementation. The
@@ -282,7 +226,7 @@ recipe.assign(
 
 Supply `--source alternate=/path/to/alternate-checkpoint`. `model.source` applies the architecture's
 source-name and axis mapping, including Q/gate extraction. The built-in compressed-tensors reader
-understands the implemented per-row FP8 and NVFP4 code/scale conventions. It can expose decoded
+understands the implemented per-row FP8 code/scale conventions. It can expose decoded
 values for another quantizer or encoded rows for exact import.
 
 For another file format or quantization convention, provide a `LogicalSource`. Its value reader
@@ -327,8 +271,6 @@ one gate/up matrix per expert while retaining separate logical gate and up banks
 parent's `order` takes precedence. Binding parts remain in logical order. Shared calibration uses
 `recipe.auxiliary_tensor(name, AuxiliaryValue(...))` and an `AuxiliaryReference(name, element)`
 passed to `recipe.use(..., auxiliaries=...)`, so several Uses can reference one FP32 element.
-These functions are used directly by the Flash-Next recipe.
-
 ## Write a conversion method
 
 A method receives a `PrepareRequest` and returns `request.job(produce=...)`. Preparation validates
@@ -385,8 +327,8 @@ including explicit groups. `output.write_codes` performs the registered packing 
 codes/scales; the method should not duplicate that byte-layout logic. Direct output uses
 `output.write_values`. Keep source blocks and temporary device tensors bounded to the method's
 working set. `--rows-per-chunk` defaults to 512; custom methods own how they use it.
-For an encoded bank, `output.write_codes(..., matrix=e)` writes rows within matrix e. NVFP4
-checks divisor consistency within that matrix; block-FP8 writes complete 128-row scale blocks.
+For an encoded bank, `output.write_codes(..., matrix=e)` writes rows within matrix e. Block-FP8
+writes complete 128-row scale blocks.
 
 ## Resources, files and inspection
 

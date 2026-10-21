@@ -119,8 +119,8 @@ The benchmark corpus is random token ids, so its MTP acceptance (0.377) is far b
 | Area | Status on `sm_75` |
 |---|---|
 | Artifacts | v3 `groupwise-int` (Q4/Q5/Q6/Q8 + BF16): Qwen3.8-27B (tested) |
-| NVFP4 / FP8 weights | not available (they need Blackwell); the NVFP4 artifacts do not load |
-| KV cache | `int8` (default), `bf16`; `fp8`, `nvfp4`, `k8v4` unavailable |
+| FP8 weights | not available (they need Blackwell) |
+| KV cache | `int8` (default), `bf16`; `fp8` unavailable |
 | Text, thinking, prefix reuse, CUDA Graph decode | yes |
 | Image / video input | yes (`--vision`) |
 | MTP speculation with the optimized proposal head | yes, on by default |
@@ -128,11 +128,11 @@ The benchmark corpus is random token ids, so its MTP acceptance (0.377) is far b
 | Qwen3.6-27B, Qwen3.6-35B-A3B, DFlash | untested; the kernels build and pass op tests, nothing is guaranteed. The 35B-A3B artifact (21.2 GiB) cannot fit a 22 GB card |
 | Kimi delta attention, Qwen4Exp (Flash Next), CPU expert offload, QSA sparse attention, block-scaled MoE and other Blackwell-only Ops | not available: the Ops are stubs that throw on `turing` |
 
-Checked on one 2080 Ti 22 GB with Qwen3.8-27B `groupwise-int` on native Windows (2026-10-19): the full CTest suite (138 tests: 0 failed, 25 skipped, the skips being FP8/NVFP4/K8V4 cases and real-model tests that need `NINFER_TEST_ARTIFACT`), protocol-B perplexity, the release zip started from an empty directory with a stripped `PATH`, and a chat request through `ninfer-serve`. Earlier checks on the same kernels covered CLI text, image and image+video prompts, a 64k-token needle retrieval, and `ninfer-serve` with OpenAI chat, SSE streaming, Responses, Anthropic messages, tool calls and two concurrent requests. On Linux/WSL2 the same commit built and passed its CTest suite (145 tests, 28 skipped) and answered a real prompt, and the Docker image built, started with the model bind-mounted and answered a chat request ([details](docs/turing-port.md#verification-of-master-2026-10-19-and-2026-10-20)). See [Tests](tests/README.md).
+Checked on one 2080 Ti 22 GB with Qwen3.8-27B `groupwise-int` on native Windows (2026-10-19): the full CTest suite (138 tests: 0 failed, 25 skipped, the skips being FP8 cases and real-model tests that need `NINFER_TEST_ARTIFACT`), protocol-B perplexity, the release zip started from an empty directory with a stripped `PATH`, and a chat request through `ninfer-serve`. Earlier checks on the same kernels covered CLI text, image and image+video prompts, a 64k-token needle retrieval, and `ninfer-serve` with OpenAI chat, SSE streaming, Responses, Anthropic messages, tool calls and two concurrent requests. On Linux/WSL2 the same commit built and passed its CTest suite (145 tests, 28 skipped) and answered a real prompt, and the Docker image built, started with the model bind-mounted and answered a chat request ([details](docs/turing-port.md#verification-of-master-2026-10-19-and-2026-10-20)). See [Tests](tests/README.md).
 
 ## Known limitations
 
-- Turing only: the `rtx5090` target in the tree is upstream's and is neither built nor tested here. FP8 and NVFP4 weights and KV are unavailable.
+- Turing only: the `rtx5090` target in the tree is upstream's and is neither built nor tested here. FP8 weights and KV are unavailable.
 - Qwen3.8-27B is the only tested model.
 - Greedy output is not bit-identical to the fork's build from before the port onto upstream `dev`: on 5 of 8 test prompts the text diverges at a near-tied token, while log-probabilities agree to 0.19 nats at most and perplexity to 0.045% ([details](docs/turing-port.md#port-onto-upstream-dev-2026-10-18)).
 - The 64k default context leaves little VRAM headroom; other programs using the GPU can force a smaller context at startup.
@@ -171,9 +171,9 @@ An artifact is a `.ninfer` v3 container: the model configuration, the encoded we
 | Q8 | signed integer codes, one FP16 scale per 32 weights | vocabulary tensors, MTP block |
 | BF16 | plain | norms and small tensors |
 
-NVFP4 and FP8 are Blackwell-only, so the `nvfp4` artifacts and recipes do not apply. The kernels also exist only for the registered Qwen 27B-class shapes: converting some other model into the format would not make it runnable.
+FP8 is Blackwell-only. The kernels also exist only for the registered Qwen 27B-class shapes: converting some other model into the format would not make it runnable.
 
-**Convert from the original checkpoint.** Start from the original BF16 Hugging Face checkpoint (a local directory of safetensors). The converter quantizes once with group-wise absolute-max rounding; it reads safetensors and already-quantized NVFP4/FP8 checkpoints, and has no GGUF reader. It needs Python 3.10 or newer with PyTorch and NumPy and runs the same on native Windows and on Linux/WSL2 (use `python` instead of `python3` on Windows); it uses CUDA by default and `--device cpu` otherwise. From the repository root:
+**Convert from the original checkpoint.** Start from the original BF16 Hugging Face checkpoint (a local directory of safetensors). The converter quantizes once with group-wise absolute-max rounding; it reads safetensors and already-quantized FP8 checkpoints, and has no GGUF reader. It needs Python 3.10 or newer with PyTorch and NumPy and runs the same on native Windows and on Linux/WSL2 (use `python` instead of `python3` on Windows); it uses CUDA by default and `--device cpu` otherwise. From the repository root:
 
 ```bash
 python3 -m tools.convert \

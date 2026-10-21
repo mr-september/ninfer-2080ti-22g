@@ -254,9 +254,8 @@ Shape 描述对象的逻辑值域；layout 自己计算物理 padding、planes �
 例如 Q4 的 K 维 padding 由 row_split_k128_v1 计算。对象可以容纳多个投影或多个专家，
 其数学用途由第 7 节绑定给出。
 
-一个已编码对象包含其 codec/layout 要求的全部 planes 和对象级标量。现有 NVFP4 的 block
-scales 与 weight divisor 在对象内；现有逐行 FP8 的 row scales 也在对象内。
-Op 所需的独立指针从这个对象的既定布局取得。使用位置的 activation divisor 则单独绑定，见第 8 节。
+一个已编码对象包含其 codec/layout 要求的全部 planes 和对象级标量。现有逐行 FP8 的 row scales 也在对象内。
+Op 所需的独立指针从这个对象的既定布局取得。
 
 ### 5.2 Resource 对象
 
@@ -318,14 +317,13 @@ group size、scale 类型和解码规则直接由该 codec 定义。
 | q5_g64_fp16 | Signed 5-bit codes，G64，FP16 multiplier |
 | q6_g64_fp16 | Signed 6-bit codes，G64，FP16 multiplier |
 | q8_g32_fp16 | Codes `[-127,127]`，G32，FP16 multiplier |
-| nvfp4 | E2M1 codes、G16 E4M3FN block scale、FP32 weight divisor |
 | fp8_e4m3fn_row_bf16 | E4M3FN codes，每行一个 BF16 multiplier |
 | fp8_e4m3fn_block128x128_bf16 | E4M3FN codes，每 128×128 块一个 BF16 multiplier |
 | nf4_g16_e4m3fn | 固定 NF4 codebook，G16 E4M3FN block scale，FP32 weight divisor |
 
 量化名字末尾的 FP16/BF16 表示 scale 类型。激活计算许可在 uses 中表达。
 Code 范围、特殊浮点值、舍入与精确重建按[数值合同](tensor-formats.md)解释。
-尤其是 NVFP4 的重建采用 `code_value * block_scale / weight_divisor`，逐行 FP8 采用其既定的
+尤其是逐行 FP8 采用其既定的
 `code_value * row_scale` 重建规则。
 
 同一数值含义更换 encoder 或校准过程时，format 名保持相同，生成方法记录在 recipe/provenance。
@@ -336,8 +334,6 @@ Code 范围、特殊浮点值、舍入与精确重建按[数值合同](tensor-fo
 |---|---|---:|
 | contiguous_le_v1 | bf16/fp32/int32，rank 0..16 | 256 |
 | row_split_k128_v1 | q4_g64_fp16、q5_g64_fp16、q6_g64_fp16、q8_g32_fp16，正 rank-2 `[N,K]` | 256 |
-| block_scale_k16_m128x4_v1 | nvfp4，`N%128=0`、`K%64=0` | 256 |
-| batched_block_scale_k16_m128x4_v1 | nvfp4，rank-3 `[E,N,K]`，`N%128=0`、`K%64=0` | 256 |
 | block_scale_m128_k128_v1 | fp8_e4m3fn_block128x128_bf16，`[N,K]` 或 `[E,N,K]`，N/K 为 128 的倍数 | 256 |
 | row_scale_v1 | fp8_e4m3fn_row_bf16，正 rank-2 `[N,K]` | 256 |
 | row_paged_g16_4k_v1 | nf4_g16_e4m3fn，正 rank-2 `[N,K]`、`K%16=0`、encoded row≤4096 B | 4096 |
@@ -406,14 +402,11 @@ C-order 表示最后一维变化最快。对 shape `[N,K]`，元素坐标 `(n,k)
 Binder 检查逻辑覆盖和对应关系，并保留每个 Part 的 parent、原始 shape、format/layout、
 范围和 owner。一个逻辑参数可以由多个表示组成；一个原生 Op 也可以消费多个逻辑参数。
 
-例如 Q/K 与 gate/V 分别来自 q4、q5 parent 时，参数准备可以进入已实现的双权重入口；四者
-来自同一个 nvfp4 parent 时，可以进入对应单权重入口。代码根据真实 grouping、范围和几何
+例如 Q/K 与 gate/V 分别来自 q4、q5 parent 时，参数准备可以进入已实现的双权重入口。代码根据真实 grouping、范围和几何
 组织这些调用。
 
 Zero-copy view 由实际 layout 与 consumer 的寻址能力决定。RowSplit 的一段逻辑行涉及 base、
-可选 high-bit 和 scale 等多个 plane 区间；NVFP4 的 view 还保留原 parent 的 scale swizzle 与
-所属矩阵的 weight divisor。Bank 中各矩阵的 divisor 独立；一个 native NVFP4 矩阵 view
-不能跨越 divisor 域。Materializer 上传 parent 的原始编码，Op 准备其真实可消费的 view。
+可选 high-bit 和 scale 等多个 plane 区间。Materializer 上传 parent 的原始编码，Op 准备其真实可消费的 view。
 需要改变 packing 或重新组织编码的工作由 converter 完成。
 
 文件分片只影响 parent 字节的获取。即使一个 parent 跨多个文件，以上逻辑引用和 Op 参数关系
@@ -438,30 +431,16 @@ Zero-copy view 由实际 layout 与 consumer 的寻址能力决定。RowSplit �
 |---|---|
 | A16Only | A16 |
 | AllowA8 | A16、A8 |
-| AllowA4 | A16、A8、A4 |
 
 Writer 为需要许可的 projection 使用位置写出明确结果。某个 encoder 的默认规则属于 recipe，
 进入 uses 后已经展开。共享一次激活量化时采用相关用途许可的交集，并满足辅助输入关系。
 
-```json
-{
-  "parameter": "text/layers/3/attention/query",
-  "input": "text/layers/3/mixer_input",
-  "activation_policy": "AllowA4",
-  "auxiliaries": {
-    "activation_input_divisor": {"object": "a.attn.query.input_divisor"}
-  }
-}
-```
-
-该例的辅助对象为 `format=fp32, layout=contiguous_le_v1, shape=[]`，其数值按 consumer 要求
-检查为正且有限。也可用 Part 引用一个 FP32 向量中的单个元素，保留相同 scalar 含义。
 Auxiliary Binding 的期望 shape、类型和作用由对应使用合同定义。
 
 DFlash/DFlash2 的 query K/V 使用 `attention/key`、`attention/value`，context K/V 使用
 `attention/context_key`、`attention/context_value`，各自建立 Binding 和 Use。
 两组绑定可以共享 parent 区域，也可以独立选择表示，见第 12.5 节。
-Weight divisor 和 block scales 属于权重 codec，activation divisor 属于该使用位置。
+Weight divisor 和 block scales 属于权重 codec。
 
 ## 9. 资源与可选输出表示
 
@@ -630,7 +609,7 @@ shape 和 format/layout 保持完整。两份例子的变化分别落在对象�
 
 取实际 27B 的 H=5120、Q=6144、K=1024，以下 range 均为逻辑元素：
 
-| 逻辑参数 | 双 parent：Q4 A + Q5 B | 单 parent：FP8 或 NVFP4 P |
+| 逻辑参数 | 双 parent：Q4 A + Q5 B | 单 parent：FP8 P |
 |---|---|---|
 | Query | A `[0,31457280)` | P `[0,31457280)` |
 | Key | A `[31457280,36700160)` | P `[31457280,36700160)` |
@@ -644,10 +623,8 @@ A/B 的 shape 均为 `[7168,5120]`，P 为 `[14336,5120]`。其完整编码大�
 | A | q4_g64_fp16 / row_split_k128_v1 | 19,496,960 |
 | B | q5_g64_fp16 / row_split_k128_v1 | 24,084,480 |
 | P | fp8_e4m3fn_row_bf16 / row_scale_v1 | 73,428,992 |
-| P 的另一种表示 | nvfp4 / block_scale_k16_m128x4_v1 | 41,287,684 |
 
-Binder 得到相同的四个逻辑参数，实际 Op 准备看到一个或两个 parent。NVFP4 的激活辅助值按
-第 8 节关联到对应使用位置。若 P 跨两个文件，它仍提供同一个物理 parent。
+Binder 得到相同的四个逻辑参数，实际 Op 准备看到一个或两个 parent。若 P 跨两个文件，它仍提供同一个物理 parent。
 
 ### 12.4 行块重排、reshape 与共享
 
@@ -720,7 +697,6 @@ query 使用 `w.draft.qkv [6144,5120]` 中的 K 区域，context 使用独立的
 | Part end 超过源对象逻辑元素数 | 引用错误 |
 | Part 总数值长度与所需参数不符 | Binder 报告参数覆盖错误 |
 | 对象使用未实现的 format/layout | 请求解释该对象的编码时失败 |
-| Scalar activation divisor 引用非 scalar / 非预期数值表示 | 对应用途绑定错误 |
 | 所需 parent 横跨的第二个续卷缺失 | 范围读取失败 |
 | 拿到另一个 artifact 的同编号续卷 | artifact_id 不匹配 |
 | 启用文件未提供的 Vision/spec | 所选组件缺失 |

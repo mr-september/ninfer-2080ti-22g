@@ -17,7 +17,7 @@ CUDA 13.4 is the validated development toolkit. Product commands and prerequisit
 `turing` composes its sources from the `rtx5090` trees: `NINFER_SOURCE_TARGET` is `rtx5090` and keys the
 source directories, while `NINFER_TARGET` stays `turing` for behavior that must differ (no CPU expert
 executor, `NINFER_EXPERT_OFFLOAD` 0). `src/ops/CMakeLists.txt` filters the Blackwell-only Op sources
-(FP8/NVFP4/K8V4 weights and KV, TMA, block-scaled MoE, QSA sparse attention, Kimi delta attention,
+(FP8 weights and KV, TMA, block-scaled MoE, QSA sparse attention, Kimi delta attention,
 hyper-connection mix) out of those manifests, and `src/ops/unsupported/turing_unsupported.cpp` links
 throwing stubs for the declarations that remain, so these Ops report unsupported at their capacity/execution
 entries. `NINFER_SM75` is defined for device code that differs on sm_75.

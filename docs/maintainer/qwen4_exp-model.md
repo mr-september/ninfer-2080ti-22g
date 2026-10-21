@@ -118,15 +118,14 @@ LayerNorm 和 `gelu_pytorch_tanh` MLP；merger 在 2×2 合并前做 LayerNorm�
 
 ## 3. Flash Next 量化 recipe
 
+转换器中的 `qwen3_8_flash_next` recipe 已随 NVFP4 一并移除（它导入 NVIDIA 的 NVFP4 expert bank）；Qwen4 系列需要新的 recipe。本节记录该 recipe 实现的量化设计。
+
 `qwen3_8_flash_next` 使用 BF16 主 checkpoint 提供 config、资源、Main 非 routed
-权重、Vision 和 PLE；`--source nvidia=PATH` 提供完整
-`nvidia/Qwen3.8-Flash-Next-NVFP4` checkpoint，导入 Main routed experts 和 MTP 独有参数。
-来源和转换方法写入 `.conversion.json`。完整选择由
-[official recipe](../../tools/convert/official_recipes.py)维护。
+权重、Vision 和 PLE。
+来源和转换方法写入 `.conversion.json`。
 
 | 部分 | 持久表示 | 计算许可或消费 |
 |---|---|---|
-| Main routed gate/up/down | NVIDIA NVFP4，G16 E4M3FN scale，每 expert 矩阵一个 FP32 divisor | `AllowA4` |
 | Main GDN QKVZ/output、QSA Q/gate/output | BF16 源转 Q8 G32/FP16 scale | `A16Only` |
 | HC、QSA K/V/indexer、PLE 投影、router/shared FFN | 原 BF16 words | `A16Only` |
 | GDN AB、convolution、norm，其他 norm/bias | 原 BF16 words | 各 Op 数学 |
@@ -137,7 +136,7 @@ LayerNorm 和 `gelu_pytorch_tanh` MLP；merger 在 2×2 合并前做 LayerNorm�
 | MTP 其他独有参数、全部 Vision | 原 BF16 words | 投影 `A16Only` |
 | PLE hash controls | 原始 35 个 INT64 | 无损 Resource |
 
-GPU MoE 已有 NVFP4 A4、block-FP8 A8/G128 及小批量 A16 路径；
+GPU MoE 已有 block-FP8 A8/G128 及小批量 A16 路径；
 各语义入口的私有 shape policy 选择实际计算。CPU Main experts 使用 BF16 输入和
 FP32 中间计算，不量化激活。许可允许高精度路径，并不要求每次调用都量化为最低位宽。
 
@@ -159,25 +158,6 @@ Offset 保留源 words，`1+w` 不预先舍入为 BF16 gain；HC 的 `/4` 不折
 参数 dtype 与归约精度是不同的约定。
 
 ### 3.2 NVIDIA 编码导入
-
-Main 源的 `weight_scale_2`、`input_scale` 是正有限 FP32 multipliers。
-[ModelOpt adapter](../../tools/convert/sources/modelopt_nvfp4.py)使用：
-
-```text
-source weight = E2M1(code) * E4M3FN(scale) * weight_scale_2
-d_w = RN_FP32(1 / weight_scale_2)
-d_a = RN_FP32(1 / input_scale)
-stored weight = E2M1(code) * E4M3FN(scale) / d_w
-```
-
-Codes/scales words 保留后按目标 layout 重排；FP32 reciprocal 舍入是元数据变换，
-不承诺所有解码值与源逐位相同。Recipe 要求同 expert 的 gate/up 两个 multiplier
-words 相等，并要求一层所有 experts 的 GU 输入 multiplier 相等、down 输入 multiplier
-相等。每个 expert 仍各自持有 weight divisor。
-
-Activation divisors 存为 FP32 `[48,2]`，元素 `2*l` 与 `2*l+1` 分别供 GU/down Use
-引用；它们与 weight divisor 分开解释。A4 输入按 G16 量化，product 从 FP32 直接编码，
-不增加 BF16 中间 seam。
 
 MTP `fp8_e4m3fn_block128x128_bf16` 重建为 E4M3FN code × BF16 block scale。
 Gate/up 各自保留原 scale，640 行边界与 128 行块对齐。A8 按每 token 的 K128 分组
@@ -205,8 +185,8 @@ Native Tensor 第 0 维连续；`M=T*B`，`column=t+T*b`。
 | PLE KV | 1 / 0 | `[12800,2560]` | BF16 | 四流 key 10240、共享 value 2560 |
 | MoE input | 48 / 1 | `[1793,2560]` | BF16 | router 512、shared score 1、shared gate 640、shared up 640 |
 | Shared down | 48 / 1 | `[2560,640]` | BF16 | 原行序 |
-| Routed GU bank | 48 / 1 | `[512,1280,2560]` | Main NVFP4 / MTP block-FP8 | expert-major，每 expert 内 gate 640、up 640 |
-| Routed down bank | 48 / 1 | `[512,2560,640]` | Main NVFP4 / MTP block-FP8 | expert-major |
+| Routed GU bank | 48 / 1 | `[512,1280,2560]` | MTP block-FP8 | expert-major，每 expert 内 gate 640、up 640 |
+| Routed down bank | 48 / 1 | `[512,2560,640]` | MTP block-FP8 | expert-major |
 | MTP fc_embedding / fc_hidden | 0 / 各 1 | `[2560,2560]` | BF16 | 独立权重；分别处理 M / 4M 列 |
 | LM head | 一份，MTP 共享 | `[248320,2560]` | BF16 | vocabulary 顺序 |
 
@@ -248,9 +228,6 @@ Norm、bias 与 convolution 不作为 Linear 权重重新量化。
 `[512,640,2560]`，down 为 `[512,2560,640]`。Binding 按 expert ID 引用 GU 的两半
 和 down 全矩阵。Binding range 按 C-order 逻辑元素计数，不包含 scale/divisor bytes。
 
-Main 使用 `batched_block_scale_k16_m128x4_v1`，bank 内依次存所有 codes、
-swizzled scales、FP32 divisors `[512]`。GU/down payload 分别为
-943720448 / 471861248 B。Scale swizzle 使用 expert 内的局部行号。
 MTP 使用 `block_scale_m128_k128_v1`，codes 后为 BF16 scales
 `[512,10,20]` / `[512,20,5]`，payload 分别为 1677926400 / 838963200 B。
 
@@ -267,7 +244,7 @@ PLE 的 128 个 NF4 parents 保留原 shard 边界和各自 divisor。
 `row_paged_g16_4k_v1` 每行 90 B：80 B packed codes、10 B scales。
 每个 4 KiB 数据页存 45 行，末页 37 行；每 shard payload 为 227557380 B。
 全局行 g 属于 `shard=g/2500012`、`row=g%2500012`，hash head 不对应固定 shard。
-具体 padding、divisor 地址和编码见[布局合同](storage-layouts.md#6-row_paged_g16_4k_v1)。
+具体 padding、divisor 地址和编码见[布局合同](storage-layouts.md#5-row_paged_g16_4k_v1)。
 
 `text.resources.ple_hash_controls` 是 280 B 的 `raw_bytes_v1` Resource，顺序为：
 三个 layer multipliers、十六个 head vocab sizes、十六个 head offsets，
@@ -332,6 +309,5 @@ Model 持有不可变权重与 PLE 文件/LUT，Program 持有可变缓存和执
 [Transformers 模型](https://github.com/huggingface/transformers/blob/8073e6dcaea9aa4b42acf2d92ec72148786bbaeb/src/transformers/models/qwen4_exp/modeling_qwen4_exp.py)、
 [配置](https://github.com/huggingface/transformers/blob/8073e6dcaea9aa4b42acf2d92ec72148786bbaeb/src/transformers/models/qwen4_exp/configuration_qwen4_exp.py)及
 [vLLM MTP](https://github.com/vllm-project/vllm/blob/6fddc9b21e763bfc947cc01d3ce815179aac1dc6/vllm/models/qwen4_exp/nvidia/mtp.py)。
-[NVIDIA 来源说明](https://huggingface.co/nvidia/Qwen3.8-Flash-Next-NVFP4/blob/fc694b54fb0174e0913e6adf86691ef85a4ead47/README.md)
-记录量化来源。NInfer 的正式数值边界由生产 Op 合同维护；上游 TP、私有 casts 和
+NInfer 的正式数值边界由生产 Op 合同维护；上游 TP、私有 casts 和
 kernel packing 不自动成为本项目的数学或持久合同。

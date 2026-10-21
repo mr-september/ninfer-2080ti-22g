@@ -133,12 +133,10 @@ For row-split Q4/Q5/Q6/Q8, let `K_pad = align_up(K,128)` and
 | Q5 G64 FP16 scales | 64 | `groups * (32 low + 8 high + 2 scale)` |
 | Q6 G64 FP16 scales | 64 | `groups * (32 low + 16 high + 2 scale)` |
 | Q8 G32 FP16 scales | 32 | `groups * (32 code + 2 scale)` |
-| NVFP4 | 16 | `N*K/16 * (8 code + 1 E4M3 scale)` |
 | BF16 | — | `2*N*K` |
 | FP8 E4M3 row BF16 scales | one row | `N*(K+2)` |
 
-The current NVFP4 fixture uses its admitted aligned N/K directly; its scalar divisor is metadata,
-outside the code/scale traffic model. For elapsed time `seconds` and `median_us`:
+For elapsed time `seconds` and `median_us`:
 
 ```text
 model_bytes       = weight_bytes + 2*K*T + 2*N*T
@@ -202,8 +200,7 @@ without repeating their timing. No-argument invocation prints usage instead of s
 Points share one weight and maximum-T activation/output allocation per `(qtype,policy,N,K)` group.
 Suites use the exact-point execution path and do not reproduce production admission or dispatch.
 Fused projections and sparse MoE remain in their owning Op benchmarks even when their parent
-weights are present in an artifact. NVFP4 A16/A4 development points remain explicit numeric
-geometries: `[14336,5120]`, `[16384,5120]`, `[34816,5120]`, `[5120,6144]`, `[5120,17408]`.
+weights are present in an artifact.
 
 A newly supported production shape is immediately measurable through numeric N/K/T arguments;
 add it to a suite only for a representative workload role. Entries contain semantic geometry,

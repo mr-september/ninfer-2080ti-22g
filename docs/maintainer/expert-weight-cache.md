@@ -5,7 +5,7 @@
 执行与生命周期由 [Engine 架构](engine-architecture.md)拥有。
 
 Engine 支持常驻 GPU，以及受显存预算约束的 MoE 混合执行。CPU `routed_swiglu` Op
-支持 Q4 GU + Q5/Q6 down 及 NVFP4 GU/down，直接消费 Host bank 并产生 FP32 分项。
+支持 Q4 GU + Q5/Q6 down，直接消费 Host bank 并产生 FP32 分项。
 GPU 使用同一组 logical expert ID，既可以计算固定子集，也可以消费补齐后的整层 bank。
 Qwen3.5 MoE 与 Qwen4Exp Main 均使用这套公共调度，支持 eager 和分段 CUDA Graph。
 
@@ -21,8 +21,6 @@ Qwen3.5 MoE 与 Qwen4Exp Main 均使用这套公共调度，支持 eager 和分�
 例如 GU bank 中所有 gate 构成的视图，矩阵行数是 I、步长是 2I。
 
 - Groupwise INT 使用已有 rank-2 parent `[E*N,K]`，E/N 由模型 Binding 明确给出。
-- NVFP4 使用 rank-3 `[E,N,K]`，codes、swizzled G16 scales、FP32 divisors 分别成 plane。
-  切片保持 128 行边界，每个本地矩阵位于同一 divisor 域。
 - Block-FP8 使用 rank-2/3 codes 和 BF16 `[E,N/128,K/128]` scales；不含 matrix divisor。
 - Paged NF4 由其按行读取合同管理，不表示成 affine expert bank。
 
@@ -80,11 +78,6 @@ CPU 来源的每个 entry 是完整 expert 的 GU/down 数据块，只包含 cod
 所有 bank 共用一个 byte pool；Program 显式规划固定区和可复用区域，不把小 expert 填充成最大 expert。
 entry 不是序列化 parent，不追加虚假的 divisor trailer。
 
-NVFP4 的 matrix divisor 是静态元数据：CPU 来源在启动时镜像到 GPU，常驻 GPU 来源
-直接引用原 divisor plane。Host 元数据与 payload 的 divisor 必须表示同一组值，
-由来源建立者保证；artifact materializer 从原 payload 提取并验证。
-运行期上传只搬 codes/high/scales，divisor 始终按 logical expert ID 寻址。
-
 `device_weight_bank` / `device_expert_bank` 从原生 CUDA bank 建立借用视图，不分配或重排权重。
 `ExpertBankDeviceView` 同时记录逻辑 expert 数和 CUDA device。
 `ExpertMatrixDeviceView` 的寻址合同：
@@ -106,9 +99,7 @@ acquire 成功所保护的 keys，不能把表里其他条目的内容当作可�
 |---|---:|---:|
 | 35B Q4 GU + Q5 down，256 experts | 1,802,240 B | 461,373,440 B |
 | 35B Q4 GU + Q6 down，256 experts | 1,933,312 B | 494,927,872 B |
-| Flash Next NVFP4 GU + down，512 experts | 2,764,800 B | 1,415,577,600 B |
 
-Flash Next Main 48 个 bank 的两组 divisor 共 196,608 B；offset 表同为 196,608 B。
 其 MTP 原始 block-FP8 expert payload 为 2,516,889,600 B，按固定 GPU 来源计入容量。
 
 ## 准备、发布和消费
@@ -179,14 +170,13 @@ Host 的 release 不代表 GPU 已完成读取。CUDA 提交失败后停止接�
   它与独立 Op 共用 kernel 机制，保有自己的格式/shape 分派和调优策略；全 GPU Main/MTP
   通过这一入口执行。
 
-CUDA 数学支持 35B 的整数 expert profiles，以及 Flash Next 的 NVFP4、block-FP8 profiles，
+CUDA 数学支持 35B 的整数 expert profiles，以及 Flash Next 的 block-FP8 profiles，
 通过同一组 [MoE 语义入口](../../include/ninfer/ops/moe.h)消费实际表示与 activation Use。
-CPU 支持 Q4+Q5、Q4+Q6 和 Main NVFP4，输入为 BF16，
+CPU 支持 Q4+Q5 和 Q4+Q6，输入为 BF16，
 SiLU 与 down 输入保持 FP32，不量化激活；CPU block-FP8 尚未实现。
 `CudaSwiGLUExperts` 借用 affine 或 indexed GPU bank；`CpuSwiGLUExperts` 借用完整原生 Host bank，
-直接按各 plane 的偏移和步长消费，NVFP4 使用每个 expert 自己的 matrix divisor。
-CPU 权重接口不携带 activation divisor。GPU activation divisor 属于 Use，matrix divisor 属于权重表示，二者不互相替代。
-融合 GU/down 分别取相关 Use 的 activation policy 交集；NVFP4 A4 需要共同的正值 activation divisor。
+直接按各 plane 的偏移和步长消费。
+融合 GU/down 分别取相关 Use 的 activation policy 交集。
 
 Op 不分配长期资源或上传权重；CUDA 分支消费 Device 路由，CPU 分支同步消费 Host 路由。
 Program 提供 scratch 和执行 view，负责发布、acquire/release 及 bridge 完成依赖。

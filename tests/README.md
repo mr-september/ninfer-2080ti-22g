@@ -109,12 +109,11 @@ Run all Op qualification groups or select a family:
 ctest --test-dir build/rtx5090-dev -L ops --output-on-failure
 ctest --test-dir build/rtx5090-dev -R '^ninfer_qsa_.*_test$' --output-on-failure
 ./build/rtx5090-dev/tests/ninfer_normalization_test --suite rmsnorm --list
-./build/rtx5090-dev/tests/ninfer_qsa_sparse_gqa_test --format nvfp4 --execution graph
 ./build/rtx5090-dev/tests/ninfer_linear_projection_test --format q8 --shape 6144 5120
 ```
 
 Every semantic Op executable under `ops/` accepts `--help`, `--list`, `--case ID`,
-`--suite NAME`, `--format FORMAT`, `--policy a16|a8|a4` and `--execution eager|graph`.
+`--suite NAME`, `--format FORMAT`, `--policy a16|a8` and `--execution eager|graph`.
 Filters intersect declared metadata; an absent format/policy does not match that filter.
 The first component of an ID names its suite. A case containing both eager and captured calls is
 classified as Graph. `--case` takes an exact ID from `--list`; quote IDs containing spaces.
@@ -132,7 +131,7 @@ Inputs, seeds and sample coordinates are independent of selection order. Grouped
 immutable fixtures, while each stateful case resets its own initial state. Graph cases include
 all declared input/metadata updates. ReplaySSM record/fold compares the specified snapshot
 or recurrent execution bit for bit; those computations have separate mathematical tests.
-Linear and fused projection suites select their A4 criterion for `AllowA4` and A8 criterion for
+Linear and fused projection suites select their A8 criterion for
 `AllowA8`, including when an implementation chooses higher precision for a small input.
 
 GDN recurrence uses one output criterion and one final-state criterion across running and
@@ -205,16 +204,15 @@ The causal-scoring integration test uses the same artifact variable and checks a
 score tile, overlapping target suffixes, and repeated-window State/KV isolation:
 
 ```bash
-NINFER_TEST_ARTIFACT=$PWD/out/qwen3_8_27b_nvfp4.ninfer \
+NINFER_TEST_ARTIFACT=$PWD/out/qwen3_8_27b.ninfer \
   ctest --test-dir build/rtx5090-dev -R ninfer_qwen3_5_score_real_test --output-on-failure
 ```
 
 `ninfer_moe_test` qualifies the integer routing, complete MoE and routed SwiGLU profiles.
-`ninfer_moe_block_scaled_test` qualifies NVFP4 A4 and block-FP8 A8/G128 experts with BF16
+`ninfer_moe_block_scaled_test` qualifies block-FP8 A8/G128 experts with BF16
 control/shared and small-token A16 routes. It uses independent FP64 formulas and encoded-weight
 decoders, covering per-expert divisors, K128 scales, zero groups, affine/indexed banks, masks,
-changed Graph contents, private route boundaries and workspace guards. `--format nvfp4` or
-`--format fp8` selects one format; CTest runs both.
+changed Graph contents, private route boundaries and workspace guards.
 `ninfer_elementwise_test --suite sum_contributions` covers FP32 partial summation with optional
 BF16 residual.
 Their independent FP64 oracles start from represented inputs and decoded logical weights. The MoE
@@ -230,9 +228,7 @@ public entry and oracle with
 restricted test-only dispatch. All three run with CUDA devices hidden. They cover mask/None
 semantics, arbitrary token tails through T=72, affine and strided parent banks, workspace and alias
 checks, signed code domains, scale extremes and tiny-BF16 cancellation around the BF16-dot guard.
-`ninfer_moe_cpu_nvfp4_test` and its `_avx2`/`_fma` variants qualify native NVFP4 banks against
-independent FP64 mathematics, including scale swizzles, per-expert divisors, masked metadata,
-column and chunk tails, full-precision products and tiny inputs. These CPU tests do not load
+These CPU tests do not load
 model files or use GPU memory.
 `ninfer_moe_mixed_test` qualifies complementary CPU/GPU subsets plus GPU shared/residual composition.
 
@@ -246,7 +242,7 @@ transitions through the real cache schedule. The compact Graph calibration stora
 All/None/partial contributions against the same oracle while reusing one bank window.
 
 ```bash
-ctest --test-dir build/rtx5090-dev -R '^ninfer_moe(_mixed|_block_scaled|_cpu_(groupwise_int|nvfp4)(_avx2|_fma)?)?_test$' --output-on-failure
+ctest --test-dir build/rtx5090-dev -R '^ninfer_moe(_mixed|_block_scaled|_cpu_groupwise_int(_avx2|_fma)?)?_test$' --output-on-failure
 ctest --test-dir build/rtx5090-dev -R '^ninfer_moe_execution_test$' --output-on-failure
 ```
 
@@ -280,23 +276,23 @@ NINFER_TEST_SPECULATIVE=mtp NINFER_TEST_BATCH=2 \
   ./build/rtx5090-dev/tests/ninfer_qwen3_5_prefix_real_test
 ```
 
-KV choices are `bf16`, `int8`, `fp8`, `nvfp4`, and `k8v4`; backend choices are `none`, `mtp`,
+KV choices are `bf16`, `int8`, and `fp8`; backend choices are `none`, `mtp`,
 `dflash`, and `dflash2`, requiring an artifact with the selected component. Batch defaults to 2;
 `NINFER_TEST_DRAFT_TOKENS` overrides the default MTP3 or DFlash7 block. The DFlash2-specific
-integration executable also accepts all five KV names as its fifth positional argument and rejects
+integration executable also accepts all three KV names as its fifth positional argument and rejects
 unknown names.
 
 Continuation and pressure recovery have dedicated entries:
 
 ```bash
-NINFER_TEST_ARTIFACT=$PWD/out/qwen3_8_27b_nvfp4.ninfer \
+NINFER_TEST_ARTIFACT=$PWD/out/qwen3_8_27b.ninfer \
   ctest --test-dir build/rtx5090-dev -R ninfer_qwen3_5_agent_continuation_real_test --output-on-failure
 
-NINFER_TEST_ARTIFACT=$PWD/out/qwen3_8_27b_nvfp4.ninfer \
+NINFER_TEST_ARTIFACT=$PWD/out/qwen3_8_27b.ninfer \
 NINFER_TEST_BACKEND=dflash2 \
   ctest --test-dir build/rtx5090-dev -R ninfer_qwen3_5_preemption_real_test --output-on-failure
 
-NINFER_TEST_ARTIFACT=$PWD/out/qwen3_8_27b_nvfp4.ninfer \
+NINFER_TEST_ARTIFACT=$PWD/out/qwen3_8_27b.ninfer \
   ./build/rtx5090-dev/tests/ninfer_qwen3_5_native_transactions_test dflash2
 ```
 
@@ -440,7 +436,7 @@ Program storage and the production prefill route; select the draft component sto
 
 ```bash
 cmake --build build/rtx5090-dev -j --target ninfer_qwen3_5_dflash_prefill_real_test
-NINFER_TEST_ARTIFACT=out/qwen3_8_27b_nvfp4.ninfer \
+NINFER_TEST_ARTIFACT=out/qwen3_8_27b.ninfer \
   build/rtx5090-dev/tests/ninfer_qwen3_5_dflash_prefill_real_test dflash2
 NINFER_TEST_ARTIFACT=out/qwen3_6_35b_a3b.ninfer \
   build/rtx5090-dev/tests/ninfer_qwen3_5_dflash_prefill_real_test dflash
@@ -458,19 +454,19 @@ NINFER_TEST_ARTIFACT=out/qwen3_8_27b.ninfer \
   build/rtx5090-dev/tests/ninfer_qwen3_5_dflash2_real_test 15 1 1 8
 NINFER_TEST_ARTIFACT=out/qwen3_8_27b.ninfer \
   build/rtx5090-dev/tests/ninfer_qwen3_5_dflash2_real_test 7 1 0 2 bf16 1 0
-NINFER_TEST_ARTIFACT=out/qwen3_8_27b_nvfp4.ninfer \
+NINFER_TEST_ARTIFACT=out/qwen3_8_27b.ninfer \
   build/rtx5090-dev/tests/ninfer_qwen3_5_dflash2_real_test 2 0 0 2 int8
 ```
 
-Arguments are K, Graph enabled, optimized head enabled, maximum B, target KV (`bf16`, `int8`,
-`fp8`, `nvfp4`, or `k8v4`), Vision enabled, and extra Device StateImage slots. Defaults are
+Arguments are K, Graph enabled, optimized head enabled, maximum B, target KV (`bf16`, `int8`, or
+`fp8`), Vision enabled, and extra Device StateImage slots. Defaults are
 `15 1 1 8 bf16 0 3`. Run GPU integration tests serially. The individual Op suites remain the
 numerical/state-transition oracle; the fixed Engine fixture does not define bit parity across
 arbitrary floating-point routes.
 
 ## Expert sources and replicas
 
-`ninfer_weight_bank_test` checks local matrix/plane addressing for INT, NVFP4 and block-FP8.
+`ninfer_weight_bank_test` checks local matrix/plane addressing for INT and block-FP8.
 `ninfer_expert_cache_test` checks encoded bytes, variable entry sizes, bounded upload batches, required-set
 changes, immutable fixed regions, window reconstruction, interrupted restoration, partial uploads, delayed consumers, Graph replay, independent prefetch readiness and failed
 submission cleanup. The byte oracle is the immutable source representation, not another cache.

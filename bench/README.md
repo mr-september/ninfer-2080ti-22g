@@ -89,10 +89,9 @@ not measured DRAM traffic or executed Tensor Core instructions.
 | Dense FP8 E4M3 / FP16 accumulation, TFLOP/s | 838 |
 | Dense FP8 E4M3 / FP32 accumulation, TFLOP/s | 419 |
 | Dense MXFP8 E4M3 / FP32 accumulation, TFLOP/s | 838 |
-| Dense NVFP4 / FP32 accumulation, TFLOP/s | 1676 |
 
 The 5090 sustained-read reference comes from the [memory probe](../tools/hbm_bandwidth_probe.cu)
-using a 4 GiB `uint4` read workload. The plain BF16/FP8 and NVFP4 peaks follow the dense rates in
+using a 4 GiB `uint4` read workload. The plain BF16/FP8 peaks follow the dense rates in
 [NVIDIA's RTX Blackwell whitepaper, Appendix A](https://images.nvidia.com/aem-dam/Solutions/geforce/blackwell/nvidia-rtx-blackwell-gpu-architecture.pdf).
 The MXFP8 reference describes the full-rate block-scaled FP32 accumulation path. Unestablished
 references remain absent: derived percentages print `-` in console output and an empty CSV field.
@@ -140,7 +139,7 @@ ninfer_bench --weights <artifact.ninfer>
           [--grammar-file <path> | --json-schema-file <path> | --json-object | --regex <pattern> | --choice <text> ...]
           [--mixed-constraints]
           [--max-ctx <tokens>] [--prefill-chunk <tokens>]
-          [--kv-dtype <bf16|int8|fp8|nvfp4|k8v4>]
+          [--kv-dtype <bf16|int8|fp8>]
           [--spec <mtp|dflash|dflash2> --draft-tokens <n>] [--lm-head-draft]
           [--device <id>] [--no-cuda-graph] [--profile-measured]
           [-o, --output <table|json|csv>] [--output-file <path>]
@@ -166,14 +165,6 @@ enabled by default.
 and `-r 1`, synchronizes after warmup, and brackets only the measured repetition with
 `cudaProfilerStart/Stop`. Use it with an Nsight Systems `cudaProfilerApi` capture range so artifact
 load, graph construction, and warmup do not enter topology counts.
-
-For a DFlash2 companion artifact:
-
-```bash
-./build/rtx5090-dev/bench/ninfer_bench --weights out/qwen3_8_27b_nvfp4.ninfer \
-  -pg '2048,128' --spec dflash2 --draft-tokens 7 --lm-head-draft \
-  --max-ctx 4096 --kv-dtype bf16 --warmup 1 -r 3
-```
 
 `--concurrency` submits that many prepared requests per repetition. `--grammar-file`,
 `--json-schema-file`, `--json-object`, `--regex` and repeated `--choice` select mutually exclusive output constraints and enable
@@ -269,11 +260,11 @@ and is not a runtime input.
 ## Linear Op benchmark
 
 `ninfer_linear_bench` measures only the public pure `linear()` contract. It supports Q4, Q5, Q6,
-Q8, registered BF16 weights, the registered NVFP4 problems, and the registered FP8 problems.
+Q8, registered BF16 weights, and the registered FP8 problems.
 Select an exact extent with `--t`, a regular range with `--sweep`, or explicit extents with
 `--tokens T1,T2,...`; these options are mutually exclusive.
-Existing formats use `--policy a16`; NVFP4 additionally supports `--policy a4`, and
-FP8 supports `--policy a8`. Each permission lets the production resolver select the qualified
+Existing formats use `--policy a16`; FP8 supports `--policy a8`.
+Each permission lets the production resolver select the qualified
 route for the exact geometry and T. LinearAdd, LinearSwiGLU,
 LinearPair, Attention/GDN projections, and sparse MoE remain separate semantic Ops and are not
 benchmark modes here.
@@ -292,8 +283,6 @@ Build the benchmark and measure one exact production point:
 cmake --build build/rtx5090-dev --parallel --target ninfer_linear_bench
 ./build/rtx5090-dev/bench/ninfer_linear_bench \
   --qtype q4 --policy a16 --n 4096 --k 5120 --t 8
-./build/rtx5090-dev/bench/ninfer_linear_bench \
-  --qtype nvfp4 --policy a4 --n 14336 --k 5120 --t 1024
 ./build/rtx5090-dev/bench/ninfer_linear_bench \
   --qtype fp8 --policy a8 --n 14336 --k 5120 --t 1
 ./build/rtx5090-dev/bench/ninfer_linear_bench \
@@ -631,15 +620,15 @@ Common flags are `--execution graph|eager|both`, `--cache cold|warm|both`, `--wa
 inclusive interval. Capacity and actual workspace high-water are reported separately.
 
 `ninfer_gdn_input_proj_bench` selects `--op snapshot|record`. `--format` and the actual
-`--n`/`--k` identify the stored matrix; `--policy a16|allow-a8|allow-a4` reports the caller's
+`--n`/`--k` identify the stored matrix; `--policy a16|allow-a8` reports the caller's
 activation permission. Supported geometries are Q8 `[12288,2048]` and `[16384,2560]`, and
-Q4/Q5, FP8, or NVFP4 `[16384,5120]`. Q4/Q5 uses the two stored parents `[4096,5120]` and
+Q4/Q5 or FP8 `[16384,5120]`. Q4/Q5 uses the two stored parents `[4096,5120]` and
 `[12288,5120]`. Convolution uses physical T and B, with optional device
 valid-prefix extents supplied by `--valid-columns`.
 
 ```bash
 ./build/rtx5090-dev/bench/ninfer_gdn_input_proj_bench \
-  --op snapshot --format nvfp4 --n 16384 --k 5120 --policy allow-a4 --sweep 1:17
+  --op snapshot --format fp8 --n 16384 --k 5120 --policy allow-a8 --sweep 1:17
 ./build/rtx5090-dev/bench/ninfer_gdn_input_proj_bench \
   --op record --format fp8 --n 16384 --k 5120 --policy allow-a8 \
   --tokens 6 --batch 3 --valid-columns 6,3,1 --csv-out .agent-tmp/gdn/record.csv
@@ -752,7 +741,7 @@ counts, or kernel-name filters in these benchmarks.
 
 `ninfer_causal_softmax_attention_bench` measures the two public causal-cache entries:
 append-and-attend and cached-only. It covers the registered D256 H24/KV4 and H16/KV2 geometries
-with BF16, INT8-G64, FP8-E4M3FN-row256, NVFP4-G16, and K8V4 KV storage. Production dispatch
+with BF16, INT8-G64, and FP8-E4M3FN-row256 KV storage. Production dispatch
 receives the caller-visible execution envelope and owns prefill, decode/spec and work-partition
 choices. `all` emits every storage mode as an independent row.
 
@@ -796,7 +785,7 @@ cmake --build build/rtx5090-dev --parallel --target ninfer_causal_softmax_attent
 
 The report exposes separate QK/PV logical FLOPs, their full-public-Op-equivalent TFLOP/s,
 `key_vector_bytes`/`value_vector_bytes`, and `physical_cache_bytes`. Persistent K+V bytes per D256
-vector are 516 for FP8, 288 for NVFP4, and 402 for K8V4 (258-byte K plus 144-byte V).
+vector are 516 for FP8.
 `unique_kv_bytes` counts each visible persistent KV vector once; `unique_kv_gbps` divides it by
 complete Op latency. Payload rates exclude repeated reads and do not measure DRAM bandwidth.
 Logical FLOPs do not model private operand conversion, padding, or additional quantization work;
@@ -805,10 +794,10 @@ the benchmark therefore does not infer Tensor Core utilization from a storage-fo
 Use ordinary benchmark latency `t`, not profiler replay duration, for effective roofline fractions:
 `unique_kv_bytes / (t * peak_bandwidth)` and
 `(qk_flops / peak_qk_ops + pv_flops / peak_pv_ops) / t`, with consistent units and explicitly stated
-hardware peaks. Current INT8 QK uses native INT8, FP8/K8V4 QK uses unit-scale MXFP8
-(838 TFLOP/s at the RTX 5090 reference boost clock), and BF16/NVFP4 QK
-and all PV use 16-bit Tensor Core throughput references. In particular, NVFP4 KV storage does not
-imply native FP4 QK. These useful-work fractions differ from profiler pipeline activity and actual
+hardware peaks. Current INT8 QK uses native INT8, FP8 QK uses unit-scale MXFP8
+(838 TFLOP/s at the RTX 5090 reference boost clock), and BF16 QK
+and all PV use 16-bit Tensor Core throughput references.
+These useful-work fractions differ from profiler pipeline activity and actual
 DRAM traffic; use targeted profiling to explain the remaining gap.
 
 `ninfer_context_softmax_attention_bench` measures the public read-only context-plus-query contract
@@ -871,8 +860,8 @@ instruction utilization require a profiler capture of the complete public call.
 ## KV cache append Op benchmark
 
 `ninfer_kv_cache_append_bench` unifies the two public append contracts without combining them in
-one timed body. `--mode full` calls full D256 KV publication for KV4/KV2 and BF16, INT8-G64,
-FP8-E4M3FN-row256, NVFP4-G16, or K8V4 caches. Its report keeps key/value vector bytes separate for
+one timed body. `--mode full` calls full D256 KV publication for KV4/KV2 and BF16, INT8-G64, or
+FP8-E4M3FN-row256 caches. Its report keeps key/value vector bytes separate for
 asymmetric storage profiles. `--mode prefix` calls device-count prefix publication for BF16
 D128/KV8 paged caches or cyclic caches with `--cyclic-capacity 2048|4096`. `T` is the physical input
 width and `C` is the actual device commit count. `--max-count N` selects the host envelope upper
@@ -965,20 +954,6 @@ queries workspace capacity for the requested aggregate interval.
 cmake --build build/rtx5090-dev --parallel --target ninfer_q4_linear_swiglu_bench
 ./build/rtx5090-dev/bench/ninfer_q4_linear_swiglu_bench \
   --t-sweep 1,2,4,8,16,24,32,40,48 --warmup 10 --repeat 50
-```
-
-## NVFP4 LinearSwiGLU Op benchmark
-
-`ninfer_nvfp4_linear_swiglu_bench` measures the public NVFP4
-`[34816,5120] -> [17408,T]` profile. Each sample measures the complete production-dispatched call,
-including activation quantization and caller-owned workspace when required. The fused epilogue
-consumes FP32 gate/up accumulators and writes only the final BF16 output.
-
-```bash
-cmake --build build/rtx5090-dev --parallel --target ninfer_nvfp4_linear_swiglu_bench
-./build/rtx5090-dev/bench/ninfer_nvfp4_linear_swiglu_bench \
-  --policy a4 --t-sweep 5,48,49,56,64,65,96,97,128,256,1024 \
-  --warmup 10 --repeat 50
 ```
 
 ## FP8 LinearSwiGLU Op benchmark
@@ -1077,7 +1052,7 @@ cmake --build build/rtx5090-dev --parallel --target ninfer_fp8_linear_add_bench
 
 `ninfer_linear_split_multi_output_bench` measures the three/four-output forms of public
 `linear_split()`: Q4/Q5 `[7168+7168,5120]`; Q8 `[9216,2048]`, `[6144,2048]` and
-`[6144,5120]`; and BF16, NVFP4 and FP8 `[14336,5120]`.
+`[6144,5120]`; and BF16 and FP8 `[14336,5120]`.
 Fixture packing and public workspace capacity queries happen
 before timing. Every sample and profiler range contains exactly one public Op call, so production
 owns format-specific dispatch and launch decomposition.
@@ -1099,9 +1074,6 @@ cmake --build build/rtx5090-dev -j --target ninfer_linear_split_multi_output_ben
   --cache cold --warmup 10 --repeat 50 \
   --csv-out profiles/bench/linear_split.csv
 ./build/rtx5090-dev/bench/ninfer_linear_split_multi_output_bench \
-  --format nvfp4 --nvfp4-policy a4 --tokens 1024 \
-  --cache cold --warmup 10 --profile
-./build/rtx5090-dev/bench/ninfer_linear_split_multi_output_bench \
   --format fp8 --fp8-policy a8 --tokens 1,5,32,64,65,96,128 \
   --cache cold --warmup 10 --repeat 50
 ./build/rtx5090-dev/bench/ninfer_linear_split_multi_output_bench \
@@ -1110,7 +1082,7 @@ cmake --build build/rtx5090-dev -j --target ninfer_linear_split_multi_output_ben
 ```
 
 `ninfer_linear_split_two_output_bench` covers Q8 `[12288,2048]` and `[16384,2560]`,
-FP8/NVFP4 `[16384,5120]`, and paired Q4/Q5 `[4096+12288,5120]`. It uses the common
+FP8 `[16384,5120]`, and paired Q4/Q5 `[4096+12288,5120]`. It uses the common
 `op_measurement.cuh` options described above; `--n` is the total logical row count.
 
 ```bash
@@ -1159,7 +1131,7 @@ destinations and restores both source planes outside each timed call. Extraction
   --csv-out .agent-tmp/qsa/qsa_tail.csv
 ```
 
-`--op prepare` measures the complete `qsa_prepare()` call. `--kv-cache bf16|int8|fp8|nvfp4|k8v4`
+`--op prepare` measures the complete `qsa_prepare()` call. `--kv-cache bf16|int8|fp8`
 selects the main-cache profile (default `bf16`). `--tokens` selects T, `--batch` selects B,
 and `--axes 1|3` selects current RoPE coordinates. `--base-positions` and
 `--valid` set Device metadata; cache pages use a nonsequential mapping. `--layout` controls the
@@ -1171,7 +1143,7 @@ words outside every timed call. CSV rows include positions, axes, alias mode, la
   --base-positions 63 --inplace --rounds 3 --cache both \
   --csv-out .agent-tmp/qsa/qsa_prepare_small.csv
 ./build/rtx5090-dev/bench/ninfer_qsa_bench --op prepare --tokens 128,1024,2048,4096 \
-  --kv-cache nvfp4 --axes 3 --rounds 3 --execution both --cache both \
+  --kv-cache fp8 --axes 3 --rounds 3 --execution both --cache both \
   --csv-out .agent-tmp/qsa/qsa_prepare_prefill.csv
 ```
 
@@ -1195,7 +1167,7 @@ and Graph kernel count. The index plane is always BF16, independent of main KV e
 ```
 
 `--op sparse-gqa` measures the complete public attention and sigmoid gate, including any split
-reduction and inverse value-basis transform. `--kv-cache bf16|int8|fp8|nvfp4|k8v4` selects cache
+reduction and inverse value-basis transform. `--kv-cache bf16|int8|fp8` selects cache
 storage; activations remain BF16/FP16. All profiles start from the same represented BF16 K/V
 source values, initialized through public `kv_cache_append` outside timing. `--contexts` and
 `--valid` have the same meaning as Indexer. Its
@@ -1230,7 +1202,7 @@ do not duplicate private launch plans to infer either quantity.
 
 ```bash
 ./build/rtx5090-dev/bench/ninfer_qsa_bench --op sparse-gqa --tokens 1,8,128,1024,2048,4096 \
-  --contexts 262144 --kv-cache nvfp4 --execution graph --cache both \
+  --contexts 262144 --kv-cache fp8 --execution graph --cache both \
   --csv-out .agent-tmp/qsa/qsa_sparse.csv
 ./build/rtx5090-dev/bench/ninfer_qsa_bench --op sparse-gqa --tokens 9 --batch 8 \
   --contexts 64,2048,8192,32768,131072,262144,0,65536 --valid 9,9,9,5,9,9,0,9 \
@@ -1271,7 +1243,7 @@ The complete call uses empty external read-ahead hints; next-projection cache wa
 downstream effect are covered by Engine measurements.
 
 `ninfer_moe_block_scaled_bench` measures H2560/I640/E512/top-10 through the same public
-interfaces. `--format nvfp4|fp8` selects NVFP4 or block-FP8 weights (default: `nvfp4`). `--operation routed|routed-shared|complete|route` selects the semantic scope; outputs
+interfaces. `--format fp8` selects block-FP8 weights. `--operation routed|routed-shared|complete|route` selects the semantic scope; outputs
 are BF16 Write. It uses the graph-body timing and 256 MiB cold-cache eviction described above.
 `--tokens` is a comma-separated list of total columns (`T*B`); `independent`, `same`, and `mixed`
 select uniform distinct top-10 routes, one shared top-10 set, or six shared experts plus four
@@ -1279,7 +1251,7 @@ independently sampled tail experts. All 512 experts have distinct physical backi
 construction makes the complete entry produce the same selected routes as the routed entry.
 
 ```bash
-./build/rtx5090-dev/bench/ninfer_moe_block_scaled_bench --format nvfp4 --operation routed \
+./build/rtx5090-dev/bench/ninfer_moe_block_scaled_bench --format fp8 --operation routed \
   --tokens 1,8,16,32,64,128,256,512,1024,2048,4096 --distribution all --cache both
 ./build/rtx5090-dev/bench/ninfer_moe_block_scaled_bench --format fp8 --operation complete \
   --tokens 1024,2048,4096 --repeat 50 > /tmp/moe-fp8.csv
@@ -1292,18 +1264,16 @@ measured DRAM bandwidth. Use profiler traffic when constructing a kernel or comp
 
 `ninfer_moe_cpu_bench` measures the complete synchronous CPU `routed_swiglu` call, including
 validation, grouping, decoding, arithmetic and worker publication/join. Setup and CPU/GPU transfers
-are excluded. `--format q4-q5|q4-q6|nvfp4` selects the native format and geometry. Native Host
+are excluded. `--format q4-q5|q4-q6` selects the native format and geometry. Native Host
 banks stay alive for the whole run. `repeat` reuses a fixed subset;
 `stream` rotates selected experts across prefaulted banks (by default at least four times reported
 LLC in actually selected weights). `same`, `skew` and `independent` vary reuse within each call.
 Full contributions route across the complete expert domain; partial CPU contributions use one
-masked half. NVFP4 supports zero through ten selected CPU experts per token.
+masked half.
 
 ```bash
 ./build/rtx5090-dev/bench/ninfer_moe_cpu_bench --format q4-q5 --workers 15 --caller-cpu 31 \
   --tokens 1,8,72 --active 1,8 --cache stream --distribution same --samples 240 --read-reference
-./build/rtx5090-dev/bench/ninfer_moe_cpu_bench --format nvfp4 --workers 16 --caller-cpu 31 \
-  --tokens 1,8,72,256 --active 1,4,10 --cache stream --distribution independent --samples 51 --read-reference
 ```
 
 Output includes min/median/p95/max wall time, useful encoded-weight GiB/s, logical GFLOP/s,
@@ -1315,8 +1285,6 @@ allows workers to park after their bounded spin interval.
 includes repeated weight reads, but is not a hardware traffic counter. `--read-reference` times
 the same bank/column grouping and row ownership with decode and arithmetic removed. Its median
 is an access-pattern reference, not a strict roofline or an end-to-end offload result.
-The tile-read model and matching access-pattern reference apply only to the integer formats;
-their CSV fields are `NA` for NVFP4, whose scales use the native swizzle.
 That option also reports sustained sequential read GB/s over the complete native-bank corpus,
 using the same worker team. Unique encoded bytes divided by this bandwidth give a compulsory-read
 memory roofline reference for a streaming call; repeated tile reads may hit cache and must not all

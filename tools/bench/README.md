@@ -190,7 +190,7 @@ server logs. Historical model pages identify the report directory associated wit
 ```bash
 python3 tools/bench/run_serve_concurrency.py \
   --serve build/rtx5090-dev/apps/ninfer-serve \
-  --artifact qwen3_6_27b=out/qwen3_6_27b_nvfp4.ninfer \
+  --artifact qwen3_6_27b=out/qwen3_6_27b.ninfer \
   --kv-dtype int8 \
   --mode mtp3 --suite decode-saturation \
   --concurrency 1 --concurrency 2 --concurrency 4 \
@@ -199,7 +199,7 @@ python3 tools/bench/run_serve_concurrency.py \
 
 python3 tools/bench/run_serve_concurrency.py \
   --serve build/rtx5090-dev/apps/ninfer-serve \
-  --artifact qwen3_6_27b=out/qwen3_6_27b_nvfp4.ninfer \
+  --artifact qwen3_6_27b=out/qwen3_6_27b.ninfer \
   --kv-dtype int8 \
   --mode mtp3 --suite corpus-makespan \
   --concurrency 1 --concurrency 2 \

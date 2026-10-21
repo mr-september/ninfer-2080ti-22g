@@ -172,9 +172,9 @@ allocation；销毁时先结束 Engine worker 与未决设备工作，再销毁 
 
 模型代码维护有限调用写法、跨 Op 融合和阶段关系。纯分段投影统一调用 LinearSplit；Parameters 保存
 逻辑输出行顺序及单/双 parent 参数。例如 Q4 的 Q/K 与 Q5 的 gate/V 按逻辑行拼接，完整
-FP8 parent 和 NVFP4 矩阵视图直接提供同一行序。通用权重准备解析存储视图，实际 Op 检查可执行的格式与分段。
+FP8 parent 直接提供同一行序。通用权重准备解析存储视图，实际 Op 检查可执行的格式与分段。
 View 保留 parent 几何、planes 和元素范围，共享对象在同一 Device 只驻留一次，各使用位置保留独立 Use。
-激活许可为 `A16Only={A16}`、`AllowA8={A16,A8}`、`AllowA4={A16,A8,A4}`；融合调用取相关许可交集。
+激活许可为 `A16Only={A16}`、`AllowA8={A16,A8}`；融合调用取相关许可交集。
 
 Reader、binder、原生参数准备、容量查询、warmup 和执行各自检查所消费的合同。可执行范围由实际
 消费者决定。数学公式、权重表示值和实现精度分别解释；不同量化、batch、prefill 或 speculative 路径的
