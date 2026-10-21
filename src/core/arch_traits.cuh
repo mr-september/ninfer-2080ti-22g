@@ -30,11 +30,7 @@ struct ArchTraits<CudaArch::SM120A> {
     static constexpr std::size_t max_smem_per_block = 99 * 1024; // opt-in dynamic limit
 };
 
-#if defined(NINFER_SM75)
 using CurrentArchTraits = ArchTraits<CudaArch::SM75>;
-#else
-using CurrentArchTraits = ArchTraits<CudaArch::SM120A>;
-#endif
 
 // Opt-in dynamic shared-memory limit of one CTA on the compiled architecture. Kernel schedules
 // tuned for the 99 KiB Blackwell limit are validated against this at compile time.

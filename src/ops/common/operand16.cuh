@@ -18,7 +18,6 @@
 
 namespace ninfer::ops::common {
 
-#if defined(NINFER_SM75)
 
 __device__ __forceinline__ int4 bf16x8_to_f16x8_operand(int4 v) {
     return make_int4(static_cast<int>(bf16x2_to_f16x2_operand(static_cast<unsigned>(v.x))),
@@ -72,35 +71,5 @@ __device__ __forceinline__ void mma_operands(float& c0, float& c1, float& c2, fl
     mma_f16(c0, c1, c2, c3, a0, a1, a2, a3, b0, b1);
 }
 
-#else
-
-template <int Bytes, Cache Policy = Cache::ca>
-__device__ __forceinline__ void stage_activation_operand(void* smem_dst, const void* gmem_src) {
-    cp_async<Bytes, Policy>(smem_dst, gmem_src);
-}
-
-template <int Bytes, Cache Policy = Cache::ca>
-__device__ __forceinline__ void stage_activation_operand_zfill(void* smem_dst, const void* gmem_src,
-                                                               int src_bytes) {
-    cp_async_zfill<Bytes, Policy>(smem_dst, gmem_src, src_bytes);
-}
-
-__device__ __forceinline__ unsigned scaled_weight_pair_operand(int q0, int q1, __half scale) {
-    const float s = __half2float(scale);
-    union {
-        __nv_bfloat162 value;
-        unsigned bits;
-    } pair;
-    pair.value = __floats2bfloat162_rn(static_cast<float>(q0) * s, static_cast<float>(q1) * s);
-    return pair.bits;
-}
-
-__device__ __forceinline__ void mma_operands(float& c0, float& c1, float& c2, float& c3,
-                                             unsigned a0, unsigned a1, unsigned a2, unsigned a3,
-                                             unsigned b0, unsigned b1) {
-    mma_bf16(c0, c1, c2, c3, a0, a1, a2, a3, b0, b1);
-}
-
-#endif
 
 } // namespace ninfer::ops::common

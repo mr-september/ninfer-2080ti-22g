@@ -46,16 +46,12 @@ __device__ __forceinline__ float warp_max(float x, unsigned mask = kFullWarpMask
 template <int Width = kWarpSize>
 __device__ __forceinline__ unsigned warp_reduce_max_u32(unsigned mask, unsigned x) {
     static_assert(Width > 0 && Width <= kWarpSize && (Width & (Width - 1)) == 0);
-#if defined(NINFER_SM75)
 #pragma unroll
     for (int offset = Width / 2; offset > 0; offset >>= 1) {
         const unsigned other = __shfl_xor_sync(mask, x, offset, Width);
         x                    = other > x ? other : x;
     }
     return x;
-#else
-    return __reduce_max_sync(mask, x);
-#endif
 }
 
 template <int BlockSize>
