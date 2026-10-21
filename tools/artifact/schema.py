@@ -11,7 +11,7 @@ from .layouts import align_up, encoded_size, get_layout
 
 U64_MAX = (1 << 64) - 1
 RAW_BYTES_V1 = "raw_bytes_v1"
-ACTIVATION_POLICIES = frozenset(("A16Only", "AllowA8", "AllowA4"))
+ACTIVATION_POLICIES = frozenset(("A16Only", "AllowA8"))
 
 
 class ArtifactError(ValueError):

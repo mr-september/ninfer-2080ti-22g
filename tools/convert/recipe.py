@@ -13,7 +13,6 @@ from tools.artifact.formats import (
     DirectFormat,
     Fp8BlockFormat,
     Fp8RowFormat,
-    Nvfp4Format,
     Nf4Format,
     get_format,
 )
@@ -78,8 +77,6 @@ def default_layout(format: str) -> str:
         return "row_scale_v1"
     if isinstance(kind, Fp8BlockFormat):
         return "block_scale_m128_k128_v1"
-    if isinstance(kind, Nvfp4Format):
-        return "block_scale_k16_m128x4_v1"
     if isinstance(kind, Nf4Format):
         return "row_paged_g16_4k_v1"
     return "row_split_k128_v1"
@@ -526,17 +523,6 @@ class Recipe:
             items = [(name, self.selections[name][0]) for name in names]
             if not compatible(items) or items[0][1].method not in standard:
                 continue
-            if items[0][1].format == "nvfp4" and items[0][1].method is import_encoded:
-                divisors = [
-                    (
-                        value.source.weight_divisor()
-                        if value.source.weight_divisor is not None
-                        else None
-                    )
-                    for _, value in items
-                ]
-                if None in divisors or len(set(divisors)) != 1:
-                    continue
             emit(items)
             used.update(names)
         for name, choices in self.selections.items():
@@ -593,17 +579,6 @@ class Recipe:
         ]
         for (name, input_name), policy in self.policies.items():
             # Explicitly shared weights retain independent Use and calibration records.
-            key = (name, input_name, "activation_input_divisor")
-            target = name
-            while target in self.aliases:
-                target = self.aliases[target]
-            if (
-                name in self.aliases
-                and policy == "AllowA4"
-                and any(s.format == "nvfp4" for s in self.selections[target])
-                and key not in auxiliary_values
-            ):
-                raise ValueError(f"{name}: provide its independent activation divisor")
             use = {"parameter": name, "input": input_name, "activation_policy": policy}
             referenced = {}
             for (parameter, source_input, role), value in auxiliary_values.items():

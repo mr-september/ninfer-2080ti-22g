@@ -8,16 +8,15 @@ import torch
 
 from tools.artifact.reader import Artifact
 from tools.artifact.codecs.row_split import decode_row_split_codes
-from tools.artifact.codecs.nvfp4 import encode_nvfp4
 from tools.artifact.schema import binding_parts
 from tools.artifact.writer import ArtifactWriter
-from tools.convert.methods import grouped_absmax, import_encoded
+from tools.convert.methods import grouped_absmax
 from tools.convert.model import Model, Parameter
 from tools.artifact.tensor_output import TensorOutput
 from tools.convert.recipe import Recipe
 from tools.convert.recipe import AuxiliaryReference
 from tools.convert.methods import AuxiliaryValue, cast_direct
-from tools.convert.sources.logical import EncodedRows, LogicalSource, array_source
+from tools.convert.sources.logical import array_source
 
 
 def _model(names=("query", "key", "gate", "value")):
@@ -139,13 +138,13 @@ def test_mixed_attention_uses_two_parents_and_distinct_permissions(tmp_path):
         ("query", "key"),
         format="q4_g64_fp16",
         method=grouped_absmax,
-        activation_policy="AllowA4",
+        activation_policy="AllowA8",
     )
     recipe.assign(
         ("gate", "value"),
         format="q5_g64_fp16",
         method=grouped_absmax,
-        activation_policy="AllowA8",
+        activation_policy="A16Only",
     )
     prepared = recipe.prepare(device="cpu", rows_per_chunk=3)
     path = tmp_path / "mixed.ninfer"
@@ -172,10 +171,10 @@ def test_mixed_attention_uses_two_parents_and_distinct_permissions(tmp_path):
             use["parameter"]: use["activation_policy"]
             for use in artifact.directory.uses
         } == {
-            "query": "AllowA4",
-            "key": "AllowA4",
-            "gate": "AllowA8",
-            "value": "AllowA8",
+            "query": "AllowA8",
+            "key": "AllowA8",
+            "gate": "A16Only",
+            "value": "A16Only",
         }
 
 
@@ -213,153 +212,6 @@ def test_shared_weight_keeps_use_independent_and_can_be_overridden():
     independent = recipe.prepare(device="cpu")
     assert len(independent.weights) == 2
     assert independent.bindings["key"] != independent.bindings["context_key"]
-
-
-def _encoded_source(name, divisor, shift=0):
-    codes = (
-        (torch.arange(128 * 32) + shift).remainder(256).to(torch.uint8).reshape(128, 32)
-    )
-    scales = (
-        (torch.arange(128 * 4) + shift).remainder(127).to(torch.uint8).reshape(128, 4)
-    )
-    word = struct.pack("<f", divisor)
-
-    def no_values(begin, end):
-        raise AssertionError("encoded import must not require decoded source values")
-
-    return (
-        LogicalSource(
-            (128, 64),
-            name,
-            no_values,
-            lambda begin, end: EncodedRows(
-                "nvfp4", codes[begin:end], scales[begin:end], word
-            ),
-            lambda: word,
-        ),
-        codes,
-        scales,
-    )
-
-
-def test_nvfp4_encoded_only_import_streams_complete_parent_tiles(tmp_path):
-    model = Model({"text": {"config": {}}})
-    first, codes, scales = _encoded_source("first", 2.0)
-    second, other_codes, other_scales = _encoded_source("second", 2.0, shift=17)
-    for name, source in (("gate", first), ("up", second)):
-        model.add(Parameter(name, source.shape, source, inputs=("input",)))
-    model.packing_groups = [("gate", "up")]
-    recipe = Recipe(model)
-    recipe.assign("*", format="nvfp4", method=import_encoded)
-    recipe.use(
-        "gate",
-        "input",
-        activation_policy="AllowA4",
-        auxiliaries={"activation_input_divisor": 1.5},
-    )
-    prepared = recipe.prepare(device="cpu", rows_per_chunk=128)
-    assert len(prepared.weights) == 1 and len(prepared.auxiliaries) == 1
-    path = tmp_path / "nvfp4.ninfer"
-    _write(path, model, prepared)
-    expected = encode_nvfp4(
-        torch.cat((codes, other_codes)),
-        torch.cat((scales, other_scales)),
-        struct.pack("<f", 2.0),
-        (256, 64),
-    )
-    with Artifact(path) as artifact:
-        assert artifact.read_object(prepared.weights[0].spec.id) == expected
-        assert artifact.read_object(prepared.auxiliaries[0][0].id) == struct.pack(
-            "<f", 1.5
-        )
-
-
-def test_incompatible_nvfp4_divisors_keep_default_parents_separate():
-    model = Model({"text": {"config": {}}})
-    for name, divisor in (("gate", 2.0), ("up", 4.0)):
-        source, _, _ = _encoded_source(name, divisor)
-        model.add(Parameter(name, source.shape, source))
-    model.packing_groups = [("gate", "up")]
-    recipe = Recipe(model)
-    recipe.assign("*", format="nvfp4", method=import_encoded)
-    assert len(recipe.prepare(device="cpu").weights) == 2
-    recipe.group(("gate", "up"))
-    with pytest.raises(ValueError, match="weight divisors differ"):
-        recipe.prepare(device="cpu")
-
-
-def test_nvfp4_bank_import_preserves_expert_divisor_domains(tmp_path):
-    model = Model({"text": {"config": {}}})
-    logical = array_source(torch.zeros((3, 128, 64)), "unused bf16 bank")
-    for role in ("gate", "up"):
-        model.add(Parameter(role, logical.shape, logical))
-    recipe = Recipe(model)
-    parts, codes, scales = [], [], []
-    for expert, divisor in enumerate((2.0, 3.0, 5.0)):
-        expert_codes, expert_scales = [], []
-        for role, shift in (("gate", 11), ("up", 37)):
-            source, q, s = _encoded_source(role, divisor, shift=expert * 23 + shift)
-            parts.append((role, expert * 8192, (expert + 1) * 8192, source))
-            expert_codes.append(q)
-            expert_scales.append(s)
-        codes.append(torch.cat(expert_codes))
-        scales.append(torch.cat(expert_scales))
-    recipe.parent(
-        parts,
-        shape=(3, 256, 64),
-        format="nvfp4",
-        method=import_encoded,
-        layout="batched_block_scale_k16_m128x4_v1",
-    )
-    prepared = recipe.prepare(device="cpu", rows_per_chunk=511)
-    path = tmp_path / "bank.ninfer"
-    _write(path, model, prepared)
-    with Artifact(path) as artifact:
-        payload = artifact.read_object(prepared.weights[0].spec.id)
-    assert payload == encode_nvfp4(
-        torch.stack(codes),
-        torch.stack(scales),
-        struct.pack("<fff", 2, 3, 5),
-        (3, 256, 64),
-    )
-    assert [p["range"] for p in prepared.bindings["gate"]["parts"]] == [
-        [0, 8192],
-        [16384, 24576],
-        [32768, 40960],
-    ]
-    assert [p["range"] for p in prepared.bindings["up"]["parts"]] == [
-        [8192, 16384],
-        [24576, 32768],
-        [40960, 49152],
-    ]
-
-
-def test_alias_does_not_inherit_another_uses_calibration():
-    model = Model({"text": {"config": {}}})
-    source, _, _ = _encoded_source("key", 2.0)
-    for name in ("key", "context_key"):
-        model.add(Parameter(name, source.shape, source, inputs=(name + "/input",)))
-    recipe = Recipe(model)
-    recipe.share("context_key", "key")
-    recipe.assign("key", format="nvfp4", method=import_encoded)
-    recipe.use("context_key", "context_key/input", activation_policy="AllowA4")
-    with pytest.raises(ValueError, match="independent activation divisor"):
-        recipe.prepare(device="cpu")
-    with pytest.raises(ValueError, match="positive finite"):
-        recipe.use(
-            "context_key",
-            "context_key/input",
-            auxiliaries={"activation_input_divisor": 0.0},
-        )
-    recipe.use(
-        "context_key",
-        "context_key/input",
-        auxiliaries={"activation_input_divisor": 3.0},
-    )
-    prepared = recipe.prepare(device="cpu")
-    assert len(prepared.weights) == 1
-    assert prepared.bindings["key"] == prepared.bindings["context_key"]
-    assert prepared.auxiliaries[0][1] == struct.pack("<f", 3.0)
 
 
 def test_private_component_storage_cannot_be_packed_with_target_weights():

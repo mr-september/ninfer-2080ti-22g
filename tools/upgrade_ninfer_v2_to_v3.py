@@ -29,20 +29,16 @@ FORMATS = {
     "Q5G64_F16S": "q5_g64_fp16",
     "Q6G64_F16S": "q6_g64_fp16",
     "W8G32_F16S": "q8_g32_fp16",
-    "NVFP4": "nvfp4",
     "FP8_E4M3FN_ROW_BF16S": "fp8_e4m3fn_row_bf16",
 }
 LAYOUTS = {
     "contiguous-le-v1": "contiguous_le_v1",
     "row-split-k128-v1": "row_split_k128_v1",
-    "blockscale-k16-m128x4-v1": "block_scale_k16_m128x4_v1",
     "row-scale-v1": "row_scale_v1",
 }
 KNOWN_COUNTS = {
     ("qwen3.6-27b", "groupwise-int"): (1124,),
-    ("qwen3.6-27b", "nvfp4"): (1307,),
     ("qwen3.8-27b", "groupwise-int"): (1124, 1190),
-    ("qwen3.8-27b", "nvfp4"): (1124, 1190),
     ("qwen3.6-35b-a3b", "groupwise-int"): (940,),
 }
 LIMIT = 32_000_000_000
@@ -164,13 +160,6 @@ def encoded_bytes(obj):
         low = n * groups * (group if bits == 8 else group // 2)
         high = n * groups * (0 if bits in (4, 8) else group * (bits - 4) // 8)
         return align(low, 256) + align(high, 256) + n * groups * 2
-    if (
-        layout == "block_scale_k16_m128x4_v1"
-        and format == "nvfp4"
-        and n % 128 == 0
-        and k % 64 == 0
-    ):
-        return align(n * k // 2, 256) + n * k // 16 + 4
     if layout == "row_scale_v1" and format == "fp8_e4m3fn_row_bf16":
         return align(n * k, 256) + n * 2
     raise ValueError(f"{obj['id']}: unknown format/layout combination")
@@ -664,11 +653,7 @@ def make_directory(identity, old_objects):
     uses = []
     for name in bindings:
         format = parameter_formats[name]
-        policy = (
-            "AllowA4"
-            if format == "nvfp4"
-            else "AllowA8" if format == "fp8_e4m3fn_row_bf16" else "A16Only"
-        )
+        policy = "AllowA8" if format == "fp8_e4m3fn_row_bf16" else "A16Only"
         for input_name in _input_names(name, components):
             use = {"parameter": name, "input": input_name, "activation_policy": policy}
             if name in scalar_uses:

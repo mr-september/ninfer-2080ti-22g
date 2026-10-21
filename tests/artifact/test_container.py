@@ -43,7 +43,7 @@ def _small(path: Path) -> dict:
         {
             "parameter": "text/weight",
             "input": "text/input",
-            "activation_policy": "AllowA4",
+            "activation_policy": "AllowA8",
             "auxiliaries": {"activation_input_divisor": {"object": "scale"}},
         }
     ]

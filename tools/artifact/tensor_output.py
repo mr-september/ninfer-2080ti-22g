@@ -12,20 +12,17 @@ import torch
 from .codecs.direct import encode_direct
 from .codecs.fp8_block import encode_fp8_block_scaled
 from .codecs.fp8_row import encode_fp8_row_scaled
-from .codecs.nvfp4 import encode_nvfp4
 from .codecs.nf4 import divisor_word, nf4_rows
 from .codecs.row_split import encode_row_split, split_row_planes
 from .formats import (
     DirectFormat,
     Fp8BlockFormat,
     Fp8RowFormat,
-    Nvfp4Format,
     Nf4Format,
     QuantFormat,
     get_format,
 )
 from .layouts import (
-    block_scale_geometry,
     fp8_block_geometry,
     row_scale_geometry,
     row_split_geometry,
@@ -76,9 +73,6 @@ class TensorOutput:
             gaps = ((g.code_plane_bytes, g.scale_plane_offset),)
         elif isinstance(self.format, Fp8BlockFormat):
             g = fp8_block_geometry(self.format, obj.shape)
-            gaps = ((g.code_plane_bytes, g.scale_plane_offset),)
-        elif isinstance(self.format, Nvfp4Format):
-            g = block_scale_geometry(self.format, obj.shape)
             gaps = ((g.code_plane_bytes, g.scale_plane_offset),)
         else:
             gaps = ()
@@ -140,27 +134,6 @@ class TensorOutput:
                 g.scale_plane_offset + parent_row // 128 * g.scale_columns * 2,
                 block[local.scale_plane_offset :],
             )
-        elif isinstance(self.format, Nvfp4Format):
-            if row_begin % 128 or rows % 128 or weight_divisor is None:
-                raise ValueError(
-                    f"{obj.id}: NVFP4 output needs whole 128-row tiles and weight divisor"
-                )
-            g = block_scale_geometry(self.format, obj.shape)
-            local = block_scale_geometry(self.format, (rows, k))
-            block = memoryview(encode_nvfp4(codes, scales, weight_divisor, (rows, k)))
-            divisor = bytes(block[local.weight_divisor_offset :])
-            if matrix in self._divisors and self._divisors[matrix] != divisor:
-                raise ValueError(
-                    f"{obj.id}: matrix weight divisor changed between row blocks"
-                )
-            self.write_bytes(parent_row * (k // 2), block[: local.code_plane_bytes])
-            self.write_bytes(
-                g.scale_plane_offset + parent_row * (k // 16),
-                block[local.scale_plane_offset : local.weight_divisor_offset],
-            )
-            if matrix not in self._divisors:
-                self.write_bytes(g.weight_divisor_offset + matrix * 4, divisor)
-                self._divisors[matrix] = divisor
         else:
             raise TypeError(f"{obj.id}: direct format does not accept quantized codes")
 

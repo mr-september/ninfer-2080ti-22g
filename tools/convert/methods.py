@@ -238,11 +238,11 @@ def fp8_row_maxabs(request: PrepareRequest) -> PreparedMethod:
 
 
 def import_encoded(request: PrepareRequest) -> PreparedMethod:
-    """Preserve FP8/NVFP4 words, with independent divisors for bank matrices."""
+    """Preserve FP8 words, including banks of independently scaled matrices."""
     block_fp8 = request.target.format == "fp8_e4m3fn_block128x128_bf16"
     if (
         request.target.format
-        not in ("nvfp4", "fp8_e4m3fn_row_bf16", "fp8_e4m3fn_block128x128_bf16")
+        not in ("fp8_e4m3fn_row_bf16", "fp8_e4m3fn_block128x128_bf16")
         or len(request.target.shape) not in (2, 3)
         or (
             len(request.target.shape) == 3
@@ -254,8 +254,6 @@ def import_encoded(request: PrepareRequest) -> PreparedMethod:
     n, k = request.target.shape[-2:]
     matrices = request.target.shape[0] if len(request.target.shape) == 3 else 1
     auxiliaries = {}
-    divisors = {}
-    cursor = 0
     for item in request.inputs:
         source = item.source
         if len(source.shape) != 2 or source.shape[1] != k:
@@ -273,32 +271,9 @@ def import_encoded(request: PrepareRequest) -> PreparedMethod:
             raise ValueError(
                 f"{item.parameter}: source {first.format} differs from target {request.target.format}"
             )
-        if first.format == "nvfp4":
-            for matrix in range(cursor // n, (cursor + source.shape[0] - 1) // n + 1):
-                if matrix in divisors and divisors[matrix] != first.weight_divisor:
-                    raise ValueError("NVFP4 weight divisors differ within one matrix")
-                divisors[matrix] = first.weight_divisor
-            for parameter, input_name in item.uses:
-                key = (parameter, input_name, "activation_input_divisor")
-                if key in request.auxiliary_overrides:
-                    value = request.auxiliary_overrides[key]
-                elif request.policies[(parameter, input_name)] == "AllowA4":
-                    if source.input_divisor is None:
-                        raise ValueError(
-                            f"{parameter}: supply an activation divisor for AllowA4"
-                        )
-                    value = AuxiliaryValue.activation_divisor(source.input_divisor())
-                else:
-                    continue
-                if key in auxiliaries and auxiliaries[key] != value:
-                    raise ValueError(
-                        f"{parameter}: activation divisors differ within one Use"
-                    )
-                auxiliaries[key] = value
-        cursor += source.shape[0]
     chunk = (
         max(128, request.rows_per_chunk // 128 * 128)
-        if request.target.format == "nvfp4" or block_fp8
+        if block_fp8
         else request.rows_per_chunk
     )
 
@@ -321,16 +296,11 @@ def import_encoded(request: PrepareRequest) -> PreparedMethod:
 
 def stored_scale_mse(request: PrepareRequest) -> PreparedMethod:
     """Two-pass object amax and exhaustive G16 stored-scale MSE encoding."""
-    if (
-        request.target.format not in ("nf4_g16_e4m3fn", "nvfp4")
-        or len(request.target.shape) != 2
-    ):
-        raise ValueError("stored_scale_mse requires an NF4 or NVFP4 matrix")
+    if request.target.format != "nf4_g16_e4m3fn" or len(request.target.shape) != 2:
+        raise ValueError("stored_scale_mse requires an NF4 matrix")
     _preflight(request)
     n, k = request.target.shape
     chunk = request.rows_per_chunk
-    if request.target.format == "nvfp4":
-        chunk = max(128, chunk // 128 * 128)
 
     def produce(output):
         maximum = 0.0
@@ -342,7 +312,7 @@ def stored_scale_mse(request: PrepareRequest) -> PreparedMethod:
             if not bool(torch.isfinite(values).all()):
                 raise ValueError("stored-scale source contains NaN or infinity")
             maximum = max(maximum, values.abs().max().item())
-        limit = 448.0 if request.target.format == "nf4_g16_e4m3fn" else 2688.0
+        limit = 448.0
         divisor = struct.pack("<f", limit / maximum if maximum else 1.0)
         if not valid_positive_fp32_word(struct.unpack("<I", divisor)[0]):
             raise ValueError("amax produces an invalid FP32 object divisor")

@@ -1,4 +1,3 @@
-import random
 import struct
 
 import pytest
@@ -9,42 +8,6 @@ from tools.artifact.codecs.fp8_block import (
     dequantize_fp8_block_scaled,
     encode_fp8_block_scaled,
 )
-from tools.artifact.codecs.nvfp4 import decode_nvfp4_words, encode_nvfp4
-from tools.artifact.layouts import encoded_size
-
-
-def test_nvfp4_bank_keeps_independent_scales_and_divisors():
-    shape = (3, 256, 128)
-    rng = random.Random(20261012)
-    codes = torch.tensor(
-        [rng.randrange(256) for _ in range(49152)], dtype=torch.uint8
-    ).reshape(3, 256, 64)
-    scales = torch.tensor(
-        [rng.randrange(127) for _ in range(6144)], dtype=torch.uint8
-    ).reshape(3, 256, 8)
-    divisors = struct.pack("<fff", 2.0, 3.0, 5.0)
-    encoded = encode_nvfp4(codes, scales, divisors, shape)
-    expected = bytearray(codes.numpy().tobytes() + bytes(6144) + divisors)
-    for expert in range(3):
-        for row in range(256):
-            for group in range(8):
-                tile = (row // 128 * 2 + group // 4) * 512
-                within = row % 32 * 16 + row % 128 // 32 * 4 + group % 4
-                expected[49152 + expert * 2048 + tile + within] = int(
-                    scales[expert, row, group]
-                )
-    assert encoded == expected
-    q, s, d = decode_nvfp4_words(expected, shape)
-    assert torch.equal(q, codes)
-    assert torch.equal(s, scales)
-    assert d.tolist() == [2.0, 3.0, 5.0]
-    assert encoded_size("batched_block_scale_k16_m128x4_v1", "nvfp4", shape) == 55308
-    with pytest.raises(ValueError, match="rank 2"):
-        encoded_size("block_scale_k16_m128x4_v1", "nvfp4", shape)
-    with pytest.raises(TypeError, match="per matrix"):
-        encode_nvfp4(codes, scales, struct.pack("<f", 2), shape)
-    with pytest.raises(ValueError, match="finite and positive"):
-        encode_nvfp4(codes, scales, struct.pack("<fff", 2, 0, 5), shape)
 
 
 @pytest.mark.parametrize("bank", [False, True])

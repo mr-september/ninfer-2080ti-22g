@@ -5,11 +5,7 @@ import struct
 import pytest
 import torch
 
-from tools.artifact.layouts import (
-    block_scale_geometry,
-)
 from tools.artifact.codecs.direct import decode_direct, encode_direct
-from tools.artifact.codecs.nvfp4 import decode_nvfp4_words, encode_nvfp4
 from tools.artifact.codecs.row_split import decode_row_split_codes, encode_row_split
 
 
@@ -147,42 +143,3 @@ def test_row_split_matches_known_packed_bytes(
     assert torch.equal(decoded_scales, scales)
     assert torch.equal(decoded_codes, codes)
 
-
-def test_nvfp4_known_vector_geometry_swizzle_tail_and_round_trip():
-    shape = (128, 64)
-    geometry = block_scale_geometry("nvfp4", shape)
-    assert (
-        geometry.code_plane_bytes,
-        geometry.scale_plane_offset,
-        geometry.scale_plane_bytes,
-        geometry.weight_divisor_offset,
-        geometry.payload_bytes,
-    ) == (4096, 4096, 512, 4608, 4612)
-
-    packed = (
-        torch.arange(geometry.code_plane_bytes, dtype=torch.int64)
-        .remainder(256)
-        .to(torch.uint8)
-        .reshape(128, 32)
-    )
-    packed[0, 0] = 0x10
-    scales = (
-        torch.arange(128 * 4, dtype=torch.int64)
-        .remainder(0x7F)
-        .to(torch.uint8)
-        .reshape(128, 4)
-    )
-    divisor = struct.pack("<f", 2.5)
-    payload = encode_nvfp4(packed, scales, divisor, shape)
-
-    assert len(payload) == 4612
-    assert payload[0] == 0x10  # low nibble is K=0; high nibble is K=1.
-    for row, lane in ((0, 0), (31, 3), (32, 0), (127, 3)):
-        offset = geometry.scale_plane_offset + (row % 32) * 16 + (row // 32) * 4 + lane
-        assert payload[offset] == int(scales[row, lane])
-    assert payload[geometry.weight_divisor_offset :] == divisor
-
-    decoded_packed, decoded_scales, decoded_divisor = decode_nvfp4_words(payload, shape)
-    assert torch.equal(decoded_packed, packed)
-    assert torch.equal(decoded_scales, scales)
-    assert bytes(decoded_divisor.reshape(1).view(torch.uint8).numpy()) == divisor

@@ -20,7 +20,6 @@ def main() -> int:
         offset = row // 45 * 4096 + row % 45 * 90
         nf4[offset : offset + 80] = b"\x77" * 80
     nf4.extend(struct.pack("<f", 2.0))
-    nvfp4 = b"\x11" * 49152 + b"\x38" * 6144 + struct.pack("<fff", 2.0, 3.0, 5.0)
     fp8 = b"\x38" * 98304 + struct.pack(
         "<6H", 0x3F80, 0x4000, 0x4040, 0x4080, 0x40A0, 0x40C0
     )
@@ -35,12 +34,6 @@ def main() -> int:
                         "nf4", (46, 160), "nf4_g16_e4m3fn", "row_paged_g16_4k_v1"
                     ),
                     TensorSpec(
-                        "nvfp4",
-                        (3, 256, 128),
-                        "nvfp4",
-                        "batched_block_scale_k16_m128x4_v1",
-                    ),
-                    TensorSpec(
                         "fp8",
                         (3, 128, 256),
                         "fp8_e4m3fn_block128x128_bf16",
@@ -51,7 +44,6 @@ def main() -> int:
                 bindings={
                     "whole": {"object": "matrix"},
                     "paged_table": {"object": "nf4"},
-                    "nvfp4_bank": {"object": "nvfp4"},
                     "fp8_bank": {"object": "fp8"},
                     "reordered_rows": {
                         "parts": [
@@ -64,7 +56,6 @@ def main() -> int:
             ) as writer:
                 writer.write_object("matrix", data)
                 writer.write_object("nf4", nf4)
-                writer.write_object("nvfp4", nvfp4)
                 writer.write_object("fp8", fp8)
             result = subprocess.run([executable, "--writer-fixture", str(path)])
             if result.returncode:

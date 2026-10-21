@@ -18,7 +18,6 @@ from .formats import (
     DirectFormat,
     Fp8BlockFormat,
     Fp8RowFormat,
-    Nvfp4Format,
     Nf4Format,
     NumericFormat,
     QuantFormat,
@@ -53,20 +52,6 @@ class RowSplitGeometry:
     high_bytes: int
     scale_offset: int
     scale_bytes: int
-    payload_bytes: int
-
-
-@dataclass(frozen=True, slots=True)
-class BlockScaleGeometry:
-    matrices: int
-    n: int
-    k: int
-    groups_per_row: int
-    k_tiles: int
-    code_plane_bytes: int
-    scale_plane_offset: int
-    scale_plane_bytes: int
-    weight_divisor_offset: int
     payload_bytes: int
 
 
@@ -116,14 +101,6 @@ ROW_SPLIT_K128_V1 = Layout(
     256,
     frozenset(("q4_g64_fp16", "q5_g64_fp16", "q6_g64_fp16", "q8_g32_fp16")),
 )
-BLOCK_SCALE_K16_M128X4_V1 = Layout(
-    "block_scale_k16_m128x4_v1",
-    256,
-    frozenset(("nvfp4",)),
-)
-BATCHED_BLOCK_SCALE_K16_M128X4_V1 = Layout(
-    "batched_block_scale_k16_m128x4_v1", 256, frozenset(("nvfp4",))
-)
 BLOCK_SCALE_M128_K128_V1 = Layout(
     "block_scale_m128_k128_v1",
     256,
@@ -144,8 +121,6 @@ LAYOUTS = MappingProxyType(
         for layout in (
             CONTIGUOUS_LE_V1,
             ROW_SPLIT_K128_V1,
-            BLOCK_SCALE_K16_M128X4_V1,
-            BATCHED_BLOCK_SCALE_K16_M128X4_V1,
             BLOCK_SCALE_M128_K128_V1,
             ROW_SCALE_V1,
             ROW_PAGED_G16_4K_V1,
@@ -244,40 +219,6 @@ def row_split_geometry(
     )
 
 
-def block_scale_geometry(
-    format: str | Nvfp4Format, shape: Sequence[int]
-) -> BlockScaleGeometry:
-    spec = _format(format)
-    if not isinstance(spec, Nvfp4Format):
-        raise ValueError("block_scale_k16_m128x4_v1 requires NVFP4")
-    dims = _shape(shape)
-    if len(dims) not in (2, 3):
-        raise ValueError("NVFP4 requires [N,K] or [E,N,K]")
-    n, k = dims[-2:]
-    matrices = dims[0] if len(dims) == 3 else 1
-    if n % 128 != 0 or k % 64 != 0:
-        raise ValueError(
-            "block_scale_k16_m128x4_v1 requires N divisible by 128 "
-            "and K divisible by 64"
-        )
-    code_plane_bytes = matrices * n * k // 2
-    scale_plane_offset = align_up(code_plane_bytes, PLANE_ALIGNMENT)
-    scale_plane_bytes = matrices * n * k // spec.group_size
-    weight_divisor_offset = scale_plane_offset + scale_plane_bytes
-    return BlockScaleGeometry(
-        matrices=matrices,
-        n=n,
-        k=k,
-        groups_per_row=k // spec.group_size,
-        k_tiles=k // 64,
-        code_plane_bytes=code_plane_bytes,
-        scale_plane_offset=scale_plane_offset,
-        scale_plane_bytes=scale_plane_bytes,
-        weight_divisor_offset=weight_divisor_offset,
-        payload_bytes=weight_divisor_offset + 4 * matrices,
-    )
-
-
 def fp8_block_geometry(
     format: str | Fp8BlockFormat, shape: Sequence[int]
 ) -> Fp8BlockGeometry:
@@ -368,11 +309,6 @@ def encoded_size(
         if not isinstance(numeric_spec, QuantFormat):
             raise ValueError("row_split_k128_v1 requires a grouped quantized format")
         return row_split_geometry(numeric_spec, shape).payload_bytes
-    if layout_spec in (BLOCK_SCALE_K16_M128X4_V1, BATCHED_BLOCK_SCALE_K16_M128X4_V1):
-        if not isinstance(numeric_spec, Nvfp4Format):
-            raise ValueError("block_scale_k16_m128x4_v1 requires NVFP4")
-        _shape(shape, rank=2 if layout_spec is BLOCK_SCALE_K16_M128X4_V1 else 3)
-        return block_scale_geometry(numeric_spec, shape).payload_bytes
     if layout_spec is BLOCK_SCALE_M128_K128_V1:
         return fp8_block_geometry(numeric_spec, shape).payload_bytes
     if layout_spec is ROW_SCALE_V1:

@@ -29,14 +29,6 @@ class QuantFormat:
 
 
 @dataclass(frozen=True, slots=True)
-class Nvfp4Format:
-    """E2M1 weights with one E4M3FN scale word per K-axis group."""
-
-    name: str
-    group_size: int
-
-
-@dataclass(frozen=True, slots=True)
 class Fp8RowFormat:
     """E4M3FN weights with one BF16 multiplier per logical row."""
 
@@ -61,7 +53,7 @@ class Nf4Format:
 
 
 NumericFormat: TypeAlias = (
-    DirectFormat | QuantFormat | Nvfp4Format | Fp8RowFormat | Fp8BlockFormat | Nf4Format
+    DirectFormat | QuantFormat | Fp8RowFormat | Fp8BlockFormat | Nf4Format
 )
 
 
@@ -73,7 +65,6 @@ Q4_G64_FP16 = QuantFormat("q4_g64_fp16", 4, 64, -8, 7)
 Q5_G64_FP16 = QuantFormat("q5_g64_fp16", 5, 64, -16, 15)
 Q6_G64_FP16 = QuantFormat("q6_g64_fp16", 6, 64, -32, 31)
 Q8_G32_FP16 = QuantFormat("q8_g32_fp16", 8, 32, -127, 127)
-NVFP4 = Nvfp4Format("nvfp4", 16)
 FP8_E4M3FN_ROW_BF16 = Fp8RowFormat("fp8_e4m3fn_row_bf16")
 FP8_E4M3FN_BLOCK128X128_BF16 = Fp8BlockFormat("fp8_e4m3fn_block128x128_bf16")
 NF4_G16_E4M3FN = Nf4Format("nf4_g16_e4m3fn")
@@ -104,7 +95,6 @@ DIRECT_FORMATS = MappingProxyType({item.name: item for item in (BF16, FP32, INT3
 QUANT_FORMATS = MappingProxyType(
     {item.name: item for item in (Q4_G64_FP16, Q5_G64_FP16, Q6_G64_FP16, Q8_G32_FP16)}
 )
-NVFP4_FORMATS = MappingProxyType({NVFP4.name: NVFP4})
 FP8_ROW_FORMATS = MappingProxyType({FP8_E4M3FN_ROW_BF16.name: FP8_E4M3FN_ROW_BF16})
 FP8_BLOCK_FORMATS = MappingProxyType(
     {FP8_E4M3FN_BLOCK128X128_BF16.name: FP8_E4M3FN_BLOCK128X128_BF16}
@@ -114,24 +104,11 @@ NUMERIC_FORMATS = MappingProxyType(
     {
         **DIRECT_FORMATS,
         **QUANT_FORMATS,
-        **NVFP4_FORMATS,
         **FP8_ROW_FORMATS,
         **FP8_BLOCK_FORMATS,
         **NF4_FORMATS,
     }
 )
-
-
-_E2M1_MAGNITUDES = (0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0)
-
-
-def decode_e2m1_word(word: int) -> float:
-    """Decode one exact four-bit E2M1 word, including signed zero."""
-
-    if type(word) is not int or not 0 <= word <= 0xF:
-        raise ValueError("E2M1 word must be an integer in [0, 15]")
-    magnitude = _E2M1_MAGNITUDES[word & 0x7]
-    return math.copysign(magnitude, -1.0 if word & 0x8 else 1.0)
 
 
 def decode_e4m3fn_word(word: int) -> float:
@@ -149,12 +126,6 @@ def decode_e4m3fn_word(word: int) -> float:
     if exponent == 0xF and fraction == 0x7:
         return math.copysign(math.nan, sign)
     return sign * (1.0 + fraction / 8.0) * (2.0 ** (exponent - 7))
-
-
-def valid_nvfp4_scale_word(word: int) -> bool:
-    """Return whether *word* is an admitted nonnegative finite E4M3FN scale."""
-
-    return type(word) is int and 0 <= word <= 0xFF and word & 0x80 == 0 and word != 0x7F
 
 
 def valid_fp8_weight_word(word: int) -> bool:
@@ -198,7 +169,6 @@ __all__ = [
     "Q5_G64_FP16",
     "Q6_G64_FP16",
     "Q8_G32_FP16",
-    "NVFP4",
     "FP8_E4M3FN_ROW_BF16",
     "FP8_E4M3FN_BLOCK128X128_BF16",
     "NF4_G16_E4M3FN",
@@ -208,21 +178,17 @@ __all__ = [
     "Nf4Format",
     "DIRECT_FORMATS",
     "QUANT_FORMATS",
-    "NVFP4_FORMATS",
     "FP8_ROW_FORMATS",
     "FP8_BLOCK_FORMATS",
     "NUMERIC_FORMATS",
     "DirectFormat",
     "QuantFormat",
-    "Nvfp4Format",
     "Fp8RowFormat",
     "Fp8BlockFormat",
     "NumericFormat",
     "get_format",
-    "decode_e2m1_word",
     "decode_e4m3fn_word",
     "valid_fp8_row_scale_word",
     "valid_fp8_weight_word",
-    "valid_nvfp4_scale_word",
     "valid_positive_fp32_word",
 ]
