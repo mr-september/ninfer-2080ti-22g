@@ -5,8 +5,16 @@
 # The models folder must contain qwen3_8_27b.ninfer; for another artifact or flags, name the command:
 #         docker run --gpus all -v /path/to/models:/models -p 8080:8080 ninfer \
 #             ninfer-serve /models/other.ninfer --host 0.0.0.0 --max-context 32768
+#
+# Linux dev build and CTest (turing-dev preset; benchmarks are off unless --build-arg NINFER_BENCHMARKS=ON):
+#         docker build --target dev -t ninfer-dev .
+#         docker run --rm --gpus all --security-opt seccomp=unconfined -v /path/to/models:/models:ro ninfer-dev
+# The read-queue tests need io_uring, which Docker's default seccomp profile blocks. The default command is
+# ctest with the real-model tests skipped; a command such as `ctest --test-dir /build -R expert_cache`
+# replaces it, and the real loading test takes the artifact on its command line:
+#         ... ninfer-dev /build/tests/ninfer_qwen3_5_loading_real_test --artifact /models/qwen3_8_27b.ninfer
 
-FROM nvidia/cuda:13.1.2-devel-ubuntu24.04 AS build
+FROM nvidia/cuda:13.1.2-devel-ubuntu24.04 AS toolchain
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
@@ -23,6 +31,8 @@ RUN apt-get update \
         pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
+FROM toolchain AS build
+
 WORKDIR /src
 COPY . .
 
@@ -32,6 +42,28 @@ RUN cmake -S . -B /build -G Ninja \
         -DBUILD_TESTING=OFF \
         -DNINFER_BUILD_BENCHMARKS=OFF \
     && cmake --build /build --parallel --target ninfer ninfer-serve
+
+FROM toolchain AS dev
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG NINFER_BENCHMARKS=OFF
+ARG NINFER_JOBS=4
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends \
+        python3 \
+        python3-jinja2 \
+        python3-jsonschema \
+        python3-numpy \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY . .
+
+# nvcc runs out of memory at the default job count, so the build takes an explicit one.
+RUN cmake --preset turing-dev -B /build -DNINFER_BUILD_BENCHMARKS=${NINFER_BENCHMARKS} \
+    && cmake --build /build --parallel ${NINFER_JOBS}
+
+CMD ["ctest", "--test-dir", "/build", "--output-on-failure"]
 
 FROM nvidia/cuda:13.1.2-runtime-ubuntu24.04
 
