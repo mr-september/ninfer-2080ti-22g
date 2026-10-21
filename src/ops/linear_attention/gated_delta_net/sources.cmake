@@ -5,9 +5,9 @@ target_sources(ninfer_ops PRIVATE
   "${CMAKE_CURRENT_LIST_DIR}/recurrence/chunked/recurrence.cu"
   "${CMAKE_CURRENT_LIST_DIR}/recurrence/gated_delta_net.cpp"
   "${CMAKE_CURRENT_LIST_DIR}/recurrence/plan.cpp"
-  "${CMAKE_CURRENT_LIST_DIR}/recurrence/${NINFER_SOURCE_TARGET}/recurrent.cu"
+  "${CMAKE_CURRENT_LIST_DIR}/recurrence/recurrent.cu"
   "${CMAKE_CURRENT_LIST_DIR}/replay/fold.cpp"
-  "${CMAKE_CURRENT_LIST_DIR}/replay/${NINFER_SOURCE_TARGET}/fold.cu"
+  "${CMAKE_CURRENT_LIST_DIR}/replay/fold.cu"
   "${CMAKE_CURRENT_LIST_DIR}/replay/record.cpp"
-  "${CMAKE_CURRENT_LIST_DIR}/replay/${NINFER_SOURCE_TARGET}/record.cu"
+  "${CMAKE_CURRENT_LIST_DIR}/replay/record.cu"
 )
