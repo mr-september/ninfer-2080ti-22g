@@ -48,19 +48,13 @@ if(WIN32)
   add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
 
-# Device code that differs by architecture keys on the capability macros defined here; the
-# execution target is chosen in cmake/NinferPlatform.cmake.
-if(NINFER_TARGET STREQUAL "turing")
-  add_compile_definitions(NINFER_SM75=1)
-endif()
+# Device code that differs by architecture keys on the capability macros defined here.
+add_compile_definitions(NINFER_SM75=1)
 
 # Debug build: record the largest magnitude entering Turing's BF16 -> FP16 conversion (see
 # src/ops/common/range_probe.h). Off in every production build.
 option(NINFER_SM75_RANGE_PROBE "Record the FP16 operand range on Turing (debug)" OFF)
 if(NINFER_SM75_RANGE_PROBE)
-  if(NOT NINFER_TARGET STREQUAL "turing")
-    message(FATAL_ERROR "NINFER_SM75_RANGE_PROBE applies only to NINFER_TARGET=turing")
-  endif()
   add_compile_definitions(NINFER_SM75_RANGE_PROBE=1)
 endif()
 

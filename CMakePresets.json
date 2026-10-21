@@ -22,10 +22,7 @@
     {
       "name": "turing-release",
       "displayName": "Turing (RTX 2080 Ti) product binaries",
-      "inherits": "product",
-      "cacheVariables": {
-        "NINFER_TARGET": "turing"
-      }
+      "inherits": "product"
     },
     {
       "name": "turing-dev",
