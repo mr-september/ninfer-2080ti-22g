@@ -56,10 +56,6 @@ struct CudaSwiGLUExperts {
     ExpertActivationDivisors activation_divisors;
 };
 
-struct CpuSwiGLUExperts {
-    WeightBankView gate_up, down;
-};
-
 struct SwiGLUWeights {
     SingleProjectionWeight gate_up, down;
 };
@@ -150,25 +146,6 @@ void routed_swiglu(const Tensor& x, const RoutedSwiGLUProfile& profile,
                    const CudaSwiGLUExperts& experts, const ExpertRoutes& routes,
                    ExpertSubset subset, const ScaledSwiGLUTerm& shared, MoeEpilogue epilogue,
                    Tensor& destination, MemoryArena& workspace, CudaExecutionView execution);
-
-// CPU contribution of the same routed formula. x is BF16 [H,T], destination is FP32 [H,T];
-// all tensors are contiguous CPU views with element alignment. Encoded bank planes have
-// 16-byte alignment. Route coefficients are finite; masks contain only 0/1. None writes zero
-// without accessing routes or banks. Other subsets read only their selected expert payloads.
-// Destination is overwritten and, together with live scratch, overlaps no input or each other.
-// Intermediate precision is private; no activation quantization or semantic staging cast is
-// introduced. The caller retains banks, tensors and scratch until synchronous return. No hidden
-// allocation, transfer or thread creation occurs. Shared experts and residual addition are
-// separate computations. Requires an AVX2/FMA/F16C worker team for nonempty contributions.
-// Capacity covers the inclusive token interval from a 256-byte-aligned local cursor; it is
-// independent of worker count and excludes destination storage. None requires no scratch.
-[[nodiscard]] std::size_t routed_swiglu_workspace_capacity_bytes(const RoutedSwiGLUProfile& profile,
-                                                                 ExpertSubsetKind subset,
-                                                                 std::int32_t min_tokens,
-                                                                 std::int32_t max_tokens);
-void routed_swiglu(const Tensor& x, const RoutedSwiGLUProfile& profile,
-                   const CpuSwiGLUExperts& experts, const ExpertRoutes& routes, ExpertSubset subset,
-                   Tensor& destination, MemoryArena& workspace, CpuExecutionView execution);
 
 // Complete top-k-softmax routed SwiGLU plus sigmoid-gated shared SwiGLU, with the same routing,
 // expert and residual formulas above. Destination is BF16 [H,T]. Every routed expert is readable.
