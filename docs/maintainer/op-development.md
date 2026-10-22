@@ -301,7 +301,7 @@ selector. Device-resident per-row lengths stay Device inputs under the Op's capt
   intermediate public calls or outputs. Grouping, scratch maps and stage launchers stay private.
 - **Algorithm subfamily:** GDN controls, fused input convolution, recurrence and replay belong
   together within [LinearAttention](../../src/ops/linear_attention/sources.cmake). QSA preparation,
-  indexing, sparse attention and tail handling form a [SoftmaxAttention subfamily](../../src/ops/softmax_attention/qsa/sources.cmake).
+  indexing, sparse attention and tail handling form a SoftmaxAttention subfamily, declared in [`qsa.h`](../../include/ninfer/ops/qsa.h); this build has no kernels for it.
   Shared views connect independent Op interfaces. Model call order and persistent-state ownership
   remain outside these subtrees; pure projections belong to Linear.
 
