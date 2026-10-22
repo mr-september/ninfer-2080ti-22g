@@ -51,7 +51,7 @@ group need not have the same boundary.
 | Elementwise, indexing, reduction, normalization, RoPE, embedding, sequence | One family executable; each semantic Op owns its cases and oracle. |
 | Sampling | Sampling, candidate selection and acceptance; input preparation and exact indexing live in sequence/indexing. |
 | Linear | Projection, Split, Add, SwiGLU, Pair and TopK; typed shape and policy catalogues. |
-| Linear attention | KDA, causal convolution and GDN. GDN owns control, input-conv, recurrence and replay. |
+| Linear attention | Causal convolution and GDN. GDN owns control, input-conv, recurrence and replay. |
 | Softmax attention | Causal cache fixtures, mathematical oracle, runner and cases are separate. Packed/context, sliding-window and QSA keep their own semantics. |
 | KV cache | Append codecs/paged storage, cyclic prefixes and context materialization. |
 | Gated residual, dynamic grouped convolution, PLE | Related forms share an entry and substantial family support. PLE GPU tests perform no disk I/O. |
@@ -94,11 +94,9 @@ Real-weight I/O throughput measurements belong to separate, explicitly selected 
 The Host preparation test runs without visible CUDA devices. The GPU test delays upload/consumption,
 injects event-record failures and checks graph consumption against independently reconstructed E.
 
-CPU topology/task-pool tests link the C++ `ninfer_cpu` target. The x86 feature and collective
-executor tests link `ninfer_cpu_executor` and are registered only for RTX 5090. None needs a GPU:
+CPU topology/task-pool tests link the C++ `ninfer_cpu` target and need no GPU:
 `ctest --test-dir build/turing-dev -R '^ninfer_cpu_.*_test$' --output-on-failure`.
-CPU/GPU MoE composition has its own `ninfer_moe_mixed_test`; pure GPU MoE remains in
-`ninfer_moe_test`. Shared fixtures and mathematical oracles remain common across targets.
+GPU MoE is in `ninfer_moe_test`. Shared fixtures and mathematical oracles are common.
 `ninfer_cpu_tensor_test` covers executor-based Tensor/arena computation;
 `ninfer_memory_test` covers portable CPU storage and views. Frontend and HTTP transport tests
 cover the task-pool consumers, including restricted media affinity and HTTP queue saturation.
@@ -219,18 +217,6 @@ Their independent FP64 oracles start from represented inputs and decoded logical
 suite covers the resident codec profiles, FP32/BF16 outputs, residual modes, expert masks, strided/indexed
 banks, empty GPU assignments, Graph relocation and workspace guards. The complete MoE retains
 its existing numerical samples and criteria.
-
-`ninfer_moe_cpu_groupwise_int_test` qualifies Q4+Q5/Q6 CPU routed SwiGLU against decoded-input
-FP64 mathematics,
-using an FP32 forward-error budget for dot products, SiLU, multiplication and weighted reduction.
-`ninfer_moe_cpu_groupwise_int_avx2_test` and `ninfer_moe_cpu_groupwise_int_fma_test` use the same
-public entry and oracle with
-restricted test-only dispatch. All three run with CUDA devices hidden. They cover mask/None
-semantics, arbitrary token tails through T=72, affine and strided parent banks, workspace and alias
-checks, signed code domains, scale extremes and tiny-BF16 cancellation around the BF16-dot guard.
-These CPU tests do not load
-model files or use GPU memory.
-`ninfer_moe_mixed_test` qualifies complementary CPU/GPU subsets plus GPU shared/residual composition.
 
 `ninfer_moe_execution_test` qualifies the shared single-layer execution and the Program-owned
 multi-layer fixed-cache and streaming-window schedule against the same independent complete-MoE oracle. It uses registered native Host banks and the real ExpertCache,

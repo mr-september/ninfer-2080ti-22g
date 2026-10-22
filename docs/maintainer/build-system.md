@@ -10,7 +10,7 @@ CUDA 13.4 is the validated development toolkit. Product commands and prerequisit
 The build targets NVIDIA Turing (`sm_75`) on Linux x86-64 or native Windows x86-64, and
 `CMAKE_CUDA_ARCHITECTURES` is fixed at `75`. Sources sit directly in their Op directories.
 `src/ops/CMakeLists.txt` filters the Blackwell-only Op sources (FP8 weights and KV, TMA, block-scaled
-MoE, QSA sparse attention, Kimi delta attention, hyper-connection mix) out of the manifests, and
+MoE, QSA sparse attention, hyper-connection mix) out of the manifests, and
 `src/ops/unsupported/turing_unsupported.cpp` links throwing stubs for the declarations that remain, so
 these Ops report unsupported at their capacity/execution entries. Device code is written for sm_75 only.
 
@@ -133,8 +133,6 @@ Products, tests and benchmarks link the same internal shared libraries:
 | `ninfer_cpu` | Portable CPU topology and task pool |
 | `ninfer_core` | Storage, transfers, CUDA execution and resource primitives |
 | `ninfer_ops` | GPU Ops and their host dispatch |
-| `ninfer_cpu_executor` | RTX 5090 collective CPU executor |
-| `ninfer_moe_cpu` | RTX 5090 CPU MoE dispatch and ISA implementations |
 
 Shared libraries are written to `<build-dir>/lib/`. Apps, tests and benchmarks retain their own
 output directories. Build RPATH uses `$ORIGIN` for in-tree dependencies: moving a build's binaries

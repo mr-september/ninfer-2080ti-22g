@@ -33,15 +33,6 @@ the same fixture, seed, cache policy, and timing mode.
 and `models/`. All executables remain under `<build-dir>/bench/`; the Op registration helper
 lives in `cmake/NinferBenchmarks.cmake`.
 
-`ninfer_cpu_execution_bench` measures synchronous collective dispatch and eight team barriers.
-For example: `./build/turing-dev/bench/ninfer_cpu_execution_bench --workers 8 --samples 500 --idle-us 1000`.
-Workers select physical cores from the allowed topology; `--caller-cpu ID` optionally binds the
-submitter. The benchmark prints actual affinity and ISA facts and P50/P95/max call latency.
-Process CPU/wall cost is averaged over a separate run lasting at least 250 ms at the same cadence,
-including each post-call idle interval; `cpu_calls` is that run's call count. This avoids interpreting
-sub-millisecond OS accounting samples as steady CPU cost. Setup and warmup are excluded.
-These are scheduling costs, not CPU arithmetic throughput or model performance.
-
 `ninfer_ple_disk_prepare_bench` measures Qwen4Exp disk preparation and its independent upload slots
 using an explicit NF4 artifact and a raw little-endian U32 token corpus:
 
@@ -1261,34 +1252,6 @@ CSV reports median/P95/min, complete workspace, and useful matrix FLOP/s. For ro
 calls, `unique_weight_GBps` counts unique routed expert payloads and divisors only; for `route`,
 it counts the control matrix. It excludes reloads, activations and output traffic, so it is not
 measured DRAM bandwidth. Use profiler traffic when constructing a kernel or complete-Op roofline.
-
-`ninfer_moe_cpu_bench` measures the complete synchronous CPU `routed_swiglu` call, including
-validation, grouping, decoding, arithmetic and worker publication/join. Setup and CPU/GPU transfers
-are excluded. `--format q4-q5|q4-q6` selects the native format and geometry. Native Host
-banks stay alive for the whole run. `repeat` reuses a fixed subset;
-`stream` rotates selected experts across prefaulted banks (by default at least four times reported
-LLC in actually selected weights). `same`, `skew` and `independent` vary reuse within each call.
-Full contributions route across the complete expert domain; partial CPU contributions use one
-masked half.
-
-```bash
-./build/turing-dev/bench/ninfer_moe_cpu_bench --format q4-q5 --workers 15 --caller-cpu 31 \
-  --tokens 1,8,72 --active 1,8 --cache stream --distribution same --samples 240 --read-reference
-```
-
-Output includes min/median/p95/max wall time, useful encoded-weight GiB/s, logical GFLOP/s,
-workspace and reuse footprint. Process CPU cost uses a separate interval of at least 250 ms at
-the same cadence; `--gap-us` is excluded from call latency and included in that accounting.
-`--keep-active` keeps the worker team polling between calls, including those gaps; the default
-allows workers to park after their bounded spin interval.
-`encoded_read_bytes` models the selected four/two/one-column tiles and eight-token chunks; it
-includes repeated weight reads, but is not a hardware traffic counter. `--read-reference` times
-the same bank/column grouping and row ownership with decode and arithmetic removed. Its median
-is an access-pattern reference, not a strict roofline or an end-to-end offload result.
-That option also reports sustained sequential read GB/s over the complete native-bank corpus,
-using the same worker team. Unique encoded bytes divided by this bandwidth give a compulsory-read
-memory roofline reference for a streaming call; repeated tile reads may hit cache and must not all
-be charged as DRAM bytes. No compute-peak or Engine-throughput claim follows from either reference.
 
 ## Q8 context K/V LinearPair benchmark
 

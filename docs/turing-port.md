@@ -14,7 +14,6 @@ This fork builds NInfer for NVIDIA Turing (RTX 2080 Ti 22 GB, `CMAKE_CUDA_ARCHIT
 | NVFP4 / FP8 weights | unsupported; the routes link throwing definitions |
 | KV cache | `bf16`, `int8`; `fp8`, `nvfp4`, `k8v4` unsupported |
 | Speculation | MTP (tested); DFlash is untested and tied to 35B-A3B |
-| Kimi delta attention | not built into the sm_75 test set (needs more than the 64 KiB CTA limit) |
 
 Unsupported formats are not stubbed one symbol at a time inside upstream sources. `src/ops/CMakeLists.txt` filters the Blackwell-only sources (FP8 and the TMA kernels) out of the source manifests, and `src/ops/unsupported/turing_unsupported.cpp` defines the declarations the shared wrappers still name.
 
@@ -403,7 +402,7 @@ Not carried over, and why:
 
 - CUDA Graph memory allowances per profile (upstream now calibrates graph memory at startup), the cooperative GDN gating projection (removed upstream), and the device-memory typed-error classes (upstream has its own; the fork's `DeviceMemoryError` remains only as the type the context-fitting retry catches).
 - The pinned-host embedding is carried over as a platform capability (`NINFER_HOST_MAPPED_EMBEDDING`, registered host memory read in place); the earlier fallback to a device copy when pinning fails is not, so a host short of RAM fails at startup with `HostMemoryError` instead of loading with the embedding on the device.
-- Qwen4Exp, Kimi delta attention, sparse QSA attention, the hyper-connection mix, block-scaled MoE and CPU expert offload are not built for Turing.
+- Qwen4Exp, sparse QSA attention, the hyper-connection mix, block-scaled MoE and CPU expert offload are not built for Turing.
 
 Linux, packaging and Docker (verified on the same tree):
 
