@@ -49,7 +49,7 @@ Options parse_options(int argc, char** argv) {
     if (o.format == "q4q5" && o.policy != "a16")
         throw std::invalid_argument("paired Q4/Q5 weights use A16");
     const bool supported = o.format == "q8"
-                               ? ((o.n == 12288 && o.k == 2048) || (o.n == 16384 && o.k == 2560))
+                               ? (o.n == 16384 && o.k == 2560)
                                : (o.format == "q4q5" || o.format == "fp8") &&
                                      o.n == 16384 && o.k == 5120;
     if (!supported) throw std::invalid_argument("unsupported format/N/K");

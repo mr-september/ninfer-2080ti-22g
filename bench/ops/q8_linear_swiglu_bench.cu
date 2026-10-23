@@ -36,7 +36,6 @@ struct Problem {
     std::int32_t hidden;
 };
 
-constexpr Problem kCompanion{"companion", 12288, 6144, 2048};
 constexpr Problem kDFlash2{"dflash2", 34816, 17408, 5120};
 
 struct Options {
@@ -44,7 +43,7 @@ struct Options {
     int warmup = 5;
     int repeat = 30;
     std::string csv_out;
-    std::string problem = kCompanion.name;
+    std::string problem = kDFlash2.name;
     bool profile        = false;
     bool graph          = false;
 };
@@ -82,7 +81,7 @@ Options parse_options(int argc, char** argv) {
                 throw std::invalid_argument("execution must be eager or graph");
             options.graph = mode == "graph";
         } else if (arg == "--help" || arg == "-h") {
-            std::printf("Usage: %s [--problem companion|dflash2] [--t-sweep 1,2,...] "
+            std::printf("Usage: %s [--problem dflash2] [--t-sweep 1,2,...] "
                         "[--warmup N] [--repeat N] [--csv-out PATH] [--profile] "
                         "[--execution eager|graph]\n",
                         argv[0]);
@@ -94,20 +93,12 @@ Options parse_options(int argc, char** argv) {
     if (options.warmup < 0 || options.repeat <= 0) {
         throw std::invalid_argument("--warmup must be nonnegative and --repeat positive");
     }
-    if (options.problem != kCompanion.name && options.problem != kDFlash2.name) {
-        throw std::invalid_argument("--problem must be companion or dflash2");
+    if (options.problem != kDFlash2.name) {
+        throw std::invalid_argument("--problem must be dflash2");
     }
     if (options.t_sweep.empty()) {
-        if (options.problem == kDFlash2.name) {
-            options.t_sweep = {1,  8,  16, 32, 40, 41, 51, 52,  63,  64,
-                               65, 80, 81, 88, 89, 96, 97, 128, 129, 1024};
-        } else {
-            options.t_sweep = {
-                1,  2,  3,  4,   5,   6,   7,   8,   9,   10,  11,  12,  13,
-                14, 15, 16, 17,  24,  31,  32,  33,  48,  63,  64,  65,  80,
-                95, 96, 97, 127, 128, 129, 192, 256, 384, 512, 768, 896, 1024,
-            };
-        }
+        options.t_sweep = {1,  8,  16, 32, 40, 41, 51, 52,  63,  64,
+                           65, 80, 81, 88, 89, 96, 97, 128, 129, 1024};
     }
     if (options.profile && options.t_sweep.size() != 1) {
         throw std::invalid_argument("--profile requires exactly one T");
@@ -152,7 +143,7 @@ void write_csv(const Options& options, const std::vector<Result>& results) {
 int main(int argc, char** argv) {
     try {
         const Options options  = parse_options(argc, argv);
-        const Problem& problem = options.problem == kDFlash2.name ? kDFlash2 : kCompanion;
+        const Problem& problem = kDFlash2;
         auto& context          = ninfer::bench::device_context();
         const auto cuda        = context.execution_view();
         const auto stream      = cuda.stream();

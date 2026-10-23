@@ -33,7 +33,7 @@ namespace {
 constexpr std::size_t kFlushBytes = std::size_t{256} << 20;
 
 
-enum class Format : std::uint8_t { Q4Q5, Q8Qgkv, Q8Qkv, Q8DFlash2Qkv, Bf16, Fp8, All };
+enum class Format : std::uint8_t { Q4Q5, Q8DFlash2Qkv, Bf16, Fp8, All };
 enum class CacheMode : std::uint8_t { Cold, Warm, Both };
 enum class CacheState : std::uint8_t { Cold, Warm };
 
@@ -72,7 +72,7 @@ struct Measurement {
     std::fprintf(stderr,
                  "error: %s\n"
                  "usage: ninfer_linear_split_multi_output_bench "
-                 "[--format q4q5|q8-qgkv|q8-qkv|q8-dflash2-qkv|bf16|fp8|all] "
+                 "[--format q4q5|q8-dflash2-qkv|bf16|fp8|all] "
                  "[--fp8-policy a16|a8] "
                  "[--tokens T,...] [--cache cold|warm|both] [--execution eager|graph] "
                  "[--warmup N] [--repeat N] [--profile] [--csv-out PATH]\n",
@@ -120,10 +120,6 @@ Options parse_options(int argc, char** argv) {
             const std::string_view value(next("--format requires a value"));
             if (value == "q4q5")
                 options.format = Format::Q4Q5;
-            else if (value == "q8-qgkv")
-                options.format = Format::Q8Qgkv;
-            else if (value == "q8-qkv")
-                options.format = Format::Q8Qkv;
             else if (value == "q8-dflash2-qkv")
                 options.format = Format::Q8DFlash2Qkv;
             else if (value == "bf16")
@@ -133,8 +129,7 @@ Options parse_options(int argc, char** argv) {
             else if (value == "all")
                 options.format = Format::All;
             else
-                usage("--format expects q4q5, q8-qgkv, q8-qkv, q8-dflash2-qkv, bf16, "
-                      "fp8, or all");
+                usage("--format expects q4q5, q8-dflash2-qkv, bf16, fp8, or all");
         } else if (argument == "--fp8-policy") {
             const std::string_view value(next("--fp8-policy requires a value"));
             if (value == "a16")
@@ -493,14 +488,6 @@ int main(int argc, char** argv) {
         std::vector<Result> results;
 
         if (selected(options.format, Format::Q4Q5)) { run_q4q5(options, flush, cuda, results); }
-        if (selected(options.format, Format::Q8Qgkv)) {
-            auto weight = bench::make_row_split_weight(QType::Q8_G32_FP16, 9216, 2048, 2048, 507U);
-            run_four_output(options, "q8-qgkv", ops::LinearPolicy::A16Only, true, 2048, 4096, 512,
-                            9216, weight, flush, cuda, results);
-        }
-        if (selected(options.format, Format::Q8Qkv)) {
-            run_q8_qkv(options, "q8-qkv", 2048, flush, cuda, results);
-        }
         if (selected(options.format, Format::Q8DFlash2Qkv)) {
             run_q8_qkv(options, "q8-dflash2-qkv", 5120, flush, cuda, results);
         }

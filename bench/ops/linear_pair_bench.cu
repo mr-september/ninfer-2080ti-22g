@@ -63,8 +63,8 @@ Options parse_options(int argc, char** argv) {
             have_sweep     = true;
         } else if (argument == "--k") {
             options.k = bench::measurement::integer(next("--k value"));
-            if (options.k != 2048 && options.k != 5120) {
-                throw std::invalid_argument("--k must be 2048 or 5120");
+            if (options.k != 5120) {
+                throw std::invalid_argument("--k must be 5120");
             }
         } else if (argument == "--execution") {
             const std::string_view value = next("--execution value");
@@ -86,7 +86,7 @@ Options parse_options(int argc, char** argv) {
             }
             options.flush_bytes = mib << 20;
         } else if (argument == "--help" || argument == "-h") {
-            std::printf("Usage: %s --k 2048|5120 "
+            std::printf("Usage: %s --k 5120 "
                         "[--tokens 1,2,... | --sweep START:END[:STEP]] "
                         "[--execution eager|graph] [--warmup N] [--repeat N] [--flush-mib N]\n",
                         argv[0]);
