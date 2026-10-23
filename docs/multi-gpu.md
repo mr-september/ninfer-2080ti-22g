@@ -1,6 +1,6 @@
 # Multi-GPU Inference & Architecture Guide
 
-> **Status:** Single-GPU inference and multi-instance Data Parallelism are fully supported and verified. Distributed Pipeline Parallelism (Layer Splitting) is an experimental design track subject to physical multi-device community testing.
+> **Status:** Single-GPU inference and multi-instance Data Parallelism are fully supported and verified. Distributed Pipeline Parallelism (Layer Splitting) is an experimental design track that has not been validated on two physical GPUs.
 
 ---
 
@@ -11,7 +11,7 @@ NInfer's core design maximizes single-GPU inference throughput by executing stat
 When operating on systems equipped with multiple NVIDIA GPUs, two distinct multi-GPU paradigms apply:
 
 1. **Data Parallelism (Multi-Instance Replication):** Running independent NInfer server or CLI instances on separate physical GPUs. This requires zero inter-GPU communication and delivers linear aggregate throughput scaling for concurrent clients.
-2. **Pipeline Parallelism (VRAM Partitioning / Layer Splitting):** Splitting layers sequentially across 2 or more GPUs to pool VRAM (e.g. running 27B / 35B models across two 16 GB or 22 GB cards) with minimal PCIe communication overhead.
+2. **Pipeline Parallelism (VRAM Partitioning / Layer Splitting):** Splitting layers sequentially across 2 or more GPUs to pool VRAM (e.g. a model that does not fit one 22 GB card) with minimal PCIe communication overhead.
 
 ---
 
@@ -101,13 +101,13 @@ To maintain NInfer's hospital-grade reliability and single-GPU performance:
 
 ---
 
-## 5. Testing & Community Feedback Guide
+## 5. Testing Guide
 
-Because full validation of physical multi-device P2P and Unified Virtual Addressing (UVA) requires physical hardware with $\ge 2$ GPUs, we actively invite testing reports and benchmark numbers from users with multi-GPU rigs (e.g., $2\times$ RTX 2080 Ti 22GB, $2\times$ RTX 3090, $2\times$ RTX 4090, or $2\times$ RTX 5090).
+Validating physical multi-device P2P and Unified Virtual Addressing (UVA) needs a machine with at least two GPUs; this repository has not been run on one (a second 2080 Ti is the intended target).
 
 ### Diagnostic Verification Protocol
 
-When reporting multi-GPU behavior or issues, please capture and provide:
+When checking multi-GPU behavior, capture:
 
 #### 1. Hardware & Driver Topology
 ```bash
@@ -139,9 +139,3 @@ curl -s http://127.0.0.1:8080/v1/chat/completions -H "Content-Type: application/
 curl -s http://127.0.0.1:8081/v1/chat/completions -H "Content-Type: application/json" -d '{"model":"qwen3.8-27b","messages":[{"role":"user","content":"Ping GPU 1"}],"max_tokens":32}' &
 wait
 ```
-
-### Providing Feedback
-Please submit issues or discussion logs with:
-- GPU models and VRAM capacities (e.g., $2\times 2080\text{ Ti } 22\text{GB}$).
-- Motherboard PCIe slot configuration (e.g., $x8 / x8$ Gen3 or $x16 / x16$ Gen4).
-- Full console output and stderr logs from `--device 1` runs.
