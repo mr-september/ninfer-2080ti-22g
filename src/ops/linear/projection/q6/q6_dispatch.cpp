@@ -12,7 +12,6 @@ struct ShapeEntry {
 
 constexpr std::array kShapes{
     ShapeEntry{248320, 5120, select_q6_n248320_k5120},
-    ShapeEntry{248320, 2048, select_q6_n248320_k2048},
     ShapeEntry{1152, 1536, select_q6_n1152_k1536},
 };
 } // namespace

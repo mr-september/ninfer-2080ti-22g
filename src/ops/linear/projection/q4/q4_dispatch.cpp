@@ -18,7 +18,6 @@ constexpr std::array kShapes{
     ShapeEntry{7168, 5120, select_q4_n7168_k5120},
     ShapeEntry{34816, 5120, select_q4_n34816_k5120},
     ShapeEntry{131072, 5120, select_q4_n131072_k5120},
-    ShapeEntry{131072, 2048, select_q4_n131072_k2048},
     ShapeEntry{3456, 1152, select_q4_n3456_k1152},
     ShapeEntry{4304, 1152, select_q4_n4304_k1152},
 };

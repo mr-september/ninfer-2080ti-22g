@@ -30,18 +30,6 @@ void q6_a16_conformance(Suite& suite) {
               make_q6_g64_fp16_weight,
               {248320, 5120, 191U, Comparison::Sampled, false, kN248320K5120});
 
-    const std::array kN248320K2048{
-        a16(1),   a16(2),    a16(3),   a16(4),   a16(8),    a16(15),   a16(16),    a16(17),
-        a16(24),  a16(31),   a16(32),  a16(33),  a16(39),   a16(40),   a16(41),    a16(47),
-        a16(48),  a16(49),   a16(55),  a16(56),  a16(57),   a16(63),   a16(64),    a16(65),
-        a16(71),  a16(72),   a16(73),  a16(79),  a16(80),   a16(81),   a16(95),    a16(96),
-        a16(97),  a16(104),  a16(111), a16(112), a16(113),  a16(127),  a16(128),   a16(129),
-        a16(512), a16(1024), graph(1), graph(2), graph(17), graph(57), graph(128),
-    };
-    add_shape(suite, ninfer::QType::Q6_G64_FP16, ActivationRecipe::TokenBlocks,
-              make_q6_g64_fp16_weight,
-              {248320, 2048, 193U, Comparison::Sampled, false, kN248320K2048});
-
     const std::array kVisionFull{
         convenience(4), a16(8),  a16(16),  a16(20),   a16(24),   a16(28),
         a16(80),        a16(84), graph(8), graph(24), graph(28), graph(84),

@@ -149,19 +149,6 @@ void q4_a16_conformance(Suite& suite) {
               make_q4_g64_fp16_weight,
               {131072, 5120, 127U, Comparison::Sampled, false, kN131072K5120});
 
-    const std::array kN131072K2048{
-        a16(1),   a16(2),    a16(3),    a16(4),    a16(5),    a16(7),    a16(8),     a16(9),
-        a16(12),  a16(15),   a16(16),   a16(17),   a16(19),   a16(20),   a16(21),    a16(32),
-        a16(33),  a16(48),   a16(49),   a16(56),   a16(57),   a16(63),   a16(64),    a16(65),
-        a16(72),  a16(73),   a16(80),   a16(81),   a16(96),   a16(97),   a16(103),   a16(104),
-        a16(105), a16(111),  a16(112),  a16(113),  a16(119),  a16(120),  a16(121),   a16(128),
-        graph(1), graph(3),  graph(13), graph(19), graph(32), graph(64), graph(112), graph(120),
-        a16(512), a16(1024),
-    };
-    add_shape(suite, ninfer::QType::Q4_G64_FP16, ActivationRecipe::TokenBlocks,
-              make_q4_g64_fp16_weight,
-              {131072, 2048, 131U, Comparison::Sampled, false, kN131072K2048});
-
     const std::array kN3456K1152{
         a16(4),    a16(20),    a16(36),   a16(40),     a16(44),  a16(128), graph(16),
         graph(32), graph(64),  a16(68),   graph(96),   a16(100), a16(132), graph(192),

@@ -47,8 +47,6 @@ void launch_q4_a16_simt_r4_t1_w2_g8_s2(const Tensor& x, const Weight& weight, Te
                                        cudaStream_t stream);
 void launch_q4_a16_simt_r4_t4_w2_g8_s2(const Tensor& x, const Weight& weight, Tensor& out,
                                        cudaStream_t stream);
-void launch_q4_a16_sliced_k2048_t4(const Tensor& x, const Weight& weight, Tensor& out,
-                                   cudaStream_t stream);
 void launch_q4_a16_sliced_k5120_t16(const Tensor& x, const Weight& weight, Tensor& out,
                                     cudaStream_t stream);
 void launch_q4_a16_sliced_k5120_t24(const Tensor& x, const Weight& weight, Tensor& out,
