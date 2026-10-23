@@ -2,7 +2,7 @@
 
 NInfer builds from its source tree with CMake 3.28+ and C++/CUDA 20.
 CUDA 12.9 is the validated development toolkit. Product commands and prerequisites are in the
-[README](../../README.md#quick-start); test and measurement workflows live in
+[README](../../README.md#quick-start-from-source-windows); test and measurement workflows live in
 [tests](../../tests/README.md) and [benchmarks](../../bench/README.md).
 
 ## Target

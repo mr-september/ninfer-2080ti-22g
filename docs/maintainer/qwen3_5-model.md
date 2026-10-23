@@ -322,7 +322,7 @@ does not infer execution identity from tokenizer filenames, release names or sam
 Each StateImage contains the Text GDN state and continuation hidden. Per GDN layer, recurrent
 state has one `[Dv,Dk]` matrix per value head, and convolution history has
 `(2 * key_width + value_width) * (kernel_width - 1)` values. Program sizes Device/Host StateImage
-capacity under the [context resource contract](resource-scheduling-and-context-cache.md#capacity).
+capacity under the [context resource contract](resource-scheduling-and-context-cache.md#3-容量与执行许可).
 ReplaySSM records are separate pending-round scratch when speculation is enabled.
 
 Text GQA KV grows with visible context. Selected MTP owns separate KV; DFlash backends own the

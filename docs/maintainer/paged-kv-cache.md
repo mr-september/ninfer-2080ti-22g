@@ -46,7 +46,7 @@ Page boundary 不是 Attention mask boundary，也不是 prefix hit boundary。�
 
 KV Store 可以在任意 token frontier 表示、truncate 或保护 prefix；这不证明模型可以从该位置恢复。
 可复用 frontier 必须同时存在完整 StateImage 与 target-defined backend state，具体规则见
-[Continuation 与 checkpoint](resource-scheduling-and-context-cache.md#checkpoints)。
+[Continuation 与 checkpoint](resource-scheduling-and-context-cache.md#4-续接记录与完整检查点)。
 
 ---
 
