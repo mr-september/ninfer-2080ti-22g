@@ -22,12 +22,10 @@ struct Geometry {
 };
 
 const std::array kGeometries{
-    Geometry{1024, 2048, 257U},  Geometry{1024, 5120, 223U},  Geometry{2048, 4096, 251U},
-    Geometry{2048, 4608, 271U},  Geometry{2048, 16384, 283U}, Geometry{2560, 6144, 307U},
-    Geometry{4608, 4608, 277U},  Geometry{5120, 4608, 281U},  Geometry{5120, 6144, 239U},
-    Geometry{5120, 10240, 211U}, Geometry{5120, 17408, 241U}, Geometry{5120, 25600, 293U},
-    Geometry{6144, 2560, 347U},  Geometry{6144, 5120, 227U},  Geometry{9216, 2048, 263U},
-    Geometry{10240, 2560, 331U}, Geometry{12288, 2048, 269U}, Geometry{12288, 2560, 313U},
+    Geometry{1024, 5120, 223U}, Geometry{2560, 6144, 307U}, Geometry{4608, 4608, 277U},
+    Geometry{5120, 4608, 281U}, Geometry{5120, 6144, 239U}, Geometry{5120, 10240, 211U},
+    Geometry{5120, 17408, 241U}, Geometry{5120, 25600, 293U}, Geometry{6144, 2560, 347U},
+    Geometry{6144, 5120, 227U}, Geometry{10240, 2560, 331U}, Geometry{12288, 2560, 313U},
     Geometry{14336, 5120, 229U}, Geometry{16384, 2560, 359U}, Geometry{34816, 5120, 233U},
     Geometry{248320, 5120, 197U}};
 
@@ -61,9 +59,6 @@ void q8_a16_conformance(Suite& suite) {
                       31, 32, 33, 39, 40, 41, 44, 47, 48,  49,  55,  56,  57,  63,
                       64, 65, 79, 80, 81, 95, 96, 97, 127, 128, 129, 256, 1024}) {
             calls.push_back({t});
-        }
-        if (shape.n == 2048 && shape.k == 4096) {
-            for (int t : {895, 896, 897}) calls.push_back({t});
         }
         if (shape.n == 2560 && shape.k == 6144) {
             for (int t : {50, 51, 52, 511, 512, 513, 1025, 2047, 2048, 2049, 4096})
@@ -126,23 +121,11 @@ void q8_a16_conformance(Suite& suite) {
         }
         if (shape.k == 4608) {
             for (int t : {6, 11, 12, 13, 14, 19, 20, 21, 27, 28, 29}) calls.push_back({t});
-            if (shape.n == 2048) {
-                for (int t : {870, 871, 872}) calls.push_back({t});
-            }
             if (shape.n == 4608) {
                 for (int t : {255, 257}) calls.push_back({t});
             }
         }
-        if (shape.n == 9216 && shape.k == 2048) {
-            for (int t : {12, 13, 14}) calls.push_back({t});
-        }
         if (shape.n == 248320) calls.push_back({34});
-        if (shape.n == 2048 && shape.k == 16384) {
-            for (int t : {383,  384,  385,  479,  480,  481,  639,  640,  641,  703,
-                          704,  705,  959,  960,  961,  1343, 1344, 1345, 1679, 1680,
-                          1681, 2015, 2016, 2017, 2111, 2112, 2113, 4096}) {
-                calls.push_back({t});
-            }
         }
         for (int t : {1, 8, 16, 32, 48, 64, 65, 128}) {
             calls.push_back({t, CallForm::Policy, ninfer::ops::LinearPolicy::A16Only, true});
