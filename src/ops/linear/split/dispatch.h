@@ -21,8 +21,7 @@ template <int... Rows>
 inline constexpr std::array kSplitRows{Rows...};
 
 extern const SplitShape kBf16SplitN1664K2560, kBf16SplitN13952K2560, kBf16SplitN14336K5120;
-extern const SplitShape kQ8SplitN12288K2560, kQ8SplitN16384K2560, kQ8SplitN9216K2048;
-extern const SplitShape kQ8SplitN6144K2048, kQ8SplitN6144K5120, kQ8SplitN12288K2048;
+extern const SplitShape kQ8SplitN12288K2560, kQ8SplitN16384K2560, kQ8SplitN6144K5120;
 extern const SplitShape kQ4Q5SplitN7168N7168K5120, kQ4Q5SplitN4096N12288K5120;
 extern const SplitShape kFp8SplitN14336K5120, kFp8SplitN16384K5120;
 

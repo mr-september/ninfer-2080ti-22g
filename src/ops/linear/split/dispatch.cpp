@@ -32,8 +32,7 @@ const SplitShape& select_split_shape(ProjectionProfile weights) {
         return match(shapes, weights);
     }
     case QType::Q8_G32_FP16: {
-        const std::array shapes{&kQ8SplitN12288K2560, &kQ8SplitN16384K2560, &kQ8SplitN9216K2048,
-                                &kQ8SplitN6144K2048,  &kQ8SplitN6144K5120,  &kQ8SplitN12288K2048};
+        const std::array shapes{&kQ8SplitN12288K2560, &kQ8SplitN16384K2560, &kQ8SplitN6144K5120};
         return match(shapes, weights);
     }
     default:

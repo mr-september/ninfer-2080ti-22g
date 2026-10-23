@@ -22,15 +22,5 @@ void add_wide_cases(ninfer::test::linear_suite::Suite& suite) {
 } // namespace
 
 void ninfer::test::linear_swiglu::add_q8_cases(Suite& suite) {
-
-    // One public numerical case begins each materially distinct Q8 implementation interval;
-    // selected endpoints exercise exact-T and predicated tails without inspecting selectors.
-    constexpr std::array<std::int32_t, 25> kTokenCases{
-        1,   2,   6,   32,  33,  40,  41,  48,  49,  65,  81,  97,  129,
-        193, 241, 256, 257, 265, 289, 321, 385, 449, 513, 560, 561,
-    };
-    add_profile(suite, {QType::Q8_G32_FP16, 12288, 2048, 6144, 1601U, ops::LinearPolicy::A16Only},
-                kTokenCases);
-
     add_wide_cases(suite);
 }

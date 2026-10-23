@@ -64,32 +64,6 @@ int cancellation_conformance(int n, int k) {
 }
 
 void q8_a16_conformance(ninfer::test::linear_suite::Suite& suite) {
-
-    constexpr std::array<std::int32_t, 4> kK4096RouteStarts{2, 49, 129, 641};
-    constexpr std::array<std::int32_t, 5> kK4096RouteInteriors{1, 24, 96, 256, 1024};
-    ninfer::test::linear_add::add_shape(suite, QType::Q8_G32_FP16,
-                                        ShapeCase{.n               = 2048,
-                                                  .k               = 4096,
-                                                  .seed            = 419U,
-                                                  .route_starts    = kK4096RouteStarts,
-                                                  .route_interiors = kK4096RouteInteriors});
-
-    constexpr std::array<std::int32_t, 32> kK6144RouteStarts{
-        2,    49,   129,  192,  193,  257,  385,  400,  401,  448,  449,
-        481,  641,  673,  705,  785,  897,  961,  1024, 1025, 1121, 1281,
-        1345, 1409, 1681, 1792, 1793, 1920, 1921, 2017, 2048, 2049,
-    };
-    constexpr std::array<std::int32_t, 33> kK6144RouteInteriors{
-        1,    24,   96,   160,  192,  224,  320,  392,  400,  424,  448,
-        464,  560,  656,  688,  744,  840,  928,  992,  1024, 1072, 1200,
-        1312, 1376, 1544, 1736, 1792, 1856, 1920, 1968, 2032, 2048, 4096,
-    };
-    ninfer::test::linear_add::add_shape(suite, QType::Q8_G32_FP16,
-                                        ShapeCase{.n               = 2048,
-                                                  .k               = 6144,
-                                                  .seed            = 421U,
-                                                  .route_starts    = kK6144RouteStarts,
-                                                  .route_interiors = kK6144RouteInteriors});
     constexpr std::array<std::int32_t, 10> large_route_starts{5,  9,  17, 25, 33,
                                                               41, 49, 57, 65, 129};
     constexpr std::array<std::int32_t, 8> large_interiors{1, 4, 8, 96, 128, 512, 1024, 1025};
@@ -111,8 +85,7 @@ void q8_a16_conformance(ninfer::test::linear_suite::Suite& suite) {
                                                       .route_interiors = full_tokens,
                                                       .full_output     = true});
     }
-    for (const auto [n, k] : std::array<std::array<int, 2>, 4>{
-             {{2048, 4096}, {2048, 6144}, {5120, 6144}, {5120, 17408}}}) {
+    for (const auto [n, k] : std::array<std::array<int, 2>, 2>{{{5120, 6144}, {5120, 17408}}}) {
         suite.add(ninfer::test::linear_suite::make_case(
                       "q8", n, k, 129, ninfer::ops::LinearPolicy::A16Only,
                       ninfer::test::linear_suite::Execution::Eager,

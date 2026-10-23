@@ -361,7 +361,7 @@ int run_q8_a16_shape(std::string_view label, const ShapeCase& shape,
 void add_shape(linear_suite::Suite& suite, const ShapeCase& shape) {
     std::vector<Invocation> calls;
     for (int t : conformance_tokens(shape)) calls.push_back({t});
-    calls.push_back({shape.k == 2048 ? 16 : 24, true});
+    calls.push_back({24, true});
     std::vector<linear_suite::Case> cases;
     for (auto& call : calls) {
         auto test = linear_suite::make_case(
@@ -414,23 +414,5 @@ int main(int argc, char** argv) {
                                .route_starts    = kK5120RouteStarts,
                                .route_interiors = kK5120RouteInteriors});
 
-    constexpr std::array<std::int32_t, 36> kK2048RouteStarts{
-        2,    33,   49,   65,   81,   89,   97,   105,  113,  129,  161,  193,
-        385,  481,  641,  642,  673,  681,  785,  897,  961,  977,  1281, 1317,
-        1345, 1346, 1441, 1467, 1681, 1709, 1921, 1923, 2017, 2019, 2209, 2271,
-    };
-    constexpr std::array<std::int32_t, 37> kK2048RouteInteriors{
-        1,    16,   40,   56,   72,   84,   92,   100,  108,  120,  144,  176,  288,
-        432,  560,  641,  656,  676,  736,  840,  928,  968,  1120, 1296, 1332, 1345,
-        1392, 1456, 1576, 1696, 1816, 1921, 1968, 2017, 2112, 2240, 4096,
-    };
-    add_shape(suite, ShapeCase{.k               = 2048,
-                               .seed            = 433U,
-                               .parents         = WeightParents::Shared,
-                               .parent_rows     = 6144,
-                               .first_row       = 4096,
-                               .second_row      = 5120,
-                               .route_starts    = kK2048RouteStarts,
-                               .route_interiors = kK2048RouteInteriors});
     return suite.main(argc, argv);
 }

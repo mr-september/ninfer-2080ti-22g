@@ -73,39 +73,23 @@ void add_multi_output_cases(Suite& suite) {
         add_profile(suite, profile, std::move(calls));
     }
     {
-        Profile profile{2048,
-                        {{QType::Q8_G32_FP16, 9216, 211U}},
-                        {4096, 512, 4096, 512},
-                        {{0, 4096}, {4096, 512}, {4608, 4096}, {8704, 512}},
-                        a16};
-        std::vector<Invocation> calls;
-        for (int t : {1, 2, 17, 48, 64, 65, 129})
-            calls.push_back({.t = t, .input_seed = 201U, .convenience = true});
-        add_profile(suite, profile, std::move(calls));
-    }
-    for (int k : {2048, 5120}) {
-        Profile profile{k,
-                        {{QType::Q8_G32_FP16, 6144, k == 2048 ? 307U : 313U}},
+        Profile profile{5120,
+                        {{QType::Q8_G32_FP16, 6144, 313U}},
                         {4096, 1024, 1024},
                         {{0, 4096}, {4096, 1024}, {5120, 1024}},
                         a16,
                         Binding::LinearInputs};
         std::vector<Invocation> calls;
-        if (k == 2048) {
-            for (int t : {1, 2, 97, 193, 289, 321, 385, 449})
-                calls.push_back({.t = t, .input_seed = 301U, .convenience = true});
-        } else {
-            for (int t = 1; t <= 128; ++t)
-                calls.push_back({.t = t, .input_seed = 301U, .convenience = true});
-            for (int t : {129, 192, 193, 1024})
-                calls.push_back({.t = t, .input_seed = 301U, .convenience = true});
-            for (int t : {1, 8, 16, 48, 49, 53, 54, 63, 64, 65, 96, 97, 112, 127, 128, 129})
-                calls.push_back({.t           = t,
-                                 .graph       = true,
-                                 .input_seed  = 301U,
-                                 .sample_rows = 31,
-                                 .convenience = true});
-        }
+        for (int t = 1; t <= 128; ++t)
+            calls.push_back({.t = t, .input_seed = 301U, .convenience = true});
+        for (int t : {129, 192, 193, 1024})
+            calls.push_back({.t = t, .input_seed = 301U, .convenience = true});
+        for (int t : {1, 8, 16, 48, 49, 53, 54, 63, 64, 65, 96, 97, 112, 127, 128, 129})
+            calls.push_back({.t           = t,
+                             .graph       = true,
+                             .input_seed  = 301U,
+                             .sample_rows = 31,
+                             .convenience = true});
         add_profile(suite, profile, std::move(calls));
     }
 }
