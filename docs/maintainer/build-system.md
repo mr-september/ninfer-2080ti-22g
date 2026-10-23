@@ -1,7 +1,7 @@
 # Build system
 
 NInfer builds from its source tree with CMake 3.28+ and C++/CUDA 20.
-CUDA 13.4 is the validated development toolkit. Product commands and prerequisites are in the
+CUDA 12.9 is the validated development toolkit. Product commands and prerequisites are in the
 [README](../../README.md#quick-start); test and measurement workflows live in
 [tests](../../tests/README.md) and [benchmarks](../../bench/README.md).
 
@@ -9,10 +9,10 @@ CUDA 13.4 is the validated development toolkit. Product commands and prerequisit
 
 The build targets NVIDIA Turing (`sm_75`) on Linux x86-64 or native Windows x86-64, and
 `CMAKE_CUDA_ARCHITECTURES` is fixed at `75`. Sources sit directly in their Op directories.
-`src/ops/CMakeLists.txt` filters the Blackwell-only Op sources (FP8 weights and KV, TMA, block-scaled
-MoE, QSA sparse attention, hyper-connection mix) out of the manifests, and
-`src/ops/unsupported/turing_unsupported.cpp` links throwing stubs for the declarations that remain, so
-these Ops report unsupported at their capacity/execution entries. Device code is written for sm_75 only.
+The tree has no kernels for FP8 weights and KV, TMA, block-scaled MoE, QSA sparse attention or the
+hyper-connection mix. `src/ops/unsupported/turing_unsupported.cpp` links throwing definitions for their
+public declarations, which the Qwen4Exp host code still uses, so these Ops report unsupported at their
+capacity/execution entries. Device code is written for sm_75 only.
 
 [`cmake/NinferPlatform.cmake`](../../cmake/NinferPlatform.cmake) fixes and validates
 `CMAKE_CUDA_ARCHITECTURES` before `project()` detects CUDA. After toolchain initialization it checks
@@ -60,7 +60,7 @@ worker startup/affinity facilities directly, without depending on the arithmetic
 Core's direct-file I/O uses liburing >= 2.5.
 Its registered files and buffers are caller-owned; the queue creates no CUDA resources or threads.
 
-CUDA 13.4 and Python 3.11 describe the maintained environment, not configuration version gates.
+CUDA 12.9 and Python 3.10 describe the maintained environment, not configuration version gates.
 FFmpeg is discovered without a version floor. The libcurl 7.85 minimum follows the use of
 `CURLOPT_PROTOCOLS_STR` and `CURLOPT_REDIR_PROTOCOLS_STR`. Actual API support is checked by compilation.
 
