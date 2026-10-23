@@ -300,14 +300,12 @@ allocation:
   --sweep 48:65:1 --warmup 5 --repeat 30
 ```
 
-The registered suites run representative public Linear shapes for one or both exact products.
+The registered suite runs representative public Linear shapes for the dense 27B.
 They are compact performance surveys, not copies of the production selector or numerical test
 matrix:
 
 ```bash
 ./build/turing-dev/bench/ninfer_linear_bench --suite qwen3_6_27b
-./build/turing-dev/bench/ninfer_linear_bench --suite qwen3_6_35b_a3b
-./build/turing-dev/bench/ninfer_linear_bench --suite all
 ```
 
 When a point group includes `T=1`, `T1_lin_x` reports the calculated ratio
@@ -915,8 +913,7 @@ Useful traffic is `(2+2B)*4` bytes: two device scalar reads and two complete I32
 ## Q8 LinearSwiGLU Op benchmark
 
 `ninfer_q8_linear_swiglu_bench` measures the public Q8 LinearSwiGLU profiles:
-`--problem companion` is `[12288,2048] -> [6144,T]`; `--problem dflash2` is
-`[34816,5120] -> [17408,T]`. Every timed call uses production dispatch and writes only the fused
+`--problem dflash2` is `[34816,5120] -> [17408,T]`. Every timed call uses production dispatch and writes only the fused
 output. Workspace is queried for the requested interval before timing. Private candidate forcing
 and the former composed control are removed from this retained tool.
 
@@ -998,28 +995,6 @@ cmake --build build/turing-dev --parallel --target ninfer_bf16_linear_add_bench
   --t-sweep 1024 --profile
 ```
 
-## Q8 LinearAdd Op benchmark
-
-`ninfer_q8_linear_add_bench` measures the Q8 `[2048,4096]` and `[2048,6144]` projections with their
-BF16 residual epilogue. Each sample calls the public Op, which updates the residual in place and
-uses no workspace. Every cold-cache sample follows a 256 MiB L2 flush.
-
-```bash
-cmake --build build/turing-dev --parallel --target ninfer_q8_linear_add_bench
-./build/turing-dev/bench/ninfer_q8_linear_add_bench \
-  --k 4096 \
-  --t-sweep 1,2,4,8,16,32,48,64,96,128 --warmup 10 --repeat 50
-./build/turing-dev/bench/ninfer_q8_linear_add_bench \
-  --k 6144 \
-  --t-sweep 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,32,33,64,65,96,128,256,640,641,896,960,1024,1280,2048 \
-  --warmup 10 --repeat 50 --csv-out profiles/bench/q8_linear_add.csv
-./build/turing-dev/bench/ninfer_q8_linear_add_bench \
-  --t-sweep "$(seq -s, 1 2048)" \
-  --warmup 3 --repeat 15 --csv-out profiles/bench/q8_linear_add_all_t.csv
-./build/turing-dev/bench/ninfer_q8_linear_add_bench \
-  --profile --t-sweep 1024
-```
-
 ## FP8 LinearAdd Op benchmark
 
 `ninfer_fp8_linear_add_bench` measures the two public row-scaled FP8 LinearAdd registrations,
@@ -1042,8 +1017,7 @@ cmake --build build/turing-dev --parallel --target ninfer_fp8_linear_add_bench
 ## LinearSplit benchmarks
 
 `ninfer_linear_split_multi_output_bench` measures the three/four-output forms of public
-`linear_split()`: Q4/Q5 `[7168+7168,5120]`; Q8 `[9216,2048]`, `[6144,2048]` and
-`[6144,5120]`; and BF16 and FP8 `[14336,5120]`.
+`linear_split()`: Q4/Q5 `[7168+7168,5120]`; Q8 `[6144,5120]`; and BF16 and FP8 `[14336,5120]`.
 Fixture packing and public workspace capacity queries happen
 before timing. Every sample and profiler range contains exactly one public Op call, so production
 owns format-specific dispatch and launch decomposition.
@@ -1072,7 +1046,7 @@ cmake --build build/turing-dev -j --target ninfer_linear_split_multi_output_benc
   --execution graph --cache cold --warmup 10 --repeat 50
 ```
 
-`ninfer_linear_split_two_output_bench` covers Q8 `[12288,2048]` and `[16384,2560]`,
+`ninfer_linear_split_two_output_bench` covers Q8 `[16384,2560]`,
 FP8 `[16384,5120]`, and paired Q4/Q5 `[4096+12288,5120]`. It uses the common
 `op_measurement.cuh` options described above; `--n` is the total logical row count.
 
@@ -1256,15 +1230,13 @@ measured DRAM bandwidth. Use profiler traffic when constructing a kernel or comp
 ## Q8 context K/V LinearPair benchmark
 
 `ninfer_linear_pair_bench` measures one public `linear_pair()` call over exact adjacent Q8
-`[1024,K]` K/V row views of a `[6144,K]` QKV parent, for the registered `K=2048` and `K=5120`
-geometries. It uses cold-cache eager execution or CUDA Graph replay, accepts an arbitrary token
+`[1024,K]` K/V row views of a `[6144,K]` QKV parent, for the registered `K=5120`
+geometry. It uses cold-cache eager execution or CUDA Graph replay, accepts an arbitrary token
 list or sweep, and reports route-neutral effective bandwidth, logical FLOP/s, and calculated T=1
 linear extrapolation. `--flush-mib` must be positive; the header records the eviction size.
 
 ```bash
 cmake --build build/turing-dev -j --target ninfer_linear_pair_bench
-./build/turing-dev/bench/ninfer_linear_pair_bench \
-  --k 2048 --sweep 1:128:1 --execution graph --warmup 5 --repeat 30
 ./build/turing-dev/bench/ninfer_linear_pair_bench \
   --k 5120 --tokens 8,16,24,32,40,48,56,64 --execution graph --warmup 5 --repeat 30
 ./build/turing-dev/bench/ninfer_linear_pair_bench \
