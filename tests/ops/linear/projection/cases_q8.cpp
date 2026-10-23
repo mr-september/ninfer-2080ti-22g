@@ -126,7 +126,6 @@ void q8_a16_conformance(Suite& suite) {
             }
         }
         if (shape.n == 248320) calls.push_back({34});
-        }
         for (int t : {1, 8, 16, 32, 48, 64, 65, 128}) {
             calls.push_back({t, CallForm::Policy, ninfer::ops::LinearPolicy::A16Only, true});
         }
