@@ -2,7 +2,6 @@
 .agent-tmp
 .cache
 .claude
-.codex
 .idea
 .pytest_cache
 .vscode
@@ -10,8 +9,6 @@
 build
 build-*
 cmake-build-*
-eval/runs
-eval/server-logs
 out
 profiles
 logs

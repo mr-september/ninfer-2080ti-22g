@@ -145,7 +145,6 @@ selected local inputs; it does not make repository state part of report validity
 
 ## Serving corpus benchmark
 
-[Published coverage and model results](../../docs/performance.md) identify the recorded runs.
 The [serving methodology](../../docs/performance/methodology.md) owns workload definitions,
 metric boundaries, aggregation, comparison rules, and publication format. This section describes
 runner usage and output files.

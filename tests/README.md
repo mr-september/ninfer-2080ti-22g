@@ -331,13 +331,6 @@ supported schemas with the independent Python `jsonschema` validator; install it
 `python3 -m pip install -r tests/text/requirements.txt` in the selected test environment.
 The sampling and speculative Op tests qualify masks against independent mathematical oracles.
 
-The capability-evaluation coordinator has its own environment and unittest entry point:
-
-```bash
-PYTHONPATH=eval eval/.venv/bin/python -m unittest discover \
-  -s eval/tests -p 'test_*.py'
-```
-
 Run the serving contract manually after starting a resident server in another terminal:
 
 ```bash

@@ -1,6 +1,6 @@
 # Serving performance methodology
 
-[Performance index](../performance.md) · [Runner usage](../../tools/bench/README.md#serving-corpus-benchmark)
+[Runner usage](../../tools/bench/README.md#serving-corpus-benchmark)
 
 This is the measurement and publication reference for the serving results in this directory.
 Model pages own measured values and run-specific conditions. Engine and Op benchmarks have their
@@ -15,7 +15,7 @@ These are recorded experimental settings, not promises about current executable 
 
 | Setting | Value |
 |---|---|
-| GPU | One NVIDIA GeForce RTX 5090, 32 GiB |
+| GPU | One NVIDIA GeForce RTX 2080 Ti, 22 GiB |
 | CUDA compile/runtime | Qwen3.8: 13.4 / 13.4; Qwen3.6: 13.1 / 13.1 |
 | Route | Persistent `ninfer-serve`, loopback OpenAI Chat Completions, `stream=false` |
 | Prefill chunk | 1,024 tokens |
@@ -151,8 +151,7 @@ on another build or artifact does not promise identical historical outputs or ti
 remain local under `profiles/bench/`; reuse existing JSON/CSV/Markdown summaries to verify values.
 
 Model pages own detailed serving results. README and model-card excerpts link to them and update
-with the relevant measurements. Capability scores belong in model-card Evaluation sections, with
-workflow guidance in [eval/README.md](../../eval/README.md); runner usage and report-file descriptions
+with the relevant measurements. Capability scores belong in model-card Evaluation sections; runner usage and report-file descriptions
 belong in [tools/bench/README.md](../../tools/bench/README.md).
 
 When replacing measurements, update their run records, applicable findings, coverage index, and

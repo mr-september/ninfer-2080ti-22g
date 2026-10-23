@@ -10,7 +10,7 @@ Start with the [project README](../README.md) to build NInfer, download a publis
 | [HTTP serving](serving.md) | OpenAI Responses/Chat Completions, Anthropic Messages, state, streaming, token counting, authentication, and tool calls |
 | [Turing port](turing-port.md) | sm_75 differences, supported surface, Windows build and Turing measurements |
 | [Multi-GPU](multi-gpu.md) | device selection, multi-instance data parallelism, pipeline-parallelism design notes |
-| [Performance](performance.md) | RTX 5090 measurement coverage, per-model serving results, methodology, and publication rules |
+| [Serving methodology](performance/methodology.md) | serving workload definitions, metric formulas, statistics, and publication rules |
 | [Weight conversion](weight-conversion.md) | official recipes, custom formats and sources, conversion methods, optional components and artifact output |
 | [Perplexity](perplexity.md) | fixed-corpus and custom-text causal perplexity, comparison rules, progress, and reports |
 | [CLI examples](../examples/cli/) | committed text, multimodal, thinking, long-decode, and long-context inputs |
@@ -25,7 +25,6 @@ Published artifact downloads are listed in the [project README](../README.md).
 - [Benchmarks](../bench/README.md)
 - [Tests](../tests/README.md)
 - [Tools](../tools/README.md)
-- [Capability evaluation](../eval/README.md)
 
 ## Maintainer references
 

@@ -200,7 +200,7 @@ For DFlash:
 
 For Qwen3.8-27B artifacts containing the DFlash2 companion weights, select `--spec dflash2 --draft-tokens 7`, optionally with `--lm-head-draft` and `--vision`. DFlash2 accepts every draft count from 1 through 15; seven is the checkpoint recommendation. The `groupwise-int` artifact uses the same Engine route, including CUDA Graph, concurrent requests, sampling penalties, and prefix reuse. An artifact without the companion weights reports a missing DFlash2 component when selected. Vision, MTP and DFlash follow the same rule: their weights are required only when that component is enabled at startup.
 
-Only one speculative backend can be enabled per Engine. The published [performance results](performance.md) use MTP with three draft tokens and DFlash with seven draft tokens (block length eight), both with the optimized proposal head. DFlash accepts one to fifteen draft tokens; seven forms the measured block length eight, while fifteen uses the maximum supported block length sixteen.
+Only one speculative backend can be enabled per Engine. The measured configurations in [Turing port](turing-port.md#current-performance) use MTP with three draft tokens and DFlash with seven draft tokens (block length eight), both with the optimized proposal head. DFlash accepts one to fifteen draft tokens; seven forms the measured block length eight, while fifteen uses the maximum supported block length sixteen.
 
 ## Common options
 

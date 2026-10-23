@@ -35,7 +35,7 @@ PLE 流水、MTP/Vision、CUDA Graph 和完整 continuation 的提交规则。
 
 用户命令见 [CLI](../cli.md)与[Serving](../serving.md)，产物生成见
 [转换指南](../weight-conversion.md)。这些能力描述当前实现；公开的吞吐与质量结果由
-[性能文档](../performance.md)和 model cards 单独维护。
+[Turing 移植文档](../turing-port.md)和 model cards 单独维护。
 
 ## 2. 轴、前沿与所有权
 

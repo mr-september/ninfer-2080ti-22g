@@ -112,7 +112,7 @@ Measured 2026-10-19 on `master`: native Windows 11, driver 610.88, CUDA 12.9, Qw
 | decode, MTP3, real code prompt | 47.5 tok/s (26.3 with `--spec none`) | `ninfer --messages examples/cli/messages/scenario_code_python.json --greedy --max-new 256 --no-thinking` |
 | decode, MTP3, real prose prompt | 28.8 tok/s (26.0 with `--spec none`) | the same with `scenario_story_en_mystery.json` |
 
-The benchmark corpus is random token ids, so its MTP acceptance (0.377) is far below real text; the two CLI rows show the range on real prompts. The full table, methods and per-change measurements are in [docs/turing-port.md](docs/turing-port.md#current-performance). The RTX 5090 tables in [docs/performance.md](docs/performance.md) are upstream's and do not apply here.
+The benchmark corpus is random token ids, so its MTP acceptance (0.377) is far below real text; the two CLI rows show the range on real prompts. The full table, methods and per-change measurements are in [docs/turing-port.md](docs/turing-port.md#current-performance).
 
 ## What runs here
 
