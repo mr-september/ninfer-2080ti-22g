@@ -273,7 +273,7 @@ std::vector<qb::TestResult> sample_results() {
 
 qb::BenchEnvironment sample_environment() {
     qb::BenchEnvironment env;
-    env.gpu_name                   = "RTX 5090";
+    env.gpu_name                   = "RTX 2080 Ti";
     env.cuda_runtime_version       = "13.1";
     env.cuda_driver_version        = "590.1";
     env.device_id                  = 0;

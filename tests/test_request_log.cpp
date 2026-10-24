@@ -94,7 +94,7 @@ int main() {
     load.context_cost         = {
                 .transfer_source   = ninfer::ContextCostPresetSource::External,
                 .prefill_source    = ninfer::ContextCostPresetSource::CompiledDefault,
-                .hardware_class    = "nvidia-geforce-rtx-5090-sm120",
+                .hardware_class    = "nvidia-geforce-rtx-2080-ti-sm75",
                 .prefill_signature = "example-prefill-signature",
                 .preset_path       = "local-costs.json",
     };
@@ -136,7 +136,7 @@ int main() {
 
     ServerLogEnvironment environment;
     environment.device                    = 0;
-    environment.gpu_name                  = "NVIDIA GeForce RTX 5090";
+    environment.gpu_name                  = "NVIDIA GeForce RTX 2080 Ti";
     environment.gpu_uuid                  = "GPU-00000000-0000-0000-0000-000000000000";
     environment.total_device_memory_bytes = 32000000000ULL;
     environment.compute_capability_major  = 12;
@@ -183,7 +183,7 @@ int main() {
         server.at("engine").at("context_cost").at("transfer_source") == "external" &&
             server.at("engine").at("context_cost").at("prefill_source") == "compiled-default" &&
             server.at("engine").at("context_cost").at("hardware_class") ==
-                "nvidia-geforce-rtx-5090-sm120" &&
+                "nvidia-geforce-rtx-2080-ti-sm75" &&
             server.at("engine").at("context_cost").at("preset_path") == "local-costs.json",
         "resolved context-cost layers missing");
     failures += check(server.at("engine").at("prefix_reuse") == true, "prefix-reuse state missing");
@@ -203,7 +203,7 @@ int main() {
                 0.6F &&
             server.at("sampling_defaults").at("server_overrides").at("top_p").is_null(),
         "server sampling overrides lost omission state");
-    failures += check(server.at("environment").at("gpu_name") == "NVIDIA GeForce RTX 5090",
+    failures += check(server.at("environment").at("gpu_name") == "NVIDIA GeForce RTX 2080 Ti",
                       "GPU name missing");
     failures +=
         check(server.at("memory").at("workspace").at("capacity_bytes") == 500 &&
