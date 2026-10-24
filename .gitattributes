@@ -2,3 +2,8 @@
 # default whitespace checks.
 /third_party/spdlog/include/** -whitespace
 /third_party/spdlog/src/** -whitespace
+
+# The TTFT corpus manifest pins SHA-256 hashes of these files; keep their bytes unchanged on every platform.
+/bench/fixtures/ttft/** -text
+/examples/cli/messages/** -text
+/examples/cli/media/** -text
