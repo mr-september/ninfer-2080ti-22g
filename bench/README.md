@@ -72,20 +72,16 @@ the actual GPU separately; they do not choose a reference from its name or estim
 bandwidth from runtime memory-clock attributes. Logical GB/s and TFLOP/s describe useful work,
 not measured DRAM traffic or executed Tensor Core instructions.
 
-| Reference | RTX 5090 |
+| Reference | RTX 2080 Ti |
 |---|---:|
-| Nominal memory bandwidth, GB/s | 1792 |
-| Measured sustained pure-read bandwidth, GB/s | 1674.5 |
-| Dense BF16 / FP32 accumulation, TFLOP/s | 209.5 |
-| Dense FP8 E4M3 / FP16 accumulation, TFLOP/s | 838 |
-| Dense FP8 E4M3 / FP32 accumulation, TFLOP/s | 419 |
-| Dense MXFP8 E4M3 / FP32 accumulation, TFLOP/s | 838 |
+| Nominal memory bandwidth, GB/s | 616 |
+| Measured sustained pure-read bandwidth, GB/s | 584 |
+| Tensor-core rates | not established |
 
-The 5090 sustained-read reference comes from the [memory probe](../tools/hbm_bandwidth_probe.cu)
-using a 4 GiB `uint4` read workload. The plain BF16/FP8 peaks follow the dense rates in
-[NVIDIA's RTX Blackwell whitepaper, Appendix A](https://images.nvidia.com/aem-dam/Solutions/geforce/blackwell/nvidia-rtx-blackwell-gpu-architecture.pdf).
-The MXFP8 reference describes the full-rate block-scaled FP32 accumulation path. Unestablished
-references remain absent: derived percentages print `-` in console output and an empty CSV field.
+The sustained-read reference comes from the [memory probe](../tools/hbm_bandwidth_probe.cu)
+(measurement in [Turing port](../docs/turing-port.md)). The nominal figure is the GDDR6 specification.
+Unestablished references remain absent: derived percentages print `-` in console output and an empty
+CSV field, so Tensor Core utilization is not reported on this target.
 
 Use the profile matching the arithmetic actually selected by the Op, not merely its weight type or
 activation permission. Shape/T classification belongs to the affected benchmark, outside the
@@ -783,9 +779,8 @@ the benchmark therefore does not infer Tensor Core utilization from a storage-fo
 Use ordinary benchmark latency `t`, not profiler replay duration, for effective roofline fractions:
 `unique_kv_bytes / (t * peak_bandwidth)` and
 `(qk_flops / peak_qk_ops + pv_flops / peak_pv_ops) / t`, with consistent units and explicitly stated
-hardware peaks. Current INT8 QK uses native INT8, FP8 QK uses unit-scale MXFP8
-(838 TFLOP/s at the RTX 5090 reference boost clock), and BF16 QK
-and all PV use 16-bit Tensor Core throughput references.
+hardware peaks. Current INT8 QK uses native INT8, and BF16 QK
+and all PV use 16-bit Tensor Core throughput references; none is established for Turing.
 These useful-work fractions differ from profiler pipeline activity and actual
 DRAM traffic; use targeted profiling to explain the remaining gap.
 
@@ -944,22 +939,6 @@ cmake --build build/turing-dev --parallel --target ninfer_q4_linear_swiglu_bench
   --t-sweep 1,2,4,8,16,24,32,40,48 --warmup 10 --repeat 50
 ```
 
-## FP8 LinearSwiGLU Op benchmark
-
-`ninfer_fp8_linear_swiglu_bench` measures the public row-scaled FP8 `[34816,5120] ->
-[17408,T]` profile. `--policy a8` measures the production resolver, including caller-owned
-activation workspace and the fused SwiGLU output; `--policy a16` measures the public A16 form.
-The Tensor Core percentage uses the RTX 5090 dense MXFP8/FP32-accumulate reference of 838 TFLOP/s
-only for extents that the production resolver sends to A8.
-
-```bash
-cmake --build build/turing-dev --parallel --target ninfer_fp8_linear_swiglu_bench
-./build/turing-dev/bench/ninfer_fp8_linear_swiglu_bench \
-  --policy a8 \
-  --t-sweep 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,24,32,40,48,1024 \
-  --warmup 5 --repeat 30
-```
-
 ## Q5 LinearAdd Op benchmark
 
 `ninfer_q5_linear_add_bench` measures the public Q5 `[5120,6144]` and `[5120,17408]`
@@ -993,25 +972,6 @@ cmake --build build/turing-dev --parallel --target ninfer_bf16_linear_add_bench
   --t-sweep 1024,1536,2048 --warmup 10 --repeat 50
 ./build/turing-dev/bench/ninfer_bf16_linear_add_bench \
   --t-sweep 1024 --profile
-```
-
-## FP8 LinearAdd Op benchmark
-
-`ninfer_fp8_linear_add_bench` measures the two public row-scaled FP8 LinearAdd registrations,
-including activation quantization, caller-owned workspace, contraction, residual read, and final
-in-place BF16 write. `--policy a8` follows the independent production resolver of the selected
-semantic Op: `[5120,6144]` uses A16 below `T=22`, while `[5120,17408]` uses A16 below `T=25`; larger
-extents use FP8/FP32-accumulate Tensor Core contraction. `TC_%` is reported only when that A8 route
-actually executes, against the RTX 5090 unit-scale MXFP8/FP32-accumulate 838 TFLOP/s reference.
-
-```bash
-cmake --build build/turing-dev --parallel --target ninfer_fp8_linear_add_bench
-./build/turing-dev/bench/ninfer_fp8_linear_add_bench \
-  --k 6144 --policy a8 --t-sweep 1,2,4,8,16,20,21,22,32,48,1024 \
-  --warmup 5 --repeat 30
-./build/turing-dev/bench/ninfer_fp8_linear_add_bench \
-  --k 17408 --policy a8 --t-sweep 1,2,4,8,16,24,25,32,48,1024 \
-  --warmup 5 --repeat 30
 ```
 
 ## LinearSplit benchmarks
@@ -1057,123 +1017,6 @@ FP8 `[16384,5120]`, and paired Q4/Q5 `[4096+12288,5120]`. It uses the common
 
 Stateful projection/convolution remains in `ninfer_gdn_input_proj_bench`.
 
-## QSA Op benchmark
-
-`ninfer_qsa_bench --op input-proj` (the default) measures public A16 `linear_split()` on the three
-QSA projection geometries alongside the corresponding contiguous-output `linear()` calls.
-`--projection qg|kv-index|qkgv-index|all` selects Q8 `[12288,2560]`,
-BF16 `[1664,2560]`, or BF16 `[13952,2560]`. `--entry split|linear|both` selects the public entries;
-`both` reuses identical weights, inputs, and total output storage and alternates entry order by round.
-The split entry writes each contiguous segment directly and uses zero global workspace.
-
-Timing uses `op_measurement.cuh`: Graph body and eager latency, cold/warm cache, Host submission,
-and actual Graph kernel count. Cold measurements evict 256 MiB before timing. CSV rows include the
-projection and round; fixture creation is outside timing.
-
-```bash
-cmake --build build/turing-dev -j --target ninfer_qsa_bench
-./build/turing-dev/bench/ninfer_qsa_bench --projection all --entry both --sweep 1:128 \
-  --rounds 3 --warmup 10 --repeat 100 --execution graph --cache both \
-  --csv-out .agent-tmp/qsa/qsa_small.csv
-./build/turing-dev/bench/ninfer_qsa_bench --tokens 256,512,1024,2048,4096 \
-  --rounds 3 --warmup 10 --repeat 100 --execution both --cache both \
-  --csv-out .agent-tmp/qsa/qsa_prefill.csv
-```
-
-`--op tail-extract` measures the complete public `qsa_tail_extract()` call. `--capacity` selects
-record capacities R; `--batch`, `--base-positions`, `--valid`, and `--accepted` specify the actual
-Device metadata. A single position/count broadcasts to B rows; a list must contain B values.
-`--accepted dense` retains the valid prefix, while `mixed` varies retention across rows.
-`--layout contiguous|layered|unaligned` selects compact buffers, twelve-layer slab strides, or
-naturally aligned BF16 views requiring scalar word copies. `--inplace` uses the source slots as
-destinations and restores both source planes outside each timed call. Extraction CSV rows use
-`tokens` for R and include base positions, layout, in-place mode and round. There is zero workspace.
-
-```bash
-./build/turing-dev/bench/ninfer_qsa_bench --op tail-extract --capacity 16,4096 --batch 8 \
-  --base-positions 6 --accepted mixed --layout layered --inplace \
-  --rounds 3 --warmup 10 --repeat 100 --execution both --cache both \
-  --csv-out .agent-tmp/qsa/qsa_tail.csv
-```
-
-`--op prepare` measures the complete `qsa_prepare()` call. `--kv-cache bf16|int8|fp8`
-selects the main-cache profile (default `bf16`). `--tokens` selects T, `--batch` selects B,
-and `--axes 1|3` selects current RoPE coordinates. `--base-positions` and
-`--valid` set Device metadata; cache pages use a nonsequential mapping. `--layout` controls the
-tail/record views. `--inplace` aliases both Q/IQ outputs and restores their original projection
-words outside every timed call. CSV rows include positions, axes, alias mode, layout and round.
-
-```bash
-./build/turing-dev/bench/ninfer_qsa_bench --op prepare --sweep 1:16 --batch 8 --axes 3 \
-  --base-positions 63 --inplace --rounds 3 --cache both \
-  --csv-out .agent-tmp/qsa/qsa_prepare_small.csv
-./build/turing-dev/bench/ninfer_qsa_bench --op prepare --tokens 128,1024,2048,4096 \
-  --kv-cache fp8 --axes 3 --rounds 3 --execution both --cache both \
-  --csv-out .agent-tmp/qsa/qsa_prepare_prefill.csv
-```
-
-`--op indexer` measures the complete public `qsa_indexer()` call, including paged scoring and
-Top512 selection. `--contexts L[,L...]` gives each row's visible original-token count at its last
-live query; one value broadcasts to B rows. `--valid` sets live query prefixes. The
-`--context-capacity` envelope defaults to the batch maximum L, as it does for sparse GQA. An
-explicit wider bound measures a fixed capture envelope independently of actual context lengths.
-`--layout` selects contiguous, interleaved-page, or naturally aligned BF16 keys. Page mappings are
-nonsequential. CSV includes actual contexts, envelope, layout, caller workspace capacity/peak,
-and Graph kernel count. The index plane is always BF16, independent of main KV encoding.
-`--score-pattern random|ties` supplies ordinary inputs or zero queries with equal scores.
-
-```bash
-./build/turing-dev/bench/ninfer_qsa_bench --op indexer --tokens 1,8,64,1024,2048,4096 \
-  --contexts 262144 --context-capacity 262144 --rounds 3 --execution graph --cache both \
-  --csv-out .agent-tmp/qsa/qsa_indexer.csv
-./build/turing-dev/bench/ninfer_qsa_bench --op indexer --tokens 8 --batch 8 \
-  --contexts 262144,131072,32768,8192,2052,2051,4,0 --valid 8,8,8,8,8,8,4,0 \
-  --rounds 3 --execution graph --cache both --csv-out .agent-tmp/qsa/qsa_indexer_mixed.csv
-```
-
-`--op sparse-gqa` measures the complete public attention and sigmoid gate, including any split
-reduction and inverse value-basis transform. `--kv-cache bf16|int8|fp8` selects cache
-storage; activations remain BF16/FP16. All profiles start from the same represented BF16 K/V
-source values, initialized through public `kv_cache_append` outside timing. `--contexts` and
-`--valid` have the same meaning as Indexer. Its
-`--context-capacity` defaults to the batch's maximum actual context; an explicit wider value
-measures that capture envelope. `--selection random|shared|contiguous` selects dispersed independent
-uniform samples without replacement, a shared shuffled block ranking filtered by each query's causal boundary, or recent adjacent
-blocks. `--selected-blocks` defaults to 512 and permits 0..512; incomplete tails are always included.
-Physical pages are shuffled, and `--layout` exercises the same three plane layouts.
-
-Prepare, Indexer and sparse GQA share semantic work/traffic columns. Counts follow actual live
-prefixes; T/B describe physical extents. Indexer reports scoring queries and complete candidate
-blocks, excluding the C<=512 all-select case. QK FLOPs count the four 128-dimensional heads only
-for scored queries. Sparse GQA reports separate useful QK/PV FLOPs over selected blocks plus the
-incomplete tail, with 24 query heads and two KV heads (`value_heads` in the common CSV).
-
-`logical_read_bytes` and `logical_write_bytes` count unique boundary payloads by direction,
-including activations, relevant metadata and all required output writes. `kv_read_bytes` is the
-union of selected KV across queries; `per_query_cache_bytes` instead sums each query's cache
-support. KV counts include represented scales. Indexer has corresponding unique index-key reads.
-Prepare reports KV/index writes and raw-record writes; incomplete groups read only the necessary
-old tail, and inert Q/IQ columns still contribute zero-output writes. Physical cache allocation,
-workspace capacity and arena high-water remain separate from accessed payloads.
-
-`logical_GBps` and `logical_TFLOps` use complete-Op median latency. The reference times divide
-logical bytes by nominal target memory bandwidth and useful contraction FLOPs by the calibrated
-BF16/FP32 tensor rate; `roofline_reference_us` is their maximum. This is an ideal semantic-work
-reference: it excludes TopK selection, normalization, softmax, codec work, padding, repeated loads
-and internal scratch traffic. It is neither measured DRAM bandwidth nor Tensor Core utilization.
-Cold eviction occurs before the Op, so internal cache reuse and deferred output writeback remain
-possible. Use targeted profiling for workspace traffic and executed-kernel utilization; benchmarks
-do not duplicate private launch plans to infer either quantity.
-
-```bash
-./build/turing-dev/bench/ninfer_qsa_bench --op sparse-gqa --tokens 1,8,128,1024,2048,4096 \
-  --contexts 262144 --kv-cache fp8 --execution graph --cache both \
-  --csv-out .agent-tmp/qsa/qsa_sparse.csv
-./build/turing-dev/bench/ninfer_qsa_bench --op sparse-gqa --tokens 9 --batch 8 \
-  --contexts 64,2048,8192,32768,131072,262144,0,65536 --valid 9,9,9,5,9,9,0,9 \
-  --context-capacity 262144 --execution graph --cache both
-```
-
 ## MoE benchmark
 
 `ninfer_moe_bench` calls the public MoE interfaces over the 35B Q4+Q5/Q6 and Q8+Q8 profiles.
@@ -1206,26 +1049,6 @@ roofline, substitute sustained bandwidth and include private reloads, staging tr
 computation when interpreting the gap. Logical FLOP/s counts only the requested matrix products.
 The complete call uses empty external read-ahead hints; next-projection cache warming and its
 downstream effect are covered by Engine measurements.
-
-`ninfer_moe_block_scaled_bench` measures H2560/I640/E512/top-10 through the same public
-interfaces. `--format fp8` selects block-FP8 weights. `--operation routed|routed-shared|complete|route` selects the semantic scope; outputs
-are BF16 Write. It uses the graph-body timing and 256 MiB cold-cache eviction described above.
-`--tokens` is a comma-separated list of total columns (`T*B`); `independent`, `same`, and `mixed`
-select uniform distinct top-10 routes, one shared top-10 set, or six shared experts plus four
-independently sampled tail experts. All 512 experts have distinct physical backing. Input/router
-construction makes the complete entry produce the same selected routes as the routed entry.
-
-```bash
-./build/turing-dev/bench/ninfer_moe_block_scaled_bench --format fp8 --operation routed \
-  --tokens 1,8,16,32,64,128,256,512,1024,2048,4096 --distribution all --cache both
-./build/turing-dev/bench/ninfer_moe_block_scaled_bench --format fp8 --operation complete \
-  --tokens 1024,2048,4096 --repeat 50 > /tmp/moe-fp8.csv
-```
-
-CSV reports median/P95/min, complete workspace, and useful matrix FLOP/s. For routed/complete
-calls, `unique_weight_GBps` counts unique routed expert payloads and divisors only; for `route`,
-it counts the control matrix. It excludes reloads, activations and output traffic, so it is not
-measured DRAM bandwidth. Use profiler traffic when constructing a kernel or complete-Op roofline.
 
 ## Q8 context K/V LinearPair benchmark
 

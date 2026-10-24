@@ -105,7 +105,6 @@ Run all Op qualification groups or select a family:
 
 ```bash
 ctest --test-dir build/turing-dev -L ops --output-on-failure
-ctest --test-dir build/turing-dev -R '^ninfer_qsa_.*_test$' --output-on-failure
 ./build/turing-dev/tests/ninfer_normalization_test --suite rmsnorm --list
 ./build/turing-dev/tests/ninfer_linear_projection_test --format q8 --shape 6144 5120
 ```

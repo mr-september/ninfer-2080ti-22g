@@ -31,11 +31,9 @@ ninfer_add_op_bench(ninfer_candidate_selector_bench SOURCES "${CMAKE_CURRENT_LIS
 ninfer_add_op_bench(ninfer_linear_split_multi_output_bench SOURCES "${CMAKE_CURRENT_LIST_DIR}/linear/split/multi_output.cu")
 ninfer_add_op_bench(ninfer_linear_split_two_output_bench SOURCES "${CMAKE_CURRENT_LIST_DIR}/linear/split/two_output.cu")
 ninfer_add_op_bench(ninfer_q8_linear_swiglu_bench SOURCES "${CMAKE_CURRENT_LIST_DIR}/q8_linear_swiglu_bench.cu")
-ninfer_add_op_bench(ninfer_fp8_linear_swiglu_bench SOURCES "${CMAKE_CURRENT_LIST_DIR}/fp8_linear_swiglu_bench.cu")
 ninfer_add_op_bench(ninfer_q4_linear_swiglu_bench SOURCES "${CMAKE_CURRENT_LIST_DIR}/q4_linear_swiglu_bench.cu")
 ninfer_add_op_bench(ninfer_q5_linear_add_bench SOURCES "${CMAKE_CURRENT_LIST_DIR}/q5_linear_add_bench.cu")
 ninfer_add_op_bench(ninfer_bf16_linear_add_bench SOURCES "${CMAKE_CURRENT_LIST_DIR}/bf16_linear_add_bench.cu")
-ninfer_add_op_bench(ninfer_fp8_linear_add_bench SOURCES "${CMAKE_CURRENT_LIST_DIR}/fp8_linear_add_bench.cu")
 ninfer_add_op_bench(ninfer_causal_softmax_attention_bench
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/causal_softmax_attention_bench.cu")
 ninfer_add_op_bench(ninfer_context_softmax_attention_bench
@@ -47,7 +45,6 @@ ninfer_add_op_bench(ninfer_prepare_masked_block_bench
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/prepare_masked_block_bench.cu")
 ninfer_add_op_bench(ninfer_sampling_select_bench SOURCES "${CMAKE_CURRENT_LIST_DIR}/sampling_select_bench.cu")
 ninfer_add_op_bench(ninfer_moe_bench SOURCES "${CMAKE_CURRENT_LIST_DIR}/moe/main.cu")
-ninfer_add_op_bench(ninfer_moe_block_scaled_bench SOURCES "${CMAKE_CURRENT_LIST_DIR}/moe/block_scaled.cu")
 ninfer_add_op_bench(ninfer_linear_pair_bench SOURCES "${CMAKE_CURRENT_LIST_DIR}/linear_pair_bench.cu")
 ninfer_add_op_bench(ninfer_context_kv_materialize_bench
   SOURCES "${CMAKE_CURRENT_LIST_DIR}/context_kv_materialize_bench.cu")
@@ -56,7 +53,6 @@ ninfer_add_op_bench(ninfer_proposal_remap_bench SOURCES "${CMAKE_CURRENT_LIST_DI
 
 include("${CMAKE_CURRENT_LIST_DIR}/gdn_input_proj/benchmarks.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/ple/benchmarks.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/softmax_attention/qsa/benchmarks.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/linear_attention/gated_delta_net/benchmarks.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/rmsnorm/benchmarks.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/gdn_control/benchmarks.cmake")
