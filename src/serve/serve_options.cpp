@@ -174,7 +174,7 @@ std::string serve_usage_text(const char* argv0) {
            std::to_string(kDefaultHostKvBytes >> 20) +
            " MiB plus eight native StateImages\n"
            "       --device-state-slots is extra capacity beyond active lanes; "
-           "--host-context-mib bounds RTX 5090 Host State/KV and in-flight storage in MiB\n"
+           "--host-context-mib bounds Host State/KV and in-flight storage in MiB\n"
            "       --host-context-mib accepts decimal MiB values that resolve to whole bytes\n"
            "       --default-thinking-budget caps model-origin thinking for enabled requests; "
            "control tokens count toward the request output limit\n"
