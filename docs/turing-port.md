@@ -420,6 +420,27 @@ Everything here was run on the sources of `master` after the port (`7923b62f`, p
 - **Docker:** `git archive HEAD | docker build` built the image; `docker run --gpus all -v <models>:/models -p 18120:8080` started the server with the default configuration (15.4 GiB of weights, 3.15 GiB host context pinned in 4.4 s, engine ready in 2 min 14 s through the bind mount) and a chat request returned HTTP 200 (174 prompt and 88 output tokens, TTFT 729 ms, decode 40.1 tok/s, 60 of 87 drafted tokens accepted).
 - **Windows package:** the first package check failed: the executables need `cudart64_12.dll`, because the build links the shared CUDA runtime (upstream's CMake setting), and the zip did not ship it. `scripts\package.ps1` now copies it from the CUDA Toolkit. The zip, extracted into an empty directory and started with `serve.ps1` under a `PATH` of only `System32` and Windows PowerShell, answered a chat request with HTTP 200 (TTFT 670 ms). The download branch of `serve.ps1` (no model present) was not run.
 
+## Cut-down to one product (v0.2.0, 2026-10-25)
+
+`v0.2.0` removes everything the dense Qwen3.8-27B product on one RTX 2080 Ti does not use (NVFP4, K8V4, the FP8 kernels, the Blackwell kernel files, the multi-target build scheme, the 35B-A3B kernel shapes, the upstream eval harness, model cards and 5090 performance tables). The deletions were held to exact equality against the `v0.1.0` baseline; the benchmark session is reported as measured and is not a gate.
+
+| Metric | `v0.1.0` tree (`8c4414f2`, start of the cut-down) | `v0.2.0` |
+|---|---|---|
+| Tracked files | 2,426 | 1,959 |
+| Code lines in `src include apps bench tests` (`.cpp .h .hpp .cu .cuh .py .cmake .inc`, `CMakeLists.txt`) | 267,039 | 225,488 |
+| Compiled translation units, dev tree | 785 | 761 |
+| Build steps, release / dev | 906 / 1,670 | 884 / 1,626 |
+| Executable size | 713 to 715 MB each | 517 to 519 MB each |
+| Release zip | 1.56 GiB | 1.03 GiB |
+| CTest tests (Windows) | 138 | 134 |
+| Cold release build | 10.6 min at full parallelism (previous base) | 19.8 min at `-j4` (not comparable: parallelism) |
+
+Exact gates against `v0.1.0` (RTX 2080 Ti, Windows 11, driver 610.88, CUDA 12.9, nvcc 12.9.86): protocol-B perplexity 4.796799 with every domain value identical; `ninfer-logit-compare` bit-identical for the 8 prompts, KV int8 and bf16; greedy CLI transcripts and MTP counters identical for the 8 text and 3 vision prompts; startup memory plan identical; CTest pass set equal to the baseline minus the 6 deleted tests; per-kernel SASS hashes of the compiled device objects identical to the reference taken after the shape pruning (161 objects, 3,260 kernels, the K = 2560 Q8 GDN family excluded as documented).
+
+Speed, interleaved A/B against the `v0.1.0` executables (4 rounds each, `ninfer_bench`, same session): pp512 +1.2%, tg256 -0.3%, pp8192 -2.0%, pp65536 +3.5%, tg32 +1.0% (medians; per-pair changes range from -5.1% to +12.5%). The same executable moves by this much between rounds on this machine, and device code is identical, so none of this is a measured change.
+
+Linux: the Docker `dev` stage compiled the tree (CUDA 13.1.2, GCC 13) and its CTest ran 141 tests: 119 pass, 22 skip (FP8 cases and real-model tests without an artifact path). One of two full runs showed a single failure of `ninfer_linear_swiglu_q4_test` whose output was not captured; the second full run and 26 isolated runs passed. The real 27B loading test passed (771 parents, 15.7 GB, 113 s) and the product image answered a chat request through the mounted model.
+
 ## Maintainer notes
 
 Facts and decisions that outlive any one change:
