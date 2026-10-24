@@ -2,6 +2,8 @@
 
 Start with the [project README](../README.md) to build NInfer, download a published artifact, and run the CLI or HTTP server.
 
+The documents describe one product: dense Qwen3.8-27B on a 22 GB RTX 2080 Ti. Model-side designs for Qwen4Exp, PLE, NF4 and MoE are kept as references for the Qwen4 series; their Ops have no Turing kernels, so they do not run on this GPU.
+
 ## User guides
 
 | Document | Purpose |
