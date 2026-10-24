@@ -4,18 +4,7 @@
 
 The examples use the Qwen3.8-27B `groupwise-int` artifact with this build's INT8 KV storage, which is the default on Turing, so no `--kv-dtype` flag is needed.
 
-> **Turing fork.** Upstream's forms of these commands target an RTX 5090 (`--kv-dtype fp8`); FP8 is not available on a GeForce RTX 2080 Ti. The defaults of this build are INT8 KV, a 65,536-token context, and MTP with three draft tokens and the optimized proposal head when the artifact has one; see the [README](../README.md#defaults).
-
-The CPU-expert-offload (`NINFER_VRAM_BUDGET_MIB`) examples below are upstream's. They need CPU expert offload or FP8 weights or KV, none of which the `turing` target provides (`NINFER_EXPERT_OFFLOAD` is 0 there), so they cannot run on a Turing GPU.
-
-For Qwen3.6-35B-A3B, `NINFER_VRAM_BUDGET_MIB` caps the Engine's GPU allocation budget. If the
-model cannot remain fully on GPU, Main MoE experts use CPU/GPU execution with segmented CUDA
-Graph decode:
-
-```bash
-NINFER_VRAM_BUDGET_MIB=16384 ./build/release/apps/ninfer out/qwen3_6_35b_a3b.ninfer \
-  --prompt "Explain how a compiler works." --max-context 8192 --max-new 128
-```
+The defaults are INT8 KV, a 65,536-token context, and MTP with three draft tokens and the optimized proposal head when the artifact has one; see the [README](../README.md#defaults).
 
 `--prefill-chunk N` sets a fixed positive multiple of 128. When omitted, the default is 4096 for
 Qwen4Exp or CPU expert offload, and 1024 otherwise. Serving and offline scoring use the same Engine
@@ -213,7 +202,7 @@ The table lists the executable defaults of this build.
 | `--prefill-chunk N` | positive text-prefill chunk, in multiples of 128 | `1024` |
 | `--max-new N` | requested output-token limit | `128` |
 | `--device N` | CUDA device index | `0` |
-| `--kv-dtype bf16\|int8\|fp8` | KV-cache storage | `int8` on Turing builds, `bf16` otherwise |
+| `--kv-dtype bf16\|int8\|fp8` | KV-cache storage (`fp8` has no Turing kernels) | `int8` |
 | `--spec none\|mtp\|dflash\|dflash2` | speculative backend | `mtp` |
 | `--draft-tokens N` | MTP `1..5`; DFlash/DFlash2 `1..15` (DFlash needs it explicitly) | `3` |
 | `--lm-head-draft` / `--no-lm-head-draft` | force the optimized or the full proposal head | automatic: optimized when the artifact has one |

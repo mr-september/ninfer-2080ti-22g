@@ -9,15 +9,13 @@ See the [CLI example](cli.md) for commands and the
 
 ## Start the server
 
-> **Turing fork.** The commands in this page are upstream's RTX 5090 forms (FP8 KV). On a GeForce RTX 2080 Ti use the `groupwise-int` artifact and the defaults of this build: INT8 KV, 65,536-token context, MTP with three draft tokens and the optimized proposal head when the artifact has one. Drop `--kv-dtype fp8`, or write `--kv-dtype int8`; see the [README](../README.md#defaults).
-
 On a 2080 Ti the whole command is
 
 ```bash
 ./build/release/apps/ninfer-serve models/qwen3_8_27b.ninfer
 ```
 
-(`build\windows\apps\ninfer-serve.exe` on native Windows, or `scripts\serve.ps1`). It listens on `127.0.0.1:8080` with one lane, a 65,536-token INT8 KV context, and MTP with three draft tokens and the optimized proposal head. The long-context example below is upstream's RTX 5090 form of the command and does not run on Turing.
+(`build\windows\apps\ninfer-serve.exe` on native Windows, or `scripts\serve.ps1`). It listens on `127.0.0.1:8080` with one lane, a 65,536-token INT8 KV context, and MTP with three draft tokens and the optimized proposal head. The defaults are also written out in the [README](../README.md#defaults).
 
 See [CUDA synchronization](cli.md#cuda-synchronization) for the shared `NINFER_CUDA_SYNC` setting.
 
@@ -25,23 +23,23 @@ See [CUDA synchronization](cli.md#cuda-synchronization) for the shared `NINFER_C
 ./build/release/apps/ninfer-serve models/qwen3_8_27b.ninfer \
   --host 127.0.0.1 \
   --port 8080 \
-  --max-context 240000 \
-  --kv-capacity 240000 \
+  --max-context 65536 \
+  --kv-capacity 65536 \
   --max-concurrency 2 \
-  --kv-dtype fp8 \
+  --kv-dtype int8 \
   --device-state-slots 2 \
   --spec mtp --draft-tokens 3 \
   --lm-head-draft \
   --preserve-thinking
 ```
 
-The command uses Qwen3.8-27B. Each request has a 240,000-token logical ceiling. A shared
-240,000-token Main Text KV pool serves admitted requests; either request may use the full capacity
+The command uses Qwen3.8-27B. Each request has a 65,536-token logical ceiling. A shared
+65,536-token Main Text KV pool serves admitted requests; either request may use the full capacity
 when running alone. Requests acquire KV pages as execution advances; if concurrent growth exhausts
 the pool, the scheduler can pause a request and restore it later.
 
 With `C=2` and two extra Device slots, the process owns four Device StateImages. The default shared
-pinned Host budget is 8 GiB on RTX 5090 and 2 GiB on Turing builds (halved when the available RAM is too small), plus eight model StateImages. This pool holds retained
+pinned Host budget is 2 GiB (halved when the available RAM is too small), plus eight model StateImages. This pool holds retained
 state, KV and pause snapshots, including in-flight destinations; `--host-context-mib` sets an
 explicit total instead.
 
@@ -575,7 +573,7 @@ curl http://127.0.0.1:8080/v1/models \
 
 ## Server options
 
-The table lists executable defaults. The startup example selects a long-context FP8/MTP3 profile.
+The table lists executable defaults. The startup example selects a two-lane 64K INT8/MTP3 profile.
 
 | Option | Meaning | Default |
 |---|---|---:|
@@ -600,7 +598,7 @@ The table lists executable defaults. The startup example selects a long-context 
 | `--request-log-jsonl FILE` | append full-precision server/request records | disabled |
 | `--response-store-max-records N` | maximum locally retained Responses objects | `1024` |
 | `--response-store-max-mib N` | total local Response envelope/Item/context budget | `256` |
-| `--kv-dtype bf16\|int8\|fp8` | KV-cache storage | `int8` on Turing builds, `bf16` otherwise |
+| `--kv-dtype bf16\|int8\|fp8` | KV-cache storage (`fp8` has no Turing kernels) | `int8` |
 | `--spec none\|mtp\|dflash\|dflash2` | speculative backend | `mtp` |
 | `--draft-tokens N` | MTP `1..5`; DFlash/DFlash2 `1..15` (DFlash needs it explicitly) | `3` |
 | `--lm-head-draft` / `--no-lm-head-draft` | force the optimized or the full proposal head | automatic: optimized when the artifact has one |
@@ -611,7 +609,7 @@ The table lists executable defaults. The startup example selects a long-context 
 | `--no-cuda-graph` | disable CUDA Graph decode | graphs on |
 | `--no-prefix-reuse` | disable compatible-prefix caching | prefix reuse on |
 | `--device-state-slots N` | extra Device StateImages beyond `max-concurrency` | `max-concurrency` |
-| `--host-context-mib N` | shared pinned Host budget for StateImages, KV and pause snapshots, including in-flight destinations | `2048 MiB + 8 native StateImages` (Turing builds; `8192 MiB` on RTX 5090); on Turing builds the default is halved, down to `256 MiB`, when the available RAM is too small for it, and the reduction is logged; an explicit value is never changed |
+| `--host-context-mib N` | shared pinned Host budget for StateImages, KV and pause snapshots, including in-flight destinations | `2048 MiB + 8 native StateImages`; the default is halved, down to `256 MiB`, when the available RAM is too small for it, and the reduction is logged; an explicit value is never changed |
 | `--no-thinking` | disable thinking by default | thinking on |
 | `--preserve-thinking` | preserve closed-turn assistant reasoning by default | off |
 | `--cors` | permissive browser CORS headers | off |
