@@ -56,7 +56,7 @@ slots must also be accounted for. The profiler's observed allocations and transf
 which resource actually became scarce.
 
 The resource campaign covers hot continuations, changing private/shared working sets, interference,
-two-session 64K swaps and six-session 55K rotations. Cases retain their workload names when an
+and two-session 64K swaps. Cases retain their workload names when an
 older cache policy is replaced; the name alone does not prove a particular victim or placement.
 `private-state-working-set-shift` retains the protocol's default automatic shared writes.
 `private-only-working-set-shift` uses explicit mode with no shared markers to isolate private
@@ -66,7 +66,7 @@ The main scheduling workloads are:
 
 | Family | Workload and evidence |
 |---|---|
-| `preemption-replay`, `preemption-snapshot` | Same two growing arrivals with Host disabled/enabled; the snapshot graph also has MTP and DFlash2 profiles. |
+| `preemption-replay`, `preemption-snapshot` | Same two growing arrivals with Host disabled/enabled; the snapshot graph also has MTP and DFlash2 profiles. `preemption-snapshot-dflash2` needs an artifact with the DFlash2 companion and is outside the `preemption` and `full` campaigns; select it with `--case`. |
 | `shared-growth-recovery` | Three shared-prefix branches and two initial short arrivals; two further short requests arrive on an actual Replay restore event. Request-level boundaries measure other requests' actual progress during recovery. |
 | `host-history-pressure-cancel` | Two retained histories and three growing requests compete for limited Host capacity. A pause event identifies the request to cancel; subsequent probes measure retained history. |
 | `vision-growth-replay` | Require the Vision request itself to be preempted and replayed. |
@@ -86,15 +86,17 @@ post-eviction media preparation. `decode-with-short-arrival` and `media-during-d
 background output after the foreground completes, then cancel the background and check another
 request. Their whole-run throughput is conditional on that cancellation boundary.
 
-The two-cohort 55K case contains the complete ordinary rotation as its first phase. Phase reports
-separate that first cohort and its warm requests; whole-server counters still belong to the full
-run. Use the standalone ordinary case when an isolated whole-run resource comparison is needed.
-
 ## Run a campaign
 
-The default artifact is `out/qwen3_8_27b_nvfp4.ninfer`, with FP8 KV. GPU campaigns run serially.
+The default artifact is `models/qwen3_8_27b.ninfer` (`groupwise-int`), with INT8 KV. GPU campaigns run serially. The profiles fit the 22 GB RTX 2080 Ti: the largest context is 64K, and the 256K cold case and the 55K Host rotation of the original suite are not part of this suite because their KV does not fit.
 
-That artifact and the built-in profiles use FP8 KV and NVFP4 weights, which the `turing` target cannot run. On a Turing GPU select a `groupwise-int` artifact with `--artifact` and replace the profiles' `--kv-dtype fp8` with `--kv-dtype int8` through `--profile-config` (below). The campaign scripts are upstream's and have not been qualified on Turing by this fork.
+The profile sizes were set by starting every profile on the real artifact. Three are smaller than
+the workload they were designed around, so their cases run under tighter KV than an unconstrained
+GPU would give: `lane-limit-8` holds 28,224 KV tokens (eight lanes would need 33,792 if every
+holder grew to its full 4,224), `vision-concurrent` holds 40,960 (the two 28-image arrivals, about
+28,750 tokens each, cannot both be fully resident), and `vision-boundary` uses a 40,960-token
+context (enough for the 33,880-token rejected request). The state working-set profiles use MTP
+because the usual artifact has no DFlash2 companion.
 
 ```bash
 python3 tools/bench/run_serve_ttft_campaign.py \
@@ -111,26 +113,25 @@ Campaigns select workloads by purpose:
 
 | Campaign | Selection |
 |---|---|
-| `full` | Composite performance run, including the new load/recovery cases; excludes contract checks, specialist controls and the duplicated standalone 55K rotation. |
-| `resource` | Cache-pressure and Host rotation workloads, including the private-only control. |
+| `full` | Composite performance run, including the new load/recovery cases; excludes contract checks and specialist controls. |
+| `resource` | Cache-pressure and Host-swap workloads, including the private-only control. |
 | `preemption` | Recovery, limited Host, Vision and agent graphs, including selected speculative backends. |
 | `load` | Resident phase/ticket competition and finite mixed arrivals. |
 | `contract` | HTTP rejection, context bounds and session publication checks. |
-| `long-context` | The 256K cold case. |
 | `preprocess` | Default versus single-thread heavy-media preparation. |
 | `smoke` | One short cold case. |
 
 The default is `resource` with one sample. `--serve` is required; use
-`--artifact` when selecting another artifact. Fixture token facts
-still need to match the selected tokenizer/template. The fixtures' token facts come from the artifact's template, so add `--artifact-chat-template` to the profile's `common_args` (the default
-Sharp template adds about 150 tokens per request).
+`--artifact` when selecting another artifact. Fixture token facts come from the artifact's own
+chat template, so the built-in profiles pass `--artifact-chat-template` (the vendored default
+template adds about 150 tokens per request and would break the exact context-boundary cases).
 
 `--profile-config FILE` replaces the built-in profile catalog. This allows a preserved baseline
 binary to use its own CLI without compatibility flags in the candidate:
 
 ```json
 {
-  "common_args": ["--kv-dtype", "fp8", "--no-thinking", "--greedy"],
+  "common_args": ["--kv-dtype", "int8", "--no-thinking", "--greedy"],
   "profiles": {
     "cache-hot": ["--max-context", "8192", "--kv-capacity", "8192",
                   "--max-concurrency", "1", "--device-state-slots", "2",
@@ -144,10 +145,9 @@ records these effective arguments in its manifest. Host capacity is a unified by
 and state; when comparing a baseline with separate pools, match its actual aggregate backing.
 `--device-state-slots` remains extra state capacity beyond active lanes.
 
-Before loading servers, the controller stages the selected immutable artifact once under
-`/dev/shm/ninfer-artifacts/`. It reuses that copy while the source identity is unchanged; insufficient
-tmpfs space is an explicit error. Server warmup completes before measurement and does not populate
-the logical prefix cache.
+Every Serve process reads the selected immutable artifact in place, so after the first start the
+operating system's file cache serves it. Server warmup completes before measurement and does not
+populate the logical prefix cache.
 
 Each sample gets a fresh process. Results are written under the selected `--output-dir`, or the
 normal `profiles/bench/ttft/` campaign directory:

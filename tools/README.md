@@ -65,7 +65,7 @@ python3 tools/bench/run_ninfer_bench_matrix.py --build-dir build/turing-dev --pr
 See [`tools/bench/README.md`](bench/README.md) and [`bench/README.md`](../bench/README.md) for the
 orchestrator and executable contracts.
 
-For request-arrival latency, use the managed Qwen3.8-27B NVFP4/FP8 TTFT campaign. Its measurement
+For request-arrival latency, use the managed Qwen3.8-27B TTFT campaign. Its measurement
 runner remains an external-only HTTP client; the separate controller owns Serve lifecycle and
 artifacts. See [`tools/bench/ttft/README.md`](bench/ttft/README.md).
 

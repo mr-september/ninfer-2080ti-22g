@@ -11,7 +11,7 @@ Choose the executable or configured tree explicitly. Examples use `turing-dev`.
 
 [`ttft/README.md`](ttft/README.md) defines the black-box latency benchmark. The measurement runner
 uses frozen text/media requests and public streaming protocols without calling Engine. A separate
-controller manages the fixed Qwen3.8-27B NVFP4/FP8 Serve profiles and fresh-process isolation.
+controller manages the fixed Qwen3.8-27B `groupwise-int` / INT8 KV Serve profiles and fresh-process isolation.
 
 ```bash
 python3 tools/bench/run_serve_ttft_campaign.py \
@@ -19,7 +19,7 @@ python3 tools/bench/run_serve_ttft_campaign.py \
 ```
 
 The controller chooses the profile, starts and stops Serve for every sample, runs the external
-client, stages the NVFP4 artifact once in `/dev/shm`, stores raw/progress/Serve artifacts below
+client, stores raw/progress/Serve artifacts below
 `profiles/bench/ttft/`, records structured per-request Serve diagnostics, and writes Markdown,
 JSON, and CSV summaries. The case catalog, exact profiles, TTFT boundary, and fixture qualification
 are documented in the dedicated README.
