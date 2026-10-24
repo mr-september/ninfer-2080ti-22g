@@ -1,6 +1,7 @@
 # Contributing to NInfer
 
-NInfer welcomes precise problem reports, reproducible performance evidence, and carefully scoped
+This repository is a single-owner derivative of [Neroued/ninfer](https://github.com/Neroued/ninfer),
+cut down to dense Qwen3.8-27B on one RTX 2080 Ti ([`NOTICE`](NOTICE)). It welcomes precise problem reports, reproducible performance evidence, and carefully scoped
 code contributions. The most useful first contribution is often an Issue that establishes what is
 happening and why it matters. A pull request is an implementation of an agreed change, not the
 place to ask the maintainer to discover the problem, choose its semantics, or redesign its core
@@ -8,7 +9,7 @@ approach.
 
 ## Project scope and decisions
 
-NInfer is an intentionally focused inference engine. Contributions are evaluated against the
+NInfer is an intentionally focused inference engine, and this repository supports exactly one product: the dense Qwen3.8-27B (and Qwen3.6-27B) on a 22 GB GeForce RTX 2080 Ti. Other GPUs, models and weight formats are out of scope here and belong to upstream. Contributions are evaluated against the
 supported product described in [`README.md`](README.md), the public documentation map in
 [`docs/README.md`](docs/README.md), and the applicable architecture documents. Broader
 compatibility or generality is not a benefit by itself when it adds a product contract or
@@ -72,8 +73,7 @@ maintainer has accepted both the product direction and the proposed ownership mo
 
 ## Pull request scope
 
-Target pull requests at the `master` branch. Before implementation, also review the current `dev`
-branch to avoid duplicating or conflicting with maintainer work that has not yet reached `master`.
+Target pull requests at the `master` branch; there is no `dev` branch and no upstream sync.
 
 Each pull request must represent one coherent engineering decision:
 
