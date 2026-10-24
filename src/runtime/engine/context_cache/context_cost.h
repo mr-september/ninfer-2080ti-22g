@@ -90,6 +90,12 @@ parse_context_cost_presets(std::string_view json, std::string_view source_name);
 [[nodiscard]] ResolvedContextMachineCost
 resolve_context_machine_cost(const ContextCostIdentity& identity,
                              const std::filesystem::path& external_preset_path = {});
+// The same resolution over an explicit table of compiled defaults, so tests can exercise that layer
+// while the shipped table is empty.
+[[nodiscard]] ResolvedContextMachineCost
+resolve_context_machine_cost(const std::vector<ContextCostMachinePreset>& compiled,
+                             const ContextCostIdentity& identity,
+                             const std::filesystem::path& external_preset_path = {});
 
 // Calibration updates one independently measurable component and preserves every other component.
 void upsert_context_transfer_cost_atomic(const std::filesystem::path& path,

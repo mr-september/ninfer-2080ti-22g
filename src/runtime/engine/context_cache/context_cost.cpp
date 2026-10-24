@@ -456,6 +456,14 @@ std::vector<ContextCostMachinePreset> parse_context_cost_presets(std::string_vie
 ResolvedContextMachineCost
 resolve_context_machine_cost(const ContextCostIdentity& identity,
                              const std::filesystem::path& external_preset_path) {
+    return resolve_context_machine_cost(compiled_context_cost_defaults(), identity,
+                                        external_preset_path);
+}
+
+ResolvedContextMachineCost
+resolve_context_machine_cost(const std::vector<ContextCostMachinePreset>& compiled,
+                             const ContextCostIdentity& identity,
+                             const std::filesystem::path& external_preset_path) {
     if (identity.hardware_class.empty() || identity.prefill_signature.empty()) {
         throw std::invalid_argument("context-cost identity contains an empty component");
     }
@@ -465,7 +473,6 @@ resolve_context_machine_cost(const ContextCostIdentity& identity,
     ContextCostPresetSource transfer_source = ContextCostPresetSource::GenericDefault;
     ContextCostPresetSource prefill_source  = ContextCostPresetSource::GenericDefault;
 
-    const auto& compiled = compiled_context_cost_defaults();
     validate_presets(compiled, "compiled context-cost defaults");
     if (const ContextCostMachinePreset* machine = find_machine(compiled, identity.hardware_class)) {
         if (machine->transfer) {

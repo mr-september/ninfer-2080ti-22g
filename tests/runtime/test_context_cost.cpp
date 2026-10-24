@@ -95,8 +95,8 @@ std::string read_file(const std::filesystem::path& path) {
 }
 
 void test_exact_evaluation() {
-    expect(ninfer::runtime::context_cost_hardware_class("NVIDIA GeForce RTX 5090", 12, 0) ==
-               "nvidia-geforce-rtx-5090-sm120",
+    expect(ninfer::runtime::context_cost_hardware_class("NVIDIA GeForce RTX 2080 Ti", 7, 5) ==
+               "nvidia-geforce-rtx-2080-ti-sm75",
            "hardware class duplicated or lost the NVIDIA vendor");
     expect(ninfer::runtime::context_cost_hardware_class("Example Accelerator", 9, 0) ==
                "nvidia-example-accelerator-sm90",
@@ -197,22 +197,34 @@ void test_resolution_and_atomic_upserts() {
     const std::filesystem::path path = directory / "presets.json";
     try {
         const ninfer::runtime::ContextCostIdentity compiled_identity{
-            .hardware_class    = "nvidia-geforce-rtx-5090-sm120",
+            .hardware_class    = "nvidia-geforce-rtx-2080-ti-sm75",
             .prefill_signature = "unmeasured-config-and-formats",
         };
-        const auto compiled = ninfer::runtime::resolve_context_machine_cost(compiled_identity);
+        const auto shipped = ninfer::runtime::resolve_context_machine_cost(compiled_identity);
+        expect(shipped.summary.transfer_source == ninfer::ContextCostPresetSource::GenericDefault &&
+                   shipped.summary.prefill_source ==
+                       ninfer::ContextCostPresetSource::GenericDefault,
+               "the shipped table has no accepted default, so every machine must resolve generic");
+
+        const std::vector<ninfer::runtime::ContextCostMachinePreset> table{
+            {.hardware_class = compiled_identity.hardware_class,
+             .transfer       = transfer(),
+             .prefill        = {{"measured-config-and-formats", prefill(91)}}}};
+        const auto compiled =
+            ninfer::runtime::resolve_context_machine_cost(table, compiled_identity);
         expect(
             compiled.summary.transfer_source == ninfer::ContextCostPresetSource::CompiledDefault &&
                 compiled.summary.prefill_source == ninfer::ContextCostPresetSource::GenericDefault,
             "compiled transfer and prefill defaults did not resolve independently");
 
-        const auto measured = ninfer::runtime::resolve_context_machine_cost({
-            .hardware_class    = compiled_identity.hardware_class,
-            .prefill_signature = "e6eae48276e11c15c932cb90d258b51b81e144dc13fb461e7ffa202d2caa440a",
-        });
+        const auto measured = ninfer::runtime::resolve_context_machine_cost(
+            table, {
+                       .hardware_class    = compiled_identity.hardware_class,
+                       .prefill_signature = "measured-config-and-formats",
+                   });
         expect(measured.summary.prefill_source ==
                        ninfer::ContextCostPresetSource::CompiledDefault &&
-                   measured.model.prefill.token_ns_q32 == 375'800'765'711'778,
+                   measured.model.prefill.chunk_ns == 91,
                "measured bindings did not select their compiled prefill cost");
 
         const ninfer::runtime::ContextCostIdentity unknown{
