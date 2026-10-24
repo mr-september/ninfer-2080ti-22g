@@ -1,0 +1,14 @@
+NInfer for Turing (RTX 2080 Ti 22 GB)
+
+This project is a derivative work of NInfer (https://github.com/Neroued/ninfer),
+copyright Neroued and its contributors, licensed under the Apache License, Version 2.0
+(see LICENSE). It was forked from the upstream `dev` branch at commit 438ae67c in October 2026;
+the full upstream history is preserved in this repository.
+
+Modifications, copyright 2026 mr-september, also under the Apache License, Version 2.0:
+CUDA kernels, tile tables and numerics for Turing (sm_75), a native Windows build, the removal of
+everything the single RTX 2080 Ti product does not use, and the release packaging.
+
+Third-party software keeps its own license under third_party/ (cpp-httplib, llama-jinja,
+nlohmann/json, spdlog, utf8proc, xgrammar). The Windows release package includes cudart64_12.dll
+from the NVIDIA CUDA Toolkit, redistributed under NVIDIA's CUDA Toolkit license.
