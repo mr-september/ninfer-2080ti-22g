@@ -2,11 +2,11 @@
 
 Fast single-GPU inference of Qwen3.8-27B on the 22 GB modified GeForce RTX 2080 Ti (Turing, `sm_75`). It runs natively on Windows or on Linux/WSL2/Docker and serves OpenAI- and Anthropic-compatible HTTP APIs or a local CLI.
 
-NInfer is a from-scratch C++/CUDA inference engine: Qwen3.5-family text, image and video prompts with native MTP speculative decoding, one resident model, one to eight execution lanes. This repository is a fork of [Neroued/ninfer](https://github.com/Neroued/ninfer) at its `dev` branch, commit `438ae67c`. The Engine, runtime, frontend, scheduling, CLI and serving are upstream's; this fork adds the `turing` build target (CUDA kernels and tile tuning for `sm_75`), a native Windows build, one-command Windows setup and a release package. See [docs/turing-port.md](docs/turing-port.md) for what differs and how it was measured.
+NInfer is a from-scratch C++/CUDA inference engine: Qwen3.5-family text, image and video prompts with native MTP speculative decoding, one resident model, one to eight execution lanes. This repository is derived from [Neroued/ninfer](https://github.com/Neroued/ninfer) (see [NOTICE](NOTICE)) and is maintained on its own, without tracking upstream. It is cut down to one product: the dense Qwen3.8-27B (and the same-architecture Qwen3.6-27B) on one RTX 2080 Ti, built natively on Windows and on Linux/WSL2/Docker. It keeps vision input, MTP, DFlash and DFlash2 speculative decoding, the CLI, the OpenAI- and Anthropic-compatible server, `ninfer-perplexity` and `ninfer-logit-compare`. [docs/turing-port.md](docs/turing-port.md) records the Turing work and how it was measured; `git checkout v0.1.0` gives the code from before the cut-down.
 
 ## Download a release
 
-Prebuilt Windows binaries are on the [Releases page](https://github.com/mr-september/ninfer-2080ti-22g/releases): `ninfer-windows.zip` (`ninfer.exe`, `ninfer-serve.exe`, `ninfer-perplexity.exe`, their DLLs including `cudart64_12.dll`, and `serve.ps1`) with its SHA-256 in the release notes. Extract it, then:
+Prebuilt Windows binaries are on the [Releases page](https://github.com/mr-september/ninfer-2080ti-22g/releases): `ninfer-windows.zip` (`ninfer.exe`, `ninfer-serve.exe`, `ninfer-perplexity.exe`, their DLLs including `cudart64_12.dll`, `serve.ps1`, `LICENSE` and `NOTICE`) with its SHA-256 in the release notes. Extract it, then:
 
 ```powershell
 .\serve.ps1                       # serves http://127.0.0.1:8080/v1
@@ -118,23 +118,23 @@ The benchmark corpus is random token ids, so its MTP acceptance (0.377) is far b
 
 | Area | Status on `sm_75` |
 |---|---|
-| Artifacts | v3 `groupwise-int` (Q4/Q5/Q6/Q8 + BF16): Qwen3.8-27B (tested) |
-| FP8 weights | not available (they need Blackwell) |
-| KV cache | `int8` (default), `bf16`; `fp8` unavailable |
+| Artifacts | v3 `groupwise-int` (Q4/Q5/Q6/Q8 + BF16): Qwen3.8-27B (tested); Qwen3.6-27B has the same architecture and shapes (untested) |
+| KV cache | `int8` (default), `bf16` |
 | Text, thinking, prefix reuse, CUDA Graph decode | yes |
 | Image / video input | yes (`--vision`) |
 | MTP speculation with the optimized proposal head | yes, on by default |
 | OpenAI Chat/Responses, Anthropic Messages, streaming | yes |
-| Qwen3.6-27B, Qwen3.6-35B-A3B, DFlash | untested; the kernels build and pass op tests, nothing is guaranteed. The 35B-A3B artifact (21.2 GiB) cannot fit a 22 GB card |
-| Qwen4Exp (Flash Next), CPU expert offload, QSA sparse attention, block-scaled MoE and other Blackwell-only Ops | not available: the Ops are stubs that throw on `turing` |
+| DFlash and DFlash2 speculation | the code and tests are kept; untested end to end, because the usual artifact has no DFlash2 companion weights |
+| Qwen3.6-35B-A3B | untested; its 21.2 GiB artifact cannot fit a 22 GB card |
+| Qwen4Exp (Flash Next), PLE, NF4, MoE experts | model-side code, planning and formats are kept for the Qwen4 series; the Ops without Turing kernels throw "unsupported", so none of it runs on a 2080 Ti today |
+| FP8 weights and KV | the formats are readable, but there are no Turing kernels; NVFP4 and K8V4 were removed |
 
-Checked on one 2080 Ti 22 GB with Qwen3.8-27B `groupwise-int` on native Windows (2026-10-19): the full CTest suite (138 tests: 0 failed, 25 skipped, the skips being FP8 cases and real-model tests that need `NINFER_TEST_ARTIFACT`), protocol-B perplexity, the release zip started from an empty directory with a stripped `PATH`, and a chat request through `ninfer-serve`. Earlier checks on the same kernels covered CLI text, image and image+video prompts, a 64k-token needle retrieval, and `ninfer-serve` with OpenAI chat, SSE streaming, Responses, Anthropic messages, tool calls and two concurrent requests. On Linux/WSL2 the same commit built and passed its CTest suite (145 tests, 28 skipped) and answered a real prompt, and the Docker image built, started with the model bind-mounted and answered a chat request ([details](docs/turing-port.md#verification-of-master-2026-10-19-and-2026-10-20)). See [Tests](tests/README.md).
+Checked on one 2080 Ti 22 GB with Qwen3.8-27B `groupwise-int` on native Windows (2026-10-19, `v0.1.0`, before the cut-down): the full CTest suite (138 tests: 0 failed, 25 skipped, the skips being FP8 cases and real-model tests that need `NINFER_TEST_ARTIFACT`), protocol-B perplexity, the release zip started from an empty directory with a stripped `PATH`, and a chat request through `ninfer-serve`. Earlier checks on the same kernels covered CLI text, image and image+video prompts, a 64k-token needle retrieval, and `ninfer-serve` with OpenAI chat, SSE streaming, Responses, Anthropic messages, tool calls and two concurrent requests. On Linux/WSL2 the same commit built and passed its CTest suite (145 tests, 28 skipped) and answered a real prompt, and the Docker image built, started with the model bind-mounted and answered a chat request ([details](docs/turing-port.md#verification-of-master-2026-10-19-and-2026-10-20)). See [Tests](tests/README.md).
 
 ## Known limitations
 
-- Turing only. FP8 weights and KV are unavailable.
+- Turing only. FP8 weights and KV have no kernels.
 - Qwen3.8-27B is the only tested model.
-- Greedy output is not bit-identical to the fork's build from before the port onto upstream `dev`: on 5 of 8 test prompts the text diverges at a near-tied token, while log-probabilities agree to 0.19 nats at most and perplexity to 0.045% ([details](docs/turing-port.md#port-onto-upstream-dev-2026-10-18)).
 - The 64k default context leaves little VRAM headroom; other programs using the GPU can force a smaller context at startup.
 - Page-locked host memory must be free RAM; on a machine short of RAM the server starts with a smaller host context, and an explicit `--host-context-mib` that cannot be pinned fails at startup.
 - Reading the model through `\\wsl$` is slow; keep it on an NTFS drive (Windows) or a Linux filesystem (WSL2).
@@ -163,7 +163,7 @@ The Q8 split-K kernels make the build slow: it took 10.6 minutes on 16 logical c
 
 ## Models, formats and converting your own weights
 
-An artifact is a `.ninfer` v3 container: the model configuration, the encoded weights, logical bindings and the tokenizer and chat-template resources. This fork changes none of the format; files converted before or after its kernel changes are interchangeable with upstream's. The weight formats this GPU runs are:
+An artifact is a `.ninfer` v3 container: the model configuration, the encoded weights, logical bindings and the tokenizer and chat-template resources. The format is upstream's, unchanged: artifacts are interchangeable with upstream's. The weight formats this GPU runs are:
 
 | Format | Layout | Used for |
 |---|---|---|
@@ -171,7 +171,7 @@ An artifact is a `.ninfer` v3 container: the model configuration, the encoded we
 | Q8 | signed integer codes, one FP16 scale per 32 weights | vocabulary tensors, MTP block |
 | BF16 | plain | norms and small tensors |
 
-FP8 is Blackwell-only. The kernels also exist only for the registered Qwen 27B-class shapes: converting some other model into the format would not make it runnable.
+The kernels exist only for the registered Qwen 27B-class shapes: converting some other model into the format would not make it runnable. The loader also reads FP8 weights, but no Turing kernel runs them.
 
 **Convert from the original checkpoint.** Start from the original BF16 Hugging Face checkpoint (a local directory of safetensors). The converter quantizes once with group-wise absolute-max rounding; it reads safetensors and already-quantized FP8 checkpoints, and has no GGUF reader. It needs Python 3.10 or newer with PyTorch and NumPy and runs the same on native Windows and on Linux/WSL2 (use `python` instead of `python3` on Windows); it uses CUDA by default and `--device cpu` otherwise. From the repository root:
 
@@ -217,10 +217,10 @@ Run the relevant `--help` for the exact current option contract.
 - [Resource scheduling and context cache](docs/maintainer/resource-scheduling-and-context-cache.md)
 - [Contributing](CONTRIBUTING.md)
 
-Based on [Neroued/ninfer](https://github.com/Neroued/ninfer); see the upstream repository for the original project and its support options.
+Derived from [Neroued/ninfer](https://github.com/Neroued/ninfer); see [NOTICE](NOTICE).
 
 ## License
 
-NInfer is licensed under the [Apache License 2.0](LICENSE).
+NInfer is licensed under the [Apache License 2.0](LICENSE); [NOTICE](NOTICE) records its origin.
 
-The published artifacts are derived from [Qwen/Qwen3.6-27B](https://huggingface.co/Qwen/Qwen3.6-27B), [Qwen/Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B), and [Qwen/Qwen3.6-35B-A3B](https://huggingface.co/Qwen/Qwen3.6-35B-A3B). These source repositories are distributed under Apache-2.0. Vendored dependencies retain their own license files under `third_party/`. The release zip includes `cudart64_12.dll` from the NVIDIA CUDA Toolkit, redistributed under NVIDIA's CUDA Toolkit license.
+The artifact this project downloads, [neroued/Qwen3.8-27B-NInfer](https://huggingface.co/neroued/Qwen3.8-27B-NInfer), is derived from [Qwen/Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B), which is distributed under Apache-2.0. Vendored dependencies retain their own license files under `third_party/`. The release zip includes `cudart64_12.dll` from the NVIDIA CUDA Toolkit, redistributed under NVIDIA's CUDA Toolkit license.
