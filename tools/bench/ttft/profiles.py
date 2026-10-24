@@ -45,13 +45,6 @@ PROFILE_ARGS: dict[str, tuple[str, ...]] = {
         "--no-prefix-reuse",
         "--host-context-mib", 0,
     ),
-    "text-cold-256k": _args(
-        "--max-context", 262144,
-        "--kv-capacity", 262144,
-        "--max-concurrency", 1,
-        "--no-prefix-reuse",
-        "--host-context-mib", 0,
-    ),
     "cache-hot": _args(
         "--max-context", 8192,
         "--kv-capacity", 8192,
@@ -108,18 +101,6 @@ PROFILE_ARGS: dict[str, tuple[str, ...]] = {
         "--max-concurrency", 2,
         "--device-state-slots", 4,
         "--host-context-mib", 4608,
-    ),
-    "cache-rotation-55k-host": _args(
-        "--max-context", 240000,
-        "--kv-capacity", 240000,
-        "--max-concurrency", 4,
-        "--max-pending-requests", 32,
-        "--pending-timeout-ms", 120000,
-        "--spec", "mtp",
-        "--draft-tokens", 3,
-        "--lm-head-draft",
-        "--device-state-slots", 2,
-        "--host-context-mib", _host_mib((49152 << 20) + 24 * STATE_IMAGE_BYTES),
     ),
     "cache-pressure-both-host": _args(
         "--max-context", 8192,

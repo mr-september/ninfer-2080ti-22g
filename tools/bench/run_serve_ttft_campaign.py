@@ -44,8 +44,6 @@ RESOURCE_CASES = (
     "resume-after-interference-both-host",
     "resume-after-interference-evicted",
     "session-alternating-64k-host-swap",
-    "session-rotation-55k-host",
-    "session-rotation-55k-two-cohort-stream",
 )
 CONTRACT_CASES = (
     "session-publication-order",
@@ -56,14 +54,10 @@ CONTRACT_CASES = (
     "vision-disabled",
     "vision-envelope-over",
 )
-LONG_CONTEXT_CASES = ("cold-long-256k",)
 PREPROCESS_CASES = ("many-image-28", "many-image-28-thread-1")
-# The two-cohort case already runs the complete ordinary 55K rotation as its first phase.
 FULL_EXCLUSIONS = {
     *CONTRACT_CASES,
-    *LONG_CONTEXT_CASES,
     "many-image-28-thread-1",
-    "session-rotation-55k-host",
 }
 CAMPAIGNS = {
     "smoke": ("cold-short",),
@@ -82,7 +76,6 @@ CAMPAIGNS = {
     "load": tuple(name for name in CASES
                   if name.startswith(("resident-", "mixed-arrivals-"))),
     "contract": CONTRACT_CASES,
-    "long-context": LONG_CONTEXT_CASES,
     "preprocess": PREPROCESS_CASES,
     "full": tuple(name for name in CASES if name not in FULL_EXCLUSIONS),
 }
@@ -461,9 +454,9 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         "--campaign",
         choices=tuple(CAMPAIGNS),
         help=(
-            "smoke=one baseline, resource=pressure and Host-rotation cases, "
+            "smoke=one baseline, resource=pressure and Host-swap cases, "
             "preemption=restore, mixed scheduling, cancellation and Vision pressure cases, "
-            "full=composite performance; contract=HTTP boundaries; long-context=long inputs; preprocess=worker control"
+            "full=composite performance; contract=HTTP boundaries; preprocess=worker control"
         ),
     )
     selection.add_argument(

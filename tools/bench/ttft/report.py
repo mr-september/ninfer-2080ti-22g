@@ -185,18 +185,6 @@ COMPARISONS = (
         "session-alternating-64k-host-swap",
         "b1",
     ),
-    *tuple(
-        _comparison(
-            f"session_rotation_55k_round2_context_{index}_vs_round1",
-            "resource pressure",
-            f"55K rotation context {index} round 2 vs round 1",
-            "session-rotation-55k-host",
-            f"round-2-context-{index}",
-            "session-rotation-55k-host",
-            f"round-1-context-{index}",
-        )
-        for index in range(6)
-    ),
     _comparison(
         "unmarked_second_vs_first",
         "private and session reuse",
