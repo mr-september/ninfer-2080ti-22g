@@ -9,7 +9,7 @@ This directory contains committed, offline `--messages` inputs for exercising th
 Run from the repository root because media paths in the JSON files are repository-relative:
 
 ```bash
-CLI=./build/turing-release/apps/ninfer
+CLI=./build/release/apps/ninfer
 MODEL=models/qwen3_6_27b.ninfer
 
 $CLI "$MODEL" \

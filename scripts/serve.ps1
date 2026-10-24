@@ -8,7 +8,7 @@ $packaged = Test-Path "$PSScriptRoot\ninfer-serve.exe"
 $root = if ($packaged) { $PSScriptRoot } else { Split-Path $PSScriptRoot -Parent }
 function Fail($message) { Write-Host "error: $message" -ForegroundColor Red; exit 1 }
 
-$exe = @("$root\build\turing-windows\apps\ninfer-serve.exe", "$PSScriptRoot\ninfer-serve.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+$exe = @("$root\build\windows\apps\ninfer-serve.exe", "$PSScriptRoot\ninfer-serve.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $exe) { Fail 'ninfer-serve.exe was not found. Run scripts\build.ps1 first.' }
 
 if (-not $Model) {

@@ -23,7 +23,7 @@ Data Parallelism is fully supported out of the box. Each engine instance binds e
 Select the active device ordinal using `--device <N>` (default is `0`):
 ```bash
 # Run CLI on GPU 1
-./build/turing-release/apps/ninfer models/qwen3_8_27b.ninfer \
+./build/release/apps/ninfer models/qwen3_8_27b.ninfer \
   --device 1 \
   --prompt "Explain virtual memory in three sentences." \
   --max-context 8192 \
@@ -35,7 +35,7 @@ Select the active device ordinal using `--device <N>` (default is `0`):
 Spawn multiple `ninfer-serve` daemons on distinct ports and GPU devices:
 ```bash
 # Instance 0 on GPU 0 (port 8080)
-./build/turing-release/apps/ninfer-serve models/qwen3_8_27b.ninfer \
+./build/release/apps/ninfer-serve models/qwen3_8_27b.ninfer \
   --device 0 \
   --port 8080 \
   --max-context 16384 \
@@ -44,7 +44,7 @@ Spawn multiple `ninfer-serve` daemons on distinct ports and GPU devices:
   --spec mtp --draft-tokens 3 --lm-head-draft &
 
 # Instance 1 on GPU 1 (port 8081)
-./build/turing-release/apps/ninfer-serve models/qwen3_8_27b.ninfer \
+./build/release/apps/ninfer-serve models/qwen3_8_27b.ninfer \
   --device 1 \
   --port 8081 \
   --max-context 16384 \
@@ -118,7 +118,7 @@ nvidia-smi topo -m
 #### 2. Verify Single-Device Execution on Secondary GPU
 Ensure GPU 1 executes correctly in isolation:
 ```bash
-./build/turing-release/apps/ninfer models/qwen3_8_27b.ninfer \
+./build/release/apps/ninfer models/qwen3_8_27b.ninfer \
   --device 1 \
   --prompt "Testing GPU 1 execution." \
   --max-new 64 \
@@ -129,10 +129,10 @@ Ensure GPU 1 executes correctly in isolation:
 Verify concurrent dual-server execution without VRAM collision:
 ```bash
 # Terminal 1
-./build/turing-release/apps/ninfer-serve models/qwen3_8_27b.ninfer --device 0 --port 8080 --max-concurrency 1
+./build/release/apps/ninfer-serve models/qwen3_8_27b.ninfer --device 0 --port 8080 --max-concurrency 1
 
 # Terminal 2
-./build/turing-release/apps/ninfer-serve models/qwen3_8_27b.ninfer --device 1 --port 8081 --max-concurrency 1
+./build/release/apps/ninfer-serve models/qwen3_8_27b.ninfer --device 1 --port 8081 --max-concurrency 1
 
 # Terminal 3 (Run concurrent queries)
 curl -s http://127.0.0.1:8080/v1/chat/completions -H "Content-Type: application/json" -d '{"model":"qwen3.8-27b","messages":[{"role":"user","content":"Ping GPU 0"}],"max_tokens":32}' &

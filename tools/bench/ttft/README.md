@@ -100,10 +100,10 @@ because the usual artifact has no DFlash2 companion.
 
 ```bash
 python3 tools/bench/run_serve_ttft_campaign.py \
-  --serve build/turing-dev/apps/ninfer-serve --campaign preemption --samples 1
+  --serve build/dev/apps/ninfer-serve --campaign preemption --samples 1
 
 python3 tools/bench/run_serve_ttft_campaign.py \
-  --serve build/turing-dev/apps/ninfer-serve \
+  --serve build/dev/apps/ninfer-serve \
   --case session-hot-continuation \
   --case private-state-working-set-shift \
   --samples 3

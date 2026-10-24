@@ -38,10 +38,10 @@ if (-not (Test-Path "$env:VCPKG_ROOT\vcpkg.exe")) {
 
 # 4. Configure and build.
 Set-Location $root
-$preset = if ($Dev) { 'turing-windows-dev' } else { 'turing-windows' }
+$preset = if ($Dev) { 'windows-dev' } else { 'windows' }
 cmake --preset $preset; if ($LASTEXITCODE) { Fail 'configure failed' }
 cmake --build --preset $preset; if ($LASTEXITCODE) { Fail 'build failed' }
 
 # 5. Result.
-Write-Host "`nBuilt: $root\build\turing-windows\apps\ninfer.exe, ninfer-serve.exe, ninfer-perplexity.exe"
+Write-Host "`nBuilt: $root\build\windows\apps\ninfer.exe, ninfer-serve.exe, ninfer-perplexity.exe"
 Write-Host 'Next: scripts\serve.ps1'

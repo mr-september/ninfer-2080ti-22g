@@ -71,13 +71,13 @@ uses Python 3.11; CMake finds Python 3 without restricting its minor version.
 `Python3_EXECUTABLE` selects the interpreter used by interop and frontend tests explicitly.
 
 ```bash
-cmake --preset turing-dev \
+cmake --preset dev \
   -DPython3_EXECUTABLE="$(command -v python3)"
-cmake --build build/turing-dev -j
-ctest --test-dir build/turing-dev --output-on-failure
+cmake --build build/dev -j
+ctest --test-dir build/dev --output-on-failure
 ```
 
-`turing-dev` enables products, tests and benchmarks together. `turing-ops` instead
+`dev` enables products, tests and benchmarks together. `ops` instead
 registers Core, Artifact and Op tests. Use the selected build directory
 in the commands below; `ctest --preset <preset-name>` runs its registered suite. See
 [Build system](../docs/maintainer/build-system.md) for local interpreter presets.
@@ -85,7 +85,7 @@ in the commands below; `ctest --preset <preset-name>` runs its registered suite.
 The chat-template reference test uses Python Jinja2.
 
 PLE reading foundations run with
-`ctest --test-dir build/turing-dev -R 'ninfer_(nf4|read_queue|artifact_backing|ple_(disk|upload))' --output-on-failure`.
+`ctest --test-dir build/dev -R 'ninfer_(nf4|read_queue|artifact_backing|ple_(disk|upload))' --output-on-failure`.
 The NF4 oracle uses exact Python fractions. The PLE fixture includes a row split across three files.
 `ninfer_ple_upload_test` checks exact Host-to-Device E and slot retirement using a direct Host
 producer, without a table or disk service. Disk preparation tests separately cover their composition.
@@ -95,7 +95,7 @@ The Host preparation test runs without visible CUDA devices. The GPU test delays
 injects event-record failures and checks graph consumption against independently reconstructed E.
 
 CPU topology/task-pool tests link the C++ `ninfer_cpu` target and need no GPU:
-`ctest --test-dir build/turing-dev -R '^ninfer_cpu_.*_test$' --output-on-failure`.
+`ctest --test-dir build/dev -R '^ninfer_cpu_.*_test$' --output-on-failure`.
 GPU MoE is in `ninfer_moe_test`. Shared fixtures and mathematical oracles are common.
 `ninfer_cpu_tensor_test` covers executor-based Tensor/arena computation;
 `ninfer_memory_test` covers portable CPU storage and views. Frontend and HTTP transport tests
@@ -104,9 +104,9 @@ cover the task-pool consumers, including restricted media affinity and HTTP queu
 Run all Op qualification groups or select a family:
 
 ```bash
-ctest --test-dir build/turing-dev -L ops --output-on-failure
-./build/turing-dev/tests/ninfer_normalization_test --suite rmsnorm --list
-./build/turing-dev/tests/ninfer_linear_projection_test --format q8 --shape 6144 5120
+ctest --test-dir build/dev -L ops --output-on-failure
+./build/dev/tests/ninfer_normalization_test --suite rmsnorm --list
+./build/dev/tests/ninfer_linear_projection_test --format q8 --shape 6144 5120
 ```
 
 Every semantic Op executable under `ops/` accepts `--help`, `--list`, `--case ID`,
@@ -150,7 +150,7 @@ Enable numerical error records when reviewing a criterion:
 
 ```bash
 NINFER_OP_REPORT_STATS=1 \
-  ./build/turing-dev/tests/ninfer_gated_residual_test --suite combine-norm
+  ./build/dev/tests/ninfer_gated_residual_test --suite combine-norm
 ```
 
 Each participating comparison emits `OP_ERROR_STATS` with the case label, actual error, limit
@@ -182,7 +182,7 @@ cover consumption of their resulting representation.
 The real loading test accepts an explicit artifact path and optional component selection:
 
 ```bash
-./build/turing-dev/tests/ninfer_qwen3_5_loading_real_test \
+./build/dev/tests/ninfer_qwen3_5_loading_real_test \
   --artifact out/qwen3_6_27b.ninfer --vision --speculative mtp --proposal optimized
 ```
 
@@ -194,7 +194,7 @@ runs the real engine:
 
 ```bash
 NINFER_TEST_ARTIFACT=$PWD/out/qwen3_6_27b.ninfer \
-  ctest --test-dir build/turing-dev -R ninfer_qwen3_5_prefix_real_test --output-on-failure
+  ctest --test-dir build/dev -R ninfer_qwen3_5_prefix_real_test --output-on-failure
 ```
 
 The causal-scoring integration test uses the same artifact variable and checks a full 1,024-column
@@ -202,7 +202,7 @@ score tile, overlapping target suffixes, and repeated-window State/KV isolation:
 
 ```bash
 NINFER_TEST_ARTIFACT=$PWD/out/qwen3_8_27b.ninfer \
-  ctest --test-dir build/turing-dev -R ninfer_qwen3_5_score_real_test --output-on-failure
+  ctest --test-dir build/dev -R ninfer_qwen3_5_score_real_test --output-on-failure
 ```
 
 `ninfer_moe_test` qualifies the integer routing, complete MoE and routed SwiGLU profiles.
@@ -227,15 +227,15 @@ transitions through the real cache schedule. The compact Graph calibration stora
 All/None/partial contributions against the same oracle while reusing one bank window.
 
 ```bash
-ctest --test-dir build/turing-dev -R '^ninfer_moe(_mixed|_block_scaled|_cpu_groupwise_int(_avx2|_fma)?)?_test$' --output-on-failure
-ctest --test-dir build/turing-dev -R '^ninfer_moe_execution_test$' --output-on-failure
+ctest --test-dir build/dev -R '^ninfer_moe(_mixed|_block_scaled|_cpu_groupwise_int(_avx2|_fma)?)?_test$' --output-on-failure
+ctest --test-dir build/dev -R '^ninfer_moe_execution_test$' --output-on-failure
 ```
 
 Run the 35B-A3B MoE route independently:
 
 ```bash
 NINFER_TEST_ARTIFACT=$PWD/out/qwen3_6_35b_a3b.ninfer \
-  ctest --test-dir build/turing-dev -R ninfer_qwen3_5_moe_real_test --output-on-failure
+  ctest --test-dir build/dev -R ninfer_qwen3_5_moe_real_test --output-on-failure
 ```
 
 `ninfer_qwen3_5_moe_offload_real_test` uses the same artifact with a 16 GiB Device budget and
@@ -258,7 +258,7 @@ across a resource tier, prefix continuation, and workspace bounds:
 NINFER_TEST_ARTIFACT=$PWD/out/qwen3_6_27b.ninfer \
 NINFER_PREFIX_REAL_SCENARIO=attention NINFER_TEST_KV_DTYPE=fp8 \
 NINFER_TEST_SPECULATIVE=mtp NINFER_TEST_BATCH=2 \
-  ./build/turing-dev/tests/ninfer_qwen3_5_prefix_real_test
+  ./build/dev/tests/ninfer_qwen3_5_prefix_real_test
 ```
 
 KV choices are `bf16`, `int8`, and `fp8`; backend choices are `none`, `mtp`,
@@ -271,14 +271,14 @@ Continuation and pressure recovery have dedicated entries:
 
 ```bash
 NINFER_TEST_ARTIFACT=$PWD/out/qwen3_8_27b.ninfer \
-  ctest --test-dir build/turing-dev -R ninfer_qwen3_5_agent_continuation_real_test --output-on-failure
+  ctest --test-dir build/dev -R ninfer_qwen3_5_agent_continuation_real_test --output-on-failure
 
 NINFER_TEST_ARTIFACT=$PWD/out/qwen3_8_27b.ninfer \
 NINFER_TEST_BACKEND=dflash2 \
-  ctest --test-dir build/turing-dev -R ninfer_qwen3_5_preemption_real_test --output-on-failure
+  ctest --test-dir build/dev -R ninfer_qwen3_5_preemption_real_test --output-on-failure
 
 NINFER_TEST_ARTIFACT=$PWD/out/qwen3_8_27b.ninfer \
-  ./build/turing-dev/tests/ninfer_qwen3_5_native_transactions_test dflash2
+  ./build/dev/tests/ninfer_qwen3_5_native_transactions_test dflash2
 ```
 
 The agent entry checks multi-turn continuation and branching. The preemption entry exercises
@@ -333,7 +333,7 @@ The sampling and speculative Op tests qualify masks against independent mathemat
 Run the serving contract manually after starting a resident server in another terminal:
 
 ```bash
-./build/turing-dev/apps/ninfer-serve out/qwen3_6_27b.ninfer \
+./build/dev/apps/ninfer-serve out/qwen3_6_27b.ninfer \
   --host 127.0.0.1 --port 18080 --vision
 ```
 
@@ -352,11 +352,11 @@ prefix reuse, speculative execution, frontier bounds and Responses inheritance:
 
 ```bash
 python3 tools/smoke/serve_thinking_preservation.py \
-  --server-bin build/turing-dev/apps/ninfer-serve \
+  --server-bin build/dev/apps/ninfer-serve \
   --artifact out/qwen3_6_27b.ninfer --backend mtp
 
 python3 tools/smoke/serve_thinking_preservation.py \
-  --server-bin build/turing-dev/apps/ninfer-serve \
+  --server-bin build/dev/apps/ninfer-serve \
   --artifact out/qwen3_6_35b_a3b.ninfer --backend dflash
 ```
 
@@ -413,11 +413,11 @@ decode binding, including shortened chunks and oversized local/full KV appends. 
 Program storage and the production prefill route; select the draft component stored in the artifact:
 
 ```bash
-cmake --build build/turing-dev -j --target ninfer_qwen3_5_dflash_prefill_real_test
+cmake --build build/dev -j --target ninfer_qwen3_5_dflash_prefill_real_test
 NINFER_TEST_ARTIFACT=out/qwen3_8_27b.ninfer \
-  build/turing-dev/tests/ninfer_qwen3_5_dflash_prefill_real_test dflash2
+  build/dev/tests/ninfer_qwen3_5_dflash_prefill_real_test dflash2
 NINFER_TEST_ARTIFACT=out/qwen3_6_35b_a3b.ninfer \
-  build/turing-dev/tests/ninfer_qwen3_5_dflash_prefill_real_test dflash
+  build/dev/tests/ninfer_qwen3_5_dflash_prefill_real_test dflash
 ```
 
 The Engine test requires a DFlash2 companion artifact and covers speculative transactions,
@@ -427,13 +427,13 @@ Optional Vision enables image/video and prefix-restore cases. Zero extra Device 
 exercise Host snapshot/restore.
 
 ```bash
-cmake --build build/turing-dev -j --target ninfer_qwen3_5_dflash2_real_test
+cmake --build build/dev -j --target ninfer_qwen3_5_dflash2_real_test
 NINFER_TEST_ARTIFACT=out/qwen3_8_27b.ninfer \
-  build/turing-dev/tests/ninfer_qwen3_5_dflash2_real_test 15 1 1 8
+  build/dev/tests/ninfer_qwen3_5_dflash2_real_test 15 1 1 8
 NINFER_TEST_ARTIFACT=out/qwen3_8_27b.ninfer \
-  build/turing-dev/tests/ninfer_qwen3_5_dflash2_real_test 7 1 0 2 bf16 1 0
+  build/dev/tests/ninfer_qwen3_5_dflash2_real_test 7 1 0 2 bf16 1 0
 NINFER_TEST_ARTIFACT=out/qwen3_8_27b.ninfer \
-  build/turing-dev/tests/ninfer_qwen3_5_dflash2_real_test 2 0 0 2 int8
+  build/dev/tests/ninfer_qwen3_5_dflash2_real_test 2 0 0 2 int8
 ```
 
 Arguments are K, Graph enabled, optimized head enabled, maximum B, target KV (`bf16`, `int8`, or
@@ -457,17 +457,17 @@ The opt-in loader test accepts `--host-experts` to put Main experts in registere
 fixed tensors on GPU. This checks storage and binding, not mixed MoE execution:
 
 ```bash
-build/turing-dev/tests/ninfer_qwen3_5_loading_real_test --artifact out/qwen3_6_35b_a3b.ninfer \
+build/dev/tests/ninfer_qwen3_5_loading_real_test --artifact out/qwen3_6_35b_a3b.ninfer \
   --vision --speculative mtp --host-experts
 ```
 
 Qwen4Exp loading/resources can be checked independently of the public Engine route:
 
 ```bash
-./build/turing-dev/tests/ninfer_qwen4_exp_loading_real_test out/qwen3_8_flash_next.ninfer --host-experts
-./build/turing-dev/tests/ninfer_qwen4_exp_loading_real_test out/qwen3_8_flash_next.ninfer --host-experts --materialize
+./build/dev/tests/ninfer_qwen4_exp_loading_real_test out/qwen3_8_flash_next.ninfer --host-experts
+./build/dev/tests/ninfer_qwen4_exp_loading_real_test out/qwen3_8_flash_next.ninfer --host-experts --materialize
 NINFER_QWEN4_EXP_TEST_ARTIFACT=out/qwen3_8_flash_next.ninfer \
-  ./build/turing-dev/tests/ninfer_qwen4_exp_reclaim_real_test
+  ./build/dev/tests/ninfer_qwen4_exp_reclaim_real_test
 ```
 
 The first command plans component combinations, KV formats and concurrency without loading weight

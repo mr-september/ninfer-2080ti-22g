@@ -66,7 +66,7 @@ CUDA 12.8+ is enough (no 13.x-only features are used). The Q8 split-K translatio
 
 ## Native Windows build
 
-The same sources build with MSVC 14.4 and `nvcc` 12.9 (`cmake --preset turing-windows`; see the [README](../README.md#build) for prerequisites). Linux/WSL2 builds are unchanged; nothing selects between them at runtime, the environment you build in is the mode. What differs:
+The same sources build with MSVC 14.4 and `nvcc` 12.9 (`cmake --preset windows`; see the [README](../README.md#build) for prerequisites). Linux/WSL2 builds are unchanged; nothing selects between them at runtime, the environment you build in is the mode. What differs:
 
 | Area | Handling |
 |---|---|
@@ -98,7 +98,7 @@ Decode is at parity. Prefill is about 6% lower natively on a short prompt and ab
 The former `--chat-style sharp-v22.1` option is now the vendored Sharp v22.5.0 Jinja template `tools/chat_templates/qwen3_8_sharp_v22_5.jinja`, which is embedded in `ninfer` and `ninfer-serve` at build time and used by default. `--artifact-chat-template` selects the artifact's own template and `--chat-template FILE` another file:
 
 ```bash
-./build/turing-release/apps/ninfer model.ninfer --artifact-chat-template --prompt "..."
+./build/release/apps/ninfer model.ninfer --artifact-chat-template --prompt "..."
 ```
 
 ## Current performance
@@ -154,7 +154,7 @@ Exception: in the `bench-long` run the two measured pp8192 repetitions were 26.0
 
 ## FP16 activation range (C1)
 
-On Turing every BF16 operand is converted to FP16 before the tensor core, and values beyond +-65504 saturate. The debug build option `NINFER_SM75_RANGE_PROBE` (`cmake --preset turing-windows -B build-probe -DNINFER_SM75_RANGE_PROBE=ON`, sm_75 only) records the largest magnitude that reaches that conversion in any kernel, and how many elements exceed 16384, 32768 and 65504; `ninfer`, `ninfer-perplexity` and the benchmarks print one `range probe | ...` line when the Engine shuts down. It is a global maximum over all call sites and kernels, which bounds every individual site.
+On Turing every BF16 operand is converted to FP16 before the tensor core, and values beyond +-65504 saturate. The debug build option `NINFER_SM75_RANGE_PROBE` (`cmake --preset windows -B build-probe -DNINFER_SM75_RANGE_PROBE=ON`, sm_75 only) records the largest magnitude that reaches that conversion in any kernel, and how many elements exceed 16384, 32768 and 65504; `ninfer`, `ninfer-perplexity` and the benchmarks print one `range probe | ...` line when the Engine shuts down. It is a global maximum over all call sites and kernels, which bounds every individual site.
 
 Measured on Qwen3.8-27B `groupwise-int`, INT8 KV, 2026-10-17:
 
@@ -171,7 +171,7 @@ Every maximum is below 16384, so there is at least 4x headroom to the 16384 thre
 `ninfer_turing_route_sweep` (`bench/ops/turing_route_sweep.cu`, built only for sm_75 with `NINFER_BUILD_BENCHMARKS=ON`) forces every Q4/Q5/Q6/Q8 launcher of one shape, drops the ones that throw or whose output differs from the production route's by more than 5% of the output RMS, times the rest with cold-cache CUDA Graph replay, and prints the ranking per token count plus a `TokenRoute` table to paste into the shape selector. The candidate list comes from the `q*_launch.h` headers at configure time. It includes private `ops/linear` headers, so it is a fork-only developer tool and not part of any product or CI target.
 
 ```bash
-./build/turing-windows-dev/bench/ninfer_turing_route_sweep --qtype q5 --n 5120 --k 17408 --t 1,2,3,4,1024 --top 8
+./build/windows-dev/bench/ninfer_turing_route_sweep --qtype q5 --n 5120 --k 17408 --t 1,2,3,4,1024 --top 8
 ```
 
 First result (previous base, Q5 `n5120_k17408`, the MLP down projection, T=1024, three runs within 0.2%): the production route `launch_q5_a16_mma_r64_t128_a1` took 8.41 ms (21.7 TFLOPS) and `launch_q5_a16_mma_r128_t64_s1_a1` 8.04 ms (22.7 TFLOPS), 4.6% faster; that result drove the route table. Current tree (2026-10-19, same command with `--t 1024`): the production route ranks first at 5.58 ms (32.7 TFLOPS), ahead of `launch_q5_a16_mma_r128_t64_s1_a1` at 8.10 ms; of the 32 Q5 launchers, 22 were legal at that shape and 10 were rejected.

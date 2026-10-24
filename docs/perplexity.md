@@ -12,7 +12,7 @@ English reference text, English long-form text, Chinese reference text, and NInf
 `full` selects all streams; `--quick` selects one stream from each domain.
 
 ```bash
-./build/turing-release/apps/ninfer-perplexity models/qwen3_8_27b.ninfer \
+./build/release/apps/ninfer-perplexity models/qwen3_8_27b.ninfer \
   --corpus eval/corpora/perplexity-1m/manifest.json \
   --quick \
   --kv-dtype int8
@@ -23,13 +23,13 @@ The default evaluation uses a 4,096-token context and a 2,048-token stride. Use 
 KV representations are `bf16`, `int8`, and `fp8`; `fp8` is not available on Turing builds.
 
 ```bash
-./build/turing-release/apps/ninfer-perplexity models/qwen3_8_27b.ninfer \
+./build/release/apps/ninfer-perplexity models/qwen3_8_27b.ninfer \
   --text notes.txt \
   --context 16384 --stride 8192 \
   --kv-dtype int8
 ```
 
-Run `./build/turing-release/apps/ninfer-perplexity --help` for the complete command surface. The evaluator loads
+Run `./build/release/apps/ninfer-perplexity --help` for the complete command surface. The evaluator loads
 the model once, reads and tokenizes every selected stream before scoring, and writes readable
 startup, corpus, scoring, and per-stream summaries to stderr. Interactive weight loading and
 scoring use one transient progress line; redirected scoring emits persistent progress every ten
@@ -51,7 +51,7 @@ token (comma-separated texts, each one token) after the prompt, and the log-prob
 `--ids` continuation given the prompt.
 
 ```bash
-./build/turing-release/apps/ninfer-logit-compare models/qwen3_8_27b.ninfer \
+./build/release/apps/ninfer-logit-compare models/qwen3_8_27b.ninfer \
   --messages examples/cli/messages/long_decode_aime26_30.json \
   --candidates We,Let --ids "1596 1144 310" --context 8192 --kv-dtype bf16
 ```

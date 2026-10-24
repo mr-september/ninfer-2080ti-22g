@@ -5,7 +5,7 @@
 param([string]$Out = "$(Split-Path $PSScriptRoot -Parent)\dist\ninfer-windows.zip")
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
-$apps = "$root\build\turing-windows\apps"
+$apps = "$root\build\windows\apps"
 $exes = 'ninfer.exe', 'ninfer-serve.exe', 'ninfer-perplexity.exe'
 foreach ($exe in $exes) {
     if (-not (Test-Path "$apps\$exe")) { Write-Host "error: $apps\$exe not found. Run scripts\build.ps1 first." -ForegroundColor Red; exit 1 }

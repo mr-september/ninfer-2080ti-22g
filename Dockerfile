@@ -6,7 +6,7 @@
 #         docker run --gpus all -v /path/to/models:/models -p 8080:8080 ninfer \
 #             ninfer-serve /models/other.ninfer --host 0.0.0.0 --max-context 32768
 #
-# Linux dev build and CTest (turing-dev preset; benchmarks are off unless --build-arg NINFER_BENCHMARKS=ON):
+# Linux dev build and CTest (dev preset; benchmarks are off unless --build-arg NINFER_BENCHMARKS=ON):
 #         docker build --target dev -t ninfer-dev .
 #         docker run --rm --gpus all --security-opt seccomp=unconfined -v /path/to/models:/models:ro ninfer-dev
 # The read-queue tests need io_uring, which Docker's default seccomp profile blocks. The default command is
@@ -60,7 +60,7 @@ WORKDIR /src
 COPY . .
 
 # nvcc runs out of memory at the default job count, so the build takes an explicit one.
-RUN cmake --preset turing-dev -B /build -DNINFER_BUILD_BENCHMARKS=${NINFER_BENCHMARKS} \
+RUN cmake --preset dev -B /build -DNINFER_BUILD_BENCHMARKS=${NINFER_BENCHMARKS} \
     && cmake --build /build --parallel ${NINFER_JOBS}
 
 CMD ["ctest", "--test-dir", "/build", "--output-on-failure"]

@@ -35,8 +35,8 @@ This probe is a CMake benchmark target, using the selected native CUDA architect
 reference table. With a configured development tree:
 
 ```bash
-cmake --build build/turing-dev -j --target ninfer_memory_bandwidth_bench
-./build/turing-dev/bench/ninfer_memory_bandwidth_bench
+cmake --build build/dev -j --target ninfer_memory_bandwidth_bench
+./build/dev/bench/ninfer_memory_bandwidth_bench
 ```
 
 ## Artifact workflow
@@ -58,8 +58,8 @@ Numeric formats, layouts and framing are defined by the references in the
 writes ignored local reports below `profiles/bench/`:
 
 ```bash
-python3 tools/bench/run_ninfer_bench_matrix.py --build-dir build/turing-dev --preset core --dry-run
-python3 tools/bench/run_ninfer_bench_matrix.py --build-dir build/turing-dev --preset core
+python3 tools/bench/run_ninfer_bench_matrix.py --build-dir build/dev --preset core --dry-run
+python3 tools/bench/run_ninfer_bench_matrix.py --build-dir build/dev --preset core
 ```
 
 See [`tools/bench/README.md`](bench/README.md) and [`bench/README.md`](../bench/README.md) for the
@@ -87,6 +87,6 @@ real server and consumes the repository fixture:
 
 ```bash
 python3 tools/smoke/serve_thinking_preservation.py \
-  --server-bin build/turing-dev/apps/ninfer-serve \
+  --server-bin build/dev/apps/ninfer-serve \
   --artifact out/qwen3_6_27b.ninfer --backend mtp
 ```

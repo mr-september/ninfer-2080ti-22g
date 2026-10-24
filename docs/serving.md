@@ -1,6 +1,6 @@
 # HTTP serving
 
-`build/turing-release/apps/ninfer-serve` (`build\turing-windows\apps\ninfer-serve.exe` on native Windows) loads one v3 `.ninfer` artifact and exposes OpenAI- and Anthropic-compatible HTTP endpoints over one resident NInfer Engine.
+`build/release/apps/ninfer-serve` (`build\windows\apps\ninfer-serve.exe` on native Windows) loads one v3 `.ninfer` artifact and exposes OpenAI- and Anthropic-compatible HTTP endpoints over one resident NInfer Engine.
 
 Qwen3.8-Flash-Next supports Text/Vision/MTP serving with segmented CUDA Graph decode.
 Add `--vision` for media and `--spec mtp --draft-tokens 3` for native MTP with the full head.
@@ -14,15 +14,15 @@ See the [CLI example](cli.md) for commands and the
 On a 2080 Ti the whole command is
 
 ```bash
-./build/turing-release/apps/ninfer-serve models/qwen3_8_27b.ninfer
+./build/release/apps/ninfer-serve models/qwen3_8_27b.ninfer
 ```
 
-(`build\turing-windows\apps\ninfer-serve.exe` on native Windows, or `scripts\serve.ps1`). It listens on `127.0.0.1:8080` with one lane, a 65,536-token INT8 KV context, and MTP with three draft tokens and the optimized proposal head. The long-context example below is upstream's RTX 5090 form of the command and does not run on Turing.
+(`build\windows\apps\ninfer-serve.exe` on native Windows, or `scripts\serve.ps1`). It listens on `127.0.0.1:8080` with one lane, a 65,536-token INT8 KV context, and MTP with three draft tokens and the optimized proposal head. The long-context example below is upstream's RTX 5090 form of the command and does not run on Turing.
 
 See [CUDA synchronization](cli.md#cuda-synchronization) for the shared `NINFER_CUDA_SYNC` setting.
 
 ```bash
-./build/turing-release/apps/ninfer-serve models/qwen3_8_27b.ninfer \
+./build/release/apps/ninfer-serve models/qwen3_8_27b.ninfer \
   --host 127.0.0.1 \
   --port 8080 \
   --max-context 240000 \
@@ -630,7 +630,7 @@ Engine selects sampling defaults from the loaded architecture and the request's 
 
 For `C=--max-concurrency` and `H=--device-state-slots`, total Device StateImage capacity is `C+H`. Host state and Main/Backend KV share one startup-fixed byte budget; this is context storage, not a limit on total process RAM. `--host-context-mib 0` disables Host context backing. `--no-prefix-reuse` disables cross-request history reads and writes; pause/replay recovery remains available, and the capacity flags may still be specified.
 
-Run `./build/turing-release/apps/ninfer-serve --help` for the exact option contract.
+Run `./build/release/apps/ninfer-serve --help` for the exact option contract.
 
 Serve writes human-readable operational records to stderr using `YYYY-MM-DD HH:MM:SS.mmm  LEVEL  message`. Normal output covers material startup milestones, readiness, request lifecycle, fixed-interval throughput, and shutdown; `--log-level debug` exposes internal startup and resource-planning detail. A terminal may use one transient line during startup, but Serve throughput is always a persistent record. Redirected stderr contains no terminal control sequences. Pretty values use readable units and rounded rates; use the independent request JSONL for complete fields and full precision. Operational records never contain prompts, generated text, request bodies, credentials, or arbitrary client error messages. If a tool marker is returned to text because its structure or tool identity cannot be represented, Serve emits one warning with only the failure classification, never the generated markup.
 

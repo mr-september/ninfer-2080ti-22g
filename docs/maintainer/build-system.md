@@ -66,20 +66,20 @@ FFmpeg is discovered without a version floor. The libcurl 7.85 minimum follows t
 
 The checked-in presets use independent `build/<preset-name>/` directories:
 
-- `turing-release`: product binaries;
-- `turing-dev`: products, tests and benchmarks;
-- `turing-ops`: Core, Artifact and Ops with their tests and benchmarks (Linux);
-- `turing-windows`, `turing-windows-dev`, `turing-windows-ops`: native Windows with MSVC and the vcpkg
-  toolchain file (`VCPKG_ROOT`), building in `build/turing-windows/` and so on. The `vcpkg.json` manifest
+- `release`: product binaries;
+- `dev`: products, tests and benchmarks;
+- `ops`: Core, Artifact and Ops with their tests and benchmarks (Linux);
+- `windows`, `windows-dev`, `windows-ops`: native Windows with MSVC and the vcpkg
+  toolchain file (`VCPKG_ROOT`), building in `build/windows/` and so on. The `vcpkg.json` manifest
   supplies FFmpeg, hwloc and curl on Windows, whose direct-file I/O uses an I/O completion port instead of
   liburing;
 
 Each has a matching build preset; development presets also have test presets. For example:
 
 ```bash
-cmake --preset turing-dev
-cmake --build build/turing-dev -j
-ctest --preset turing-dev
+cmake --preset dev
+cmake --build build/dev -j
+ctest --preset dev
 ```
 
 Keep compiler, Python, pkg-config and dependency paths in ignored `CMakeUserPresets.json`.
@@ -91,7 +91,7 @@ A local preset can inherit any checked-in preset:
   "configurePresets": [
     {
       "name": "local-turing",
-      "inherits": "turing-ops",
+      "inherits": "ops",
       "binaryDir": "${sourceDir}/build/local-turing",
       "cacheVariables": {
         "CMAKE_CUDA_COMPILER": "/path/to/cuda/bin/nvcc",

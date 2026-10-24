@@ -1,6 +1,6 @@
 # NInfer CLI
 
-`build/turing-release/apps/ninfer` (`build\turing-windows\apps\ninfer.exe` on native Windows) runs one request against one v3 `.ninfer` artifact. Build NInfer and download an artifact using the [project README](../README.md) before following this guide.
+`build/release/apps/ninfer` (`build\windows\apps\ninfer.exe` on native Windows) runs one request against one v3 `.ninfer` artifact. Build NInfer and download an artifact using the [project README](../README.md) before following this guide.
 
 The examples use the Qwen3.8-27B `groupwise-int` artifact with this build's INT8 KV storage, which is the default on Turing, so no `--kv-dtype` flag is needed.
 
@@ -13,7 +13,7 @@ model cannot remain fully on GPU, Main MoE experts use CPU/GPU execution with se
 Graph decode:
 
 ```bash
-NINFER_VRAM_BUDGET_MIB=16384 ./build/turing-release/apps/ninfer out/qwen3_6_35b_a3b.ninfer \
+NINFER_VRAM_BUDGET_MIB=16384 ./build/release/apps/ninfer out/qwen3_6_35b_a3b.ninfer \
   --prompt "Explain how a compiler works." --max-context 8192 --max-new 128
 ```
 
@@ -24,7 +24,7 @@ defaults. See [expert execution](maintainer/expert-weight-cache.md) for ownershi
 ## Text input
 
 ```bash
-./build/turing-release/apps/ninfer models/qwen3_8_27b.ninfer \
+./build/release/apps/ninfer models/qwen3_8_27b.ninfer \
   --prompt "Summarize the difference between prefill and decode." \
   --max-context 32768 \
   --max-new 8192 \
@@ -37,7 +37,7 @@ Exactly one of `--prompt` and `--messages` is required. The CLI normally omits `
 Answer content is streamed to stdout. Tool calls supplied through `--messages` also stream to stdout as `{"name":"...","arguments":...}` records, with argument bytes appearing as they are generated. An interrupted record retains its partial JSON and reports the interruption on stderr; it is not repaired into a complete call. Human-readable startup milestones and runtime errors are written to stderr without service timestamps. Reasoning and the CLI result report (timings, throughput, GPU memory, token IDs when requested, and speculative-decoding statistics) also use stderr as unprefixed product output, so stdout can be redirected independently. On a terminal, weight materialization is one transient progress line followed by a compact Engine-ready summary. Redirected stderr contains persistent readable progress for long loads and no carriage returns or ANSI escapes. `--log-level debug` exposes every startup phase. Option and local prompt/message input failures remain direct command diagnostics:
 
 ```bash
-./build/turing-release/apps/ninfer models/qwen3_8_27b.ninfer \
+./build/release/apps/ninfer models/qwen3_8_27b.ninfer \
   --prompt "Return one sentence." \
   --max-context 4096 \
   --max-new 64 \
@@ -47,9 +47,9 @@ Answer content is streamed to stdout. Tool calls supplied through `--messages` a
 By default prompts are rendered with the vendored [Sharp v22.5.0 template](../tools/chat_templates/qwen3_8_sharp_v22_5.jinja), embedded in the executables at build time, so they run without the source tree (it adds about 150 prompt tokens to the system block and steers answers to be terse). `--chat-template FILE` uses a different local Jinja file, and `--artifact-chat-template` uses the template stored in the artifact; the two cannot be combined. Changes to a template file take effect after restarting NInfer:
 
 ```bash
-./build/turing-release/apps/ninfer models/qwen3_8_27b.ninfer \
+./build/release/apps/ninfer models/qwen3_8_27b.ninfer \
   --chat-template tools/chat_templates/qwen3_8.jinja --prompt "Hello"
-./build/turing-release/apps/ninfer models/qwen3_8_27b.ninfer --artifact-chat-template --prompt "Hello"
+./build/release/apps/ninfer models/qwen3_8_27b.ninfer --artifact-chat-template --prompt "Hello"
 ```
 
 The Sharp template takes `{"terse": false}` through `chat_template_kwargs` (server requests only) to drop its terse-answer instruction.
@@ -58,18 +58,18 @@ The Sharp template takes `{"terse": false}` through `chat_template_kwargs` (serv
 
 ```bash
 printf 'root ::= "yes" | "no"\n' > answer.gbnf
-./build/turing-release/apps/ninfer models/qwen3_8_27b.ninfer \
+./build/release/apps/ninfer models/qwen3_8_27b.ninfer \
   --prompt "Is 17 prime?" --no-thinking --grammar-file answer.gbnf --max-new 64
 ```
 
 `--choice TEXT` selects a literal candidate; repeat the flag to supply the candidate set. `--regex PATTERN` constrains the complete answer to a regular expression:
 
 ```bash
-./build/turing-release/apps/ninfer models/qwen3_8_27b.ninfer \
+./build/release/apps/ninfer models/qwen3_8_27b.ninfer \
   --prompt "Classify this review: the service was excellent." --no-thinking \
   --choice positive --choice neutral --choice negative
 
-./build/turing-release/apps/ninfer models/qwen3_8_27b.ninfer \
+./build/release/apps/ninfer models/qwen3_8_27b.ninfer \
   --prompt "Return ticket TASK-0042." --no-thinking --regex '(BUG|TASK)-[0-9]{4}'
 ```
 
@@ -79,7 +79,7 @@ Candidates preserve exact text; `--choice ''` explicitly permits empty content. 
 
 ```bash
 printf '%s\n' '{"type":"object","properties":{"answer":{"type":"integer"}},"required":["answer"],"additionalProperties":false}' > answer.schema.json
-./build/turing-release/apps/ninfer models/qwen3_8_27b.ninfer \
+./build/release/apps/ninfer models/qwen3_8_27b.ninfer \
   --prompt "Return the answer to 6 times 7 as JSON." --no-thinking \
   --json-schema-file answer.schema.json --max-new 64
 ```
@@ -95,7 +95,7 @@ Omitted thinking and effort options use the selected template's defaults. `--no-
 For example, this allows at most 512 model-origin thinking tokens while retaining enough total output capacity for the inserted suffix and the answer:
 
 ```bash
-./build/turing-release/apps/ninfer models/qwen3_8_27b.ninfer \
+./build/release/apps/ninfer models/qwen3_8_27b.ninfer \
   --prompt "Explain speculative decoding, then give a concise conclusion." \
   --max-context 4096 \
   --max-new 1024 \
@@ -146,7 +146,7 @@ The complete `.ninfer` inventory is still validated. These choices are not lazy 
 Run message files from the repository root when they contain repository-relative media paths:
 
 ```bash
-./build/turing-release/apps/ninfer models/qwen3_8_27b.ninfer \
+./build/release/apps/ninfer models/qwen3_8_27b.ninfer \
   --messages examples/cli/messages/image_chart.json \
   --max-context 8192 \
   --max-new 128 \
@@ -181,7 +181,7 @@ Flash Next supports native MTP with the full head only; it does not support `--l
 DFlash or DFlash2.
 
 ```bash
-./build/turing-release/apps/ninfer models/qwen3_6_35b_a3b.ninfer \
+./build/release/apps/ninfer models/qwen3_6_35b_a3b.ninfer \
   --prompt "Write a short explanation of speculative decoding." \
   --max-context 16384 \
   --max-new 512 \
@@ -192,7 +192,7 @@ DFlash or DFlash2.
 For DFlash:
 
 ```bash
-./build/turing-release/apps/ninfer models/qwen3_6_35b_a3b.ninfer \
+./build/release/apps/ninfer models/qwen3_6_35b_a3b.ninfer \
   --prompt "Write a short explanation of speculative decoding." \
   --max-context 16384 --max-new 512 \
   --spec dflash --draft-tokens 7 --lm-head-draft
@@ -254,14 +254,14 @@ Repeat `--stop-token-id`, `--stop`, or `--reasoning-stop` to add stop conditions
 `--raw-output` to expose the frontend's raw output stream and `--print-token-ids` to include
 generated token IDs in diagnostics.
 
-Run `./build/turing-release/apps/ninfer --help` for the exact option contract.
+Run `./build/release/apps/ninfer --help` for the exact option contract.
 
 ## CUDA synchronization
 
 `NINFER_CUDA_SYNC` selects the CUDA device synchronization schedule at startup for both the CLI and HTTP server. When unset, it defaults to `spin`, prioritizing low synchronization latency at the cost of CPU usage while waiting for the GPU. Use `blocking` to let the waiting thread sleep; the decode performance cost depends on the host. `yield` yields the CPU while waiting, and `auto` uses CUDA's scheduling heuristic, not an automatic performance benchmark.
 
 ```bash
-NINFER_CUDA_SYNC=blocking ./build/turing-release/apps/ninfer models/qwen3_8_27b.ninfer --prompt "Hello"
+NINFER_CUDA_SYNC=blocking ./build/release/apps/ninfer models/qwen3_8_27b.ninfer --prompt "Hello"
 ```
 
 The Engine-ready log reports the selected mode. Empty or unrecognized values, or failure to apply the schedule, fail startup. This controls device scheduling (including stream synchronization); it does not override individual CUDA event creation flags.

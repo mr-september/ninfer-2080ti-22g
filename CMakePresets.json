@@ -20,32 +20,32 @@
       }
     },
     {
-      "name": "turing-release",
+      "name": "release",
       "displayName": "Turing (RTX 2080 Ti) product binaries",
       "inherits": "product"
     },
     {
-      "name": "turing-dev",
+      "name": "dev",
       "displayName": "Turing products, tests and benchmarks",
-      "inherits": "turing-release",
+      "inherits": "release",
       "cacheVariables": {
         "BUILD_TESTING": "ON",
         "NINFER_BUILD_BENCHMARKS": "ON"
       }
     },
     {
-      "name": "turing-ops",
+      "name": "ops",
       "displayName": "Turing Core, Artifact and Ops development",
-      "inherits": "turing-dev",
+      "inherits": "dev",
       "cacheVariables": {
         "NINFER_BUILD_ENGINE": "OFF",
         "NINFER_BUILD_APPS": "OFF"
       }
     },
     {
-      "name": "turing-windows",
+      "name": "windows",
       "displayName": "Turing on native Windows (MSVC, vcpkg)",
-      "inherits": "turing-release",
+      "inherits": "release",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -59,18 +59,18 @@
       }
     },
     {
-      "name": "turing-windows-dev",
+      "name": "windows-dev",
       "displayName": "Turing on native Windows with tests and benchmarks",
-      "inherits": "turing-windows",
+      "inherits": "windows",
       "cacheVariables": {
         "BUILD_TESTING": "ON",
         "NINFER_BUILD_BENCHMARKS": "ON"
       }
     },
     {
-      "name": "turing-windows-ops",
+      "name": "windows-ops",
       "displayName": "Turing on native Windows, Core, Artifact and Ops development",
-      "inherits": "turing-windows-dev",
+      "inherits": "windows-dev",
       "cacheVariables": {
         "NINFER_BUILD_ENGINE": "OFF",
         "NINFER_BUILD_APPS": "OFF"
@@ -79,44 +79,44 @@
   ],
   "buildPresets": [
     {
-      "name": "turing-release",
-      "configurePreset": "turing-release"
+      "name": "release",
+      "configurePreset": "release"
     },
     {
-      "name": "turing-dev",
-      "configurePreset": "turing-dev"
+      "name": "dev",
+      "configurePreset": "dev"
     },
     {
-      "name": "turing-ops",
-      "configurePreset": "turing-ops"
+      "name": "ops",
+      "configurePreset": "ops"
     },
     {
-      "name": "turing-windows",
-      "configurePreset": "turing-windows"
+      "name": "windows",
+      "configurePreset": "windows"
     },
     {
-      "name": "turing-windows-dev",
-      "configurePreset": "turing-windows-dev"
+      "name": "windows-dev",
+      "configurePreset": "windows-dev"
     }
   ],
   "testPresets": [
     {
-      "name": "turing-dev",
-      "configurePreset": "turing-dev",
+      "name": "dev",
+      "configurePreset": "dev",
       "output": {
         "outputOnFailure": true
       }
     },
     {
-      "name": "turing-ops",
-      "configurePreset": "turing-ops",
+      "name": "ops",
+      "configurePreset": "ops",
       "output": {
         "outputOnFailure": true
       }
     },
     {
-      "name": "turing-windows-dev",
-      "configurePreset": "turing-windows-dev",
+      "name": "windows-dev",
+      "configurePreset": "windows-dev",
       "output": {
         "outputOnFailure": true
       }

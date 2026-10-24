@@ -45,13 +45,13 @@ scripts\serve.ps1    # serves http://127.0.0.1:8080/v1 (downloads the model if n
 
 ```bat
 rem one request: answer on stdout, diagnostics on stderr
-build\turing-windows\apps\ninfer.exe models\qwen3_8_27b.ninfer --prompt "Explain prefill and decode in two sentences."
+build\windows\apps\ninfer.exe models\qwen3_8_27b.ninfer --prompt "Explain prefill and decode in two sentences."
 
 rem the server (scripts\serve.ps1) answers on port 8080
 curl http://127.0.0.1:8080/v1/chat/completions -H "Content-Type: application/json" -d "{\"model\": \"qwen3.8-27b\", \"messages\": [{\"role\": \"user\", \"content\": \"Hi\"}], \"max_tokens\": 64}"
 ```
 
-On Linux the binaries are `build/turing-release/apps/ninfer` and `ninfer-serve` (see [Build](#build)); the commands are the same. Add `--vision` for image and video input and `--messages FILE` for structured input; see the [CLI guide](docs/cli.md), [HTTP serving](docs/serving.md) and the [committed examples](examples/cli/).
+On Linux the binaries are `build/release/apps/ninfer` and `ninfer-serve` (see [Build](#build)); the commands are the same. Add `--vision` for image and video input and `--messages FILE` for structured input; see the [CLI guide](docs/cli.md), [HTTP serving](docs/serving.md) and the [committed examples](examples/cli/).
 
 With Docker and the NVIDIA container toolkit, the [Dockerfile](Dockerfile) builds the server for Turing and serves `qwen3_8_27b.ninfer` from a mounted folder:
 
@@ -150,14 +150,14 @@ On native Windows, `scripts\build.ps1` does everything below. The two platforms 
 | **1. Libraries (once)** | Debian/Ubuntu: `sudo apt install pkg-config libavformat-dev libavcodec-dev libavutil-dev libswscale-dev libcurl4-openssl-dev libhwloc-dev liburing-dev` | nothing to run: [`vcpkg.json`](vcpkg.json) lists FFmpeg, hwloc and curl, and the configure step installs them into the build folder (FFmpeg compiles from source the first time) |
 | **2. Get the source** | `git clone https://github.com/mr-september/ninfer-2080ti-22g.git`<br>`cd ninfer-2080ti-22g` | the same clone |
 | **3. Point at the libraries** | not needed (found through `pkg-config`) | `scripts\build.ps1` sets `VCPKG_ROOT` (the Visual Studio copy, else a clone in `.vcpkg`); otherwise `set VCPKG_ROOT=C:\path\to\vcpkg` |
-| **4. Configure** | `cmake --preset turing-release` | `cmake --preset turing-windows` |
-| **5. Build** | `cmake --build build/turing-release -j` | `cmake --build build/turing-windows -j` |
-| **Binaries** | `build/turing-release/apps/ninfer`, `ninfer-serve`, `ninfer-perplexity`, `ninfer-logit-compare` | `build\turing-windows\apps\ninfer.exe`, `ninfer-serve.exe`, `ninfer-perplexity.exe`, `ninfer-logit-compare.exe` (the FFmpeg and curl DLLs are copied next to them) |
-| **Tests and benchmarks** | `cmake --preset turing-dev` | `cmake --preset turing-windows-dev` (or `scripts\build.ps1 -Dev`) |
+| **4. Configure** | `cmake --preset release` | `cmake --preset windows` |
+| **5. Build** | `cmake --build build/release -j` | `cmake --build build/windows -j` |
+| **Binaries** | `build/release/apps/ninfer`, `ninfer-serve`, `ninfer-perplexity`, `ninfer-logit-compare` | `build\windows\apps\ninfer.exe`, `ninfer-serve.exe`, `ninfer-perplexity.exe`, `ninfer-logit-compare.exe` (the FFmpeg and curl DLLs are copied next to them) |
+| **Tests and benchmarks** | `cmake --preset dev` | `cmake --preset windows-dev` (or `scripts\build.ps1 -Dev`) |
 
 The `zlib` and `dav1d` features in `vcpkg.json` provide the PNG and AV1 decoders; without `zlib` image prompts fail with "media codec is not supported".
 
-Presets are named `turing-release`, `turing-dev` (adds tests and benchmarks) and `turing-ops` (Core, Artifact and Ops only), and each builds in `build/<preset-name>/`; the Windows presets are `turing-windows`, `turing-windows-dev` and `turing-windows-ops`. The build requires `CMAKE_CUDA_ARCHITECTURES=75`. Machine-specific compiler and Python paths belong in the ignored `CMakeUserPresets.json`. On Linux the executables find the shared libraries in the same build's `lib/` directory through a relative RPATH, so keep it beside `apps/` when moving build outputs. See [build organization](docs/maintainer/build-system.md).
+Presets are named `release`, `dev` (adds tests and benchmarks) and `ops` (Core, Artifact and Ops only), and each builds in `build/<preset-name>/`; the Windows presets are `windows`, `windows-dev` and `windows-ops`. The build requires `CMAKE_CUDA_ARCHITECTURES=75`. Machine-specific compiler and Python paths belong in the ignored `CMakeUserPresets.json`. On Linux the executables find the shared libraries in the same build's `lib/` directory through a relative RPATH, so keep it beside `apps/` when moving build outputs. See [build organization](docs/maintainer/build-system.md).
 
 The Q8 split-K kernels make the build slow: it took 10.6 minutes on 16 logical cores at full parallelism with FFmpeg already in vcpkg's cache (measured on the previous base). On a machine with little free RAM the default parallelism can make `nvcc` run out of memory; set `CMAKE_BUILD_PARALLEL_LEVEL=4` (or pass `-j4`) and rerun, the build resumes.
 
