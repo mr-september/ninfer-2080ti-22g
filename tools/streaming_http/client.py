@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import errno
 import http.client
 import socket
 import ssl
+import sys
 import threading
 import time
 from dataclasses import dataclass, field
@@ -14,6 +16,18 @@ from urllib.parse import urlsplit
 
 class HttpClientError(RuntimeError):
     pass
+
+
+# WSAEINTR, WSAEBADF, WSAENOTSOCK, WSAECONNABORTED and WSAESHUTDOWN: what Windows reports for a
+# read or write on a socket this process closed or shut down.
+_WINDOWS_LOCAL_CLOSE_ERRORS = frozenset({10004, 10009, 10038, 10053, 10058})
+
+
+def _is_local_close_error(error: BaseException) -> bool:
+    return isinstance(error, OSError) and (
+        getattr(error, "winerror", None) in _WINDOWS_LOCAL_CLOSE_ERRORS
+        or error.errno == errno.EBADF
+    )
 
 
 class _StreamingResponse(http.client.HTTPResponse):
@@ -113,6 +127,13 @@ class PreparedExchange:
                 try:
                     transport.shutdown(socket.SHUT_RDWR)
                     self._shutdown = True
+                    if sys.platform == "win32":
+                        # Windows does not wake a thread blocked in recv() on shutdown(); closing
+                        # the descriptor does. detach() leaves the OS socket open so closesocket()
+                        # below is the single close, and later Python-level closes are no-ops.
+                        import ctypes
+
+                        ctypes.windll.ws2_32.closesocket(transport.detach())
                 except OSError:
                     pass
         return self._cancel_ns
@@ -194,6 +215,7 @@ class PreparedExchange:
                     or (response is None and isinstance(error, http.client.RemoteDisconnected))
                     or (response is not None and isinstance(error, http.client.IncompleteRead))
                     or isinstance(error, ssl.SSLEOFError)
+                    or (sys.platform == "win32" and _is_local_close_error(error))
                 )
             )
             result.cancelled = shutdown_error
