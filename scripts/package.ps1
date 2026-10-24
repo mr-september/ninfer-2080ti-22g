@@ -20,7 +20,7 @@ try {
         Where-Object { $_ } | ForEach-Object { if (Test-Path "$_\bin\cudart64_12.dll") { "$_\bin" } elseif (Test-Path "$_\cudart64_12.dll") { $_ } } | Select-Object -First 1
     if (-not $cudaBin) { Write-Host 'error: cudart64_12.dll was not found; set CUDA_PATH to the CUDA Toolkit that built the executables.' -ForegroundColor Red; exit 1 }
     Copy-Item "$cudaBin\cudart64_12.dll" $stage
-    Copy-Item "$PSScriptRoot\serve.ps1", "$root\LICENSE" $stage
+    Copy-Item "$PSScriptRoot\serve.ps1", "$root\LICENSE", "$root\NOTICE" $stage
     New-Item -ItemType Directory (Split-Path $Out) -Force | Out-Null
     Remove-Item $Out -ErrorAction SilentlyContinue
     Compress-Archive -Path "$stage\*" -DestinationPath $Out
