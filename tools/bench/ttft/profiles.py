@@ -5,11 +5,12 @@ from __future__ import annotations
 from decimal import Decimal
 
 
-# qwen3_8_27b_nvfp4: StateImageLayout sums 48 GDN conv/state regions and
-# continuation hidden, each aligned to 256 B (state/state_image.cpp). DFlash2 also
-# carries 5 local K/V layers of 2048 positions. MTP Full KV is in the KV arena.
+# qwen3_8_27b: StateImageLayout sums 48 GDN conv/state regions and
+# continuation hidden, each aligned to 256 B (state/state_image.cpp). MTP Full KV is in the KV
+# arena.
 STATE_IMAGE_BYTES = 153_954_304
-DFLASH2_STATE_IMAGE_BYTES = 195_897_344
+# DFlash2 adds 195_897_344 - STATE_IMAGE_BYTES for its 5 local K/V layers; the DFlash2 snapshot
+# profile needs an artifact that carries the DFlash2 companion weights.
 
 
 def _host_mib(capacity_bytes: int) -> str:
@@ -22,7 +23,8 @@ def _args(*values: str | int) -> tuple[str, ...]:
 
 COMMON_ARGS = _args(
     "--kv-dtype",
-    "fp8",
+    "int8",
+    "--artifact-chat-template",
     "--no-thinking",
     "--greedy",
     "--log-stats-interval-ms",
@@ -57,22 +59,22 @@ PROFILE_ARGS: dict[str, tuple[str, ...]] = {
         "--kv-capacity", 32768,
         "--max-concurrency", 1,
         "--prefill-chunk", 1024,
-        "--spec", "dflash2",
-        "--draft-tokens", 7,
+        "--spec", "mtp",
+        "--draft-tokens", 3,
         "--lm-head-draft",
         "--device-state-slots", 8,
-        "--host-context-mib", _host_mib(8 * DFLASH2_STATE_IMAGE_BYTES),
+        "--host-context-mib", _host_mib(8 * STATE_IMAGE_BYTES),
     ),
     "cache-private-working-set": _args(
         "--max-context", 32768,
         "--kv-capacity", 32768,
         "--max-concurrency", 1,
         "--prefill-chunk", 1024,
-        "--spec", "dflash2",
-        "--draft-tokens", 7,
+        "--spec", "mtp",
+        "--draft-tokens", 3,
         "--lm-head-draft",
         "--device-state-slots", 2,
-        "--host-context-mib", _host_mib(2 * DFLASH2_STATE_IMAGE_BYTES),
+        "--host-context-mib", _host_mib(2 * STATE_IMAGE_BYTES),
     ),
     "cache-pressure-device": _args(
         "--max-context", 8192,
@@ -178,7 +180,7 @@ PROFILE_ARGS: dict[str, tuple[str, ...]] = {
     ),
     "lane-limit-8": _args(
         "--max-context", 4224,
-        "--kv-capacity", 33792,
+        "--kv-capacity", 28224,
         "--max-concurrency", 8,
         "--max-pending-requests", 1,
         "--pending-timeout-ms", 120000,
@@ -224,7 +226,7 @@ PROFILE_ARGS: dict[str, tuple[str, ...]] = {
     ),
     "vision-concurrent": _args(
         "--max-context", 32768,
-        "--kv-capacity", 65536,
+        "--kv-capacity", 40960,
         "--max-concurrency", 2,
         "--vision",
         "--media-cache-mib", 512,
@@ -243,8 +245,8 @@ PROFILE_ARGS: dict[str, tuple[str, ...]] = {
         "--host-context-mib", 0,
     ),
     "vision-boundary": _args(
-        "--max-context", 65536,
-        "--kv-capacity", 65536,
+        "--max-context", 40960,
+        "--kv-capacity", 40960,
         "--max-concurrency", 1,
         "--vision",
         "--no-prefix-reuse",

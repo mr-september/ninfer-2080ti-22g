@@ -25,9 +25,9 @@ from tools.bench.ttft.report import ReportError
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-WEIGHTS = REPO_ROOT / "out/qwen3_8_27b_nvfp4.ninfer"
+WEIGHTS = REPO_ROOT / "models/qwen3_8_27b.ninfer"
 RUNNER = REPO_ROOT / "tools/bench/run_serve_ttft.py"
-OUTPUT_ROOT = REPO_ROOT / "profiles/bench/ttft/qwen3_8_27b_nvfp4-fp8"
+OUTPUT_ROOT = REPO_ROOT / "profiles/bench/ttft/qwen3_8_27b-int8"
 HOST = "127.0.0.1"
 PORT = 18080
 
@@ -55,6 +55,7 @@ CONTRACT_CASES = (
 PREPROCESS_CASES = ("many-image-28", "many-image-28-thread-1")
 FULL_EXCLUSIONS = {
     *CONTRACT_CASES,
+    "preemption-snapshot-dflash2",
     "many-image-28-thread-1",
 }
 CAMPAIGNS = {
@@ -64,7 +65,6 @@ CAMPAIGNS = {
         "preemption-replay",
         "preemption-snapshot",
         "preemption-snapshot-mtp",
-        "preemption-snapshot-dflash2",
         "shared-growth-recovery",
         "host-history-pressure-cancel",
         "vision-growth-replay",
@@ -344,7 +344,7 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=__doc__,
         epilog=(
-            'Profile config JSON: {"common_args": ["--kv-dtype", "fp8"], '
+            'Profile config JSON: {"common_args": ["--kv-dtype", "int8"], '
             '"profiles": {"text-cold-8k": ["--max-context", "8192"]}}. '
             "All argument values are strings. A config replaces the built-in profiles entirely; "
             "omitted common_args means no common arguments. Preserve old commands in this file "
@@ -479,7 +479,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "case_count": len(definitions),
         "run_count": total,
         "model_profile": (
-            "qwen3.8-27b/nvfp4"
+            "qwen3.8-27b/groupwise-int"
             if args.artifact == WEIGHTS.resolve()
             else f"artifact:{args.artifact.stem}"
         ),
