@@ -376,14 +376,13 @@ cmake --build build/dev -j --target ninfer_candidate_selector_bench
 ## Embedding Op benchmark
 
 `ninfer_embedding_bench` measures BF16 `[248320,2560]`, Q6 `[248320,5120]`,
-Q8 `[248320,5120]`, and Q8 `[248320,2048]`. The default sweep is
+and Q8 `[248320,5120]`. The default sweep is
 T=1..128; `--tokens` selects other matrix extents. This is an Op column domain, independent of a
 particular speculative algorithm's draft count.
 
 The fixture initializes nonuniform valid code planes and positive stored scales at the complete
 registered table shape. `--id-pattern normal` uses tokenizer-addressable IDs. `masked` generates
-an anchor followed by masks at the explicit `--block-width` period: 248070 for D=5120 and 248077
-for existing Q8/D=2048. Use T=B*W to measure complete proposal blocks. CSV reports unique IDs,
+an anchor followed by masks at the explicit `--block-width` period (mask ID 248070). Use T=B*W to measure complete proposal blocks. CSV reports unique IDs,
 logical per-token bytes, execution/cache mode, Graph nodes/calls, scratch, and median/min/p95.
 `--format bf16-d2560 --id-pattern repeated` selects the dense table and repeated IDs. CSV also
 reports `unique_bytes` (each selected row once, all outputs and IDs) and its bandwidth reference
@@ -486,10 +485,9 @@ Parent storage is a contiguous BF16 `[2H,K]` matrix, with A before B; pair stora
 | Op | H | K | Weights |
 |---|---:|---:|---|
 | `control` | 48 | — | none; explicit `--input-rows` and `--weights` are rejected |
-| `projection` | 48 | 2560 | `parent` |
 | `projection`, `norm-projection` | 48 | 5120 | `parent` or `pair` |
 
-Defaults are `projection`, H=48, K=2560, `parent`, tokens=1 and batch=1. Norm-projection requires
+Defaults are `projection`, H=48, K=5120, `parent`, tokens=1 and batch=1. Norm-projection requires
 an explicit supported K. `--tokens T[,T...]` or `--sweep START:END[:STEP]` selects T, with
 `M=T*B`, column=`t+T*b`, and `--batch B` selecting B. Timing flags and CSV statistics follow the
 [RMSNorm benchmark](#rmsnorm-op-benchmark); GDN also reports `weights`. The workspace columns
@@ -499,7 +497,7 @@ Only operands needed by the selected Op are allocated. Production owns all dispa
 ```bash
 cmake --build build/dev -j --target ninfer_gdn_control_bench
 ./build/dev/bench/ninfer_gdn_control_bench \
-  --op projection --heads 48 --input-rows 2560 --weights parent --sweep 1:128 \
+  --op projection --heads 48 --input-rows 5120 --weights parent --sweep 1:128 \
   --execution graph --cache cold --warmup 10 --repeat 61
 ./build/dev/bench/ninfer_gdn_control_bench \
   --op norm-projection --heads 48 --input-rows 5120 --weights pair \
@@ -603,8 +601,7 @@ inclusive interval. Capacity and actual workspace high-water are reported separa
 
 `ninfer_gdn_input_proj_bench` selects `--op snapshot|record`. `--format` and the actual
 `--n`/`--k` identify the stored matrix; `--policy a16|allow-a8` reports the caller's
-activation permission. Supported geometries are Q8 `[16384,2560]` and
-Q4/Q5 or FP8 `[16384,5120]`. Q4/Q5 uses the two stored parents `[4096,5120]` and
+activation permission. Supported geometries are Q4/Q5 or FP8 `[16384,5120]`. Q4/Q5 uses the two stored parents `[4096,5120]` and
 `[12288,5120]`. Convolution uses physical T and B, with optional device
 valid-prefix extents supplied by `--valid-columns`.
 
@@ -637,8 +634,8 @@ BF16 Q/K tensors.
 
 `ninfer_gdn_replay_bench` selects `--op fold|record`. Fold measures all specified layers;
 record measures one recurrence layer. Specify actual `--layers`, `--value-heads`, and
-`--conv-channels`; Q/K heads are 16 and head dimension is 128. Fold geometries are
-`48/48/10240`, `30/32/8192`, and `36/48/10240`. Both Ops accept T=2..16 and B=1..8.
+`--conv-channels`; Q/K heads are 16 and head dimension is 128. The fold
+geometry is `48/48/10240`; record requires 48 value heads. Both Ops accept T=2..16 and B=1..8.
 `--commits dense|one|mixed|N[,N...]` selects fold lengths, including zero;
 `--valid dense|mixed|N[,N...]` selects positive record prefixes. Host fold rows are captured
 at graph construction; eager timing includes their submission on every call.
@@ -679,7 +676,7 @@ within a full chunked pipeline can also serve workspace requests without a DRAM 
 
 ```bash
 ./build/dev/bench/ninfer_gdn_replay_bench \
-  --op fold --layers 36 --value-heads 48 --conv-channels 10240 \
+  --op fold --layers 48 --value-heads 48 --conv-channels 10240 \
   --tokens 16 --batch 8 --commits mixed --execution both
 ./build/dev/bench/ninfer_gdn_replay_bench \
   --op record --value-heads 48 --tokens 2,8,16 --batch 8 --valid mixed
@@ -722,7 +719,7 @@ point. There are no private headers, launchers, route labels, candidate controls
 counts, or kernel-name filters in these benchmarks.
 
 `ninfer_causal_softmax_attention_bench` measures the two public causal-cache entries:
-append-and-attend and cached-only. It covers the registered D256 H24/KV4 and H16/KV2 geometries
+append-and-attend and cached-only. It covers the registered D256 H24/KV4 geometry
 with BF16, INT8-G64, and FP8-E4M3FN-row256 KV storage. Production dispatch
 receives the caller-visible execution envelope and owns prefill, decode/spec and work-partition
 choices. `all` emits every storage mode as an independent row.
@@ -748,20 +745,20 @@ so broad Graph-envelope measurements can be distinguished from exact-length meas
 ```bash
 cmake --build build/dev --parallel --target ninfer_causal_softmax_attention_bench
 ./build/dev/bench/ninfer_causal_softmax_attention_bench \
-  --entry append --geometry all --kv-dtype all --batch 1,2,4,8 \
+  --entry append --kv-dtype all --batch 1,2,4,8 \
   --tokens 1,2,4,8,16 --context 8192,32768,131072 --mapping fragmented \
   --execution graph --cache cold --warmup 10 --repeat 61
 ./build/dev/bench/ninfer_causal_softmax_attention_bench \
-  --entry append --geometry all --kv-dtype all --batch 1 \
+  --entry append --kv-dtype all --batch 1 \
   --tokens 1024 --context 8192,32768,131072 --mapping fragmented \
   --execution eager --cache cold --warmup 10 --repeat 61
 ./build/dev/bench/ninfer_causal_softmax_attention_bench \
-  --entry append --geometry d256-h16-kv2 --kv-dtype int8 \
+  --entry append --kv-dtype int8 \
   --batch 3 --tokens 6 --row-contexts 127,2047,63 \
   --valid-columns 6,3,0 --table-rows 2,0,1 \
   --execution graph --cache cold --warmup 10 --repeat 61
 ./build/dev/bench/ninfer_causal_softmax_attention_bench \
-  --entry cached --geometry d256-h16-kv2 --kv-dtype int8 \
+  --entry cached --kv-dtype int8 \
   --tokens 16 --context 8192 --execution graph --cache cold --profile
 ```
 
@@ -794,7 +791,7 @@ cmake --build build/dev --parallel --target ninfer_context_softmax_attention_ben
 ```
 
 `ninfer_sliding_window_attention_bench` measures the public Q32/KV8/D128 symmetric sliding-window
-contract over a 2048- or 4096-slot cyclic BF16-K/FP16-V cache and a complete non-causal query
+contract over a 2048-slot cyclic BF16-K/FP16-V cache and a complete non-causal query
 block with nonzero represented K/V values. It reports Graph node count, workspace, and exact batch
 shape. `--envelope-max N` holds the
 Graph resource envelope fixed while the actual context varies. `--graph-calls 32 --execution graph`
@@ -806,14 +803,8 @@ bundled rows omit the DRAM roofline fraction. Profiling uses one public call (`-
 ```bash
 cmake --build build/dev --parallel --target ninfer_sliding_window_attention_bench
 ./build/dev/bench/ninfer_sliding_window_attention_bench \
-  --window 2048 --tokens 2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 --batches 1,2,3,4,5,6,7,8 \
+  --tokens 2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 --batches 1,2,3,4,5,6,7,8 \
   --context 64,96,97,128,2047,2048,262144 \
-  --execution graph --cache cold --warmup 10 --repeat 61
-./build/dev/bench/ninfer_sliding_window_attention_bench \
-  --window 4096 \
-  --tokens 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 \
-  --batches 1 \
-  --context 0,32,64,96,128,4095,4096,8192,262144 \
   --execution graph --cache cold --warmup 10 --repeat 61
 ```
 
@@ -841,7 +832,7 @@ instruction utilization require a profiler capture of the complete public call.
 ## KV cache append Op benchmark
 
 `ninfer_kv_cache_append_bench` unifies the two public append contracts without combining them in
-one timed body. `--mode full` calls full D256 KV publication for KV4/KV2 and BF16, INT8-G64, or
+one timed body. `--mode full` calls full D256 KV publication for KV4 and BF16, INT8-G64, or
 FP8-E4M3FN-row256 caches. Its report keeps key/value vector bytes separate for
 asymmetric storage profiles. `--mode prefix` calls device-count prefix publication for BF16
 D128/KV8 paged caches or cyclic caches with `--cyclic-capacity 2048|4096`. `T` is the physical input
@@ -854,7 +845,7 @@ uses one public call.
 ```bash
 cmake --build build/dev --parallel --target ninfer_kv_cache_append_bench
 ./build/dev/bench/ninfer_kv_cache_append_bench \
-  --mode full --full-geometry all --kv-dtype all --tokens 1,2,4,8,16 \
+  --mode full --kv-dtype all --tokens 1,2,4,8,16 \
   --context 128 --execution graph --cache cold --warmup 10 --repeat 61
 ./build/dev/bench/ninfer_kv_cache_append_bench \
   --mode prefix --tokens 1,2,4,8,16 --counts 0,1,2,4,8,16 \
@@ -1003,13 +994,13 @@ cmake --build build/dev -j --target ninfer_linear_split_multi_output_bench
   --execution graph --cache cold --warmup 10 --repeat 50
 ```
 
-`ninfer_linear_split_two_output_bench` covers Q8 `[16384,2560]`,
-FP8 `[16384,5120]`, and paired Q4/Q5 `[4096+12288,5120]`. It uses the common
+`ninfer_linear_split_two_output_bench` covers FP8 `[16384,5120]`
+and paired Q4/Q5 `[4096+12288,5120]`. It uses the common
 `op_measurement.cuh` options described above; `--n` is the total logical row count.
 
 ```bash
 ./build/dev/bench/ninfer_linear_split_two_output_bench \
-  --format q8 --n 16384 --k 2560 --tokens 1,16,1024,2048,4096 --cache cold
+  --format q4q5 --n 16384 --k 5120 --tokens 1,16,1024,2048,4096 --cache cold
 ```
 
 Stateful projection/convolution remains in `ninfer_gdn_input_proj_bench`.
@@ -1139,20 +1130,20 @@ cmake --build build/dev -j --target \
 ./build/dev/bench/ninfer_target_logprobs_bench --columns 1,8,128,512 --cache both
 ```
 
-## 35B dFlash causal Attention qualification
+## Causal Attention verify-width qualification
 
 The public causal benchmark covers exact verify widths `W=1..16`, all five KV types, and the
-append-and-attend and already-cached entries for the D256 H16/KV2 geometry. Batched target
+append-and-attend and already-cached entries for the D256 H24/KV4 geometry. Batched target
 qualification uses the append entry:
 
 ```bash
 ./build/dev/bench/ninfer_causal_softmax_attention_bench \
-  --entry append --geometry d256-h16-kv2 --kv-dtype bf16 \
+  --entry append --kv-dtype bf16 \
   --batch 1,2,4,8 \
   --tokens 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 \
   --context 128,1024,8192 --execution graph --cache cold
 ./build/dev/bench/ninfer_causal_softmax_attention_bench \
-  --entry cached --geometry d256-h16-kv2 --kv-dtype int8 \
+  --entry cached --kv-dtype int8 \
   --tokens 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 \
   --context 128,1024,8192 --execution graph --cache cold
 ```
@@ -1198,13 +1189,12 @@ same measurement harness. `--warmup` and `--repeat` default to 10 and 100. `--in
 split entry's exact state alias, restoring its initial history outside every timed call.
 
 ```bash
-./build/dev/bench/ninfer_causal_conv1d_silu_bench --split --cache cold --channels 8192 --tokens 1,2,7,15,16,17,24,32,33,64,65
+./build/dev/bench/ninfer_causal_conv1d_silu_bench --split --cache cold --channels 10240 --tokens 1,2,7,15,16,17,24,32,33,64,65
 ./build/dev/bench/ninfer_causal_conv1d_silu_bench --split --cache cold --channels 10240 --tokens 1024,4096,8192
 ```
 
-`--split` selects the split-output entry. Its partition follows the channel extent, because those
-are the row profiles the entry admits: `--channels 8192` gives (2048, 2048, 4096) and
-`--channels 10240` gives (2048, 2048, 6144).
+`--split` selects the split-output entry. Its partition follows the channel extent, because that
+is the row profile the entry admits: `--channels 10240` gives (2048, 2048, 6144).
 
 ## Reports
 

@@ -22,7 +22,7 @@ Work directly on `master` and push to `origin master`; never create branches or 
 
 Deletions, renames, consolidations and refactors must not change what the product computes. Hold them to exact equality, never "within noise": the build compiles, CTest passes, protocol B perplexity and `ninfer-logit-compare` are bit-identical to the pre-change run, greedy CLI output and the startup memory plan are identical, and per-kernel SASS hashes of surviving kernels are identical, compared on the compiled device objects (executable-level hashes also move when the device linker lays out shared memory for a different object set). Run the cheap checks on every commit (preprocessed device-pass identity of the affected translation units, the compile-database comparison, `git show -M --stat` for moves, and the targeted unit test for host logic), and the heavy ones (release build with the full translation-unit sweep, dev build and CTest, logit-compare, SASS hashes, then perplexity and the A/B smoke) once per batch. Do not loosen a gate, re-baseline or call a difference noise; report it. A commit that removes a feature also removes every doc, help text, test and CMake reference to it.
 
-Some kernels compile non-reproducibly under nvcc 12.9 (the K=2560 Q8 GDN family, and a `q5_a16_sliced_k_mma` kernel); confirm a SASS difference by recompiling before reporting it as a change.
+A `q5_a16_sliced_k_mma` kernel compiles non-reproducibly under nvcc 12.9; confirm a SASS difference by recompiling before reporting it as a change.
 
 ## Verification and reporting
 

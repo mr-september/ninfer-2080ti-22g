@@ -31,6 +31,8 @@ semantics come from the target. Exact fields are parsed in
 | Dynamic convolution | — | Two taps, group width 16 |
 | Candidate selector | Per-position argmax | Top-16 conditional path, rank 256 |
 
+This tree compiles the sliding-window attention only for the 27B DFlash2 window (S=2048) and the 24/4 target attention geometry; the 35B-A3B DFlash geometry (S=4096, 16/2 target heads) has no kernels.
+
 The current Engine accepts startup draft count K in `1..15` and concurrency B in `1..8`. The
 physical block width is `W=K+1`, containing one anchor and K masks. K is a runtime choice, not a
 weight dimension. Geometry representable in config still needs the actual native Op support;
