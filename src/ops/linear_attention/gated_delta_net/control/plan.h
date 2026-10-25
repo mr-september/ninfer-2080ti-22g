@@ -8,7 +8,7 @@ namespace ninfer::ops::detail::gdn_control {
 
 enum class Kernel { Gemv, TiledGemv, SmallSplit, Mma };
 enum class RowMode { Paired, Merged };
-enum class NormKernel { Simt, Mma, Materialized };
+enum class NormKernel { Simt, Materialized };
 
 struct Plan {
     Kernel kernel          = Kernel::Gemv;
@@ -36,7 +36,7 @@ struct NormPlan {
     NormKernel kernel;
     Plan projection;
     Plan fallback;
-    int tile_cols = 0, threads = 0, capacity = 0;
+    int tile_cols = 0, threads = 0;
 };
 
 Plan select_projection_plan(Geometry geometry, std::int32_t columns);

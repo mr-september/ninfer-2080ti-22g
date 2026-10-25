@@ -38,7 +38,7 @@ struct Profile {
 };
 
 inline constexpr std::array kProfiles{Profile{48, 5120}, Profile{48, 5120, Storage::Pair},
-                                      Profile{32, 2048}, Profile{48, 2560}};
+                                      Profile{48, 2560}};
 
 struct Case {
     int columns;

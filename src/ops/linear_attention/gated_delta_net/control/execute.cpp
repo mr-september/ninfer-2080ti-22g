@@ -24,9 +24,6 @@ void execute_projection(const Tensor& x, const Weights& weights, const Tensor& a
     case 5120:
         launch_n96_k5120(in, out, plan, scratch, execution);
         return;
-    case 2048:
-        launch_n64_k2048(in, out, plan, scratch, execution);
-        return;
     case 2560:
         launch_n96_k2560(in, out, plan, scratch, execution);
         return;
@@ -43,9 +40,6 @@ void execute_norm(const Tensor& x, const Tensor& norm_weight, float eps, const W
         launch_norm_n96_k5120(in, norm, out.control, plan, execution.stream());
         return;
     }
-    if (plan.kernel == NormKernel::Mma &&
-        launch_norm_n64_k2048(in, norm, out.control, plan, scratch, execution))
-        return;
     rmsnorm(x, norm_weight, eps, true, out.normalized, execution);
     const auto control = plan.kernel == NormKernel::Materialized ? plan.projection : plan.fallback;
     execute_projection(out.normalized, weights, a_log, dt_bias, out.control, control, scratch,

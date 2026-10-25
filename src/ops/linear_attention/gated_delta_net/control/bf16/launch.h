@@ -20,13 +20,9 @@ struct Norm {
 
 void launch_n96_k5120(const Inputs& in, GdnControlOutputs out, Plan plan, Scratch scratch,
                       CudaExecutionView execution);
-void launch_n64_k2048(const Inputs& in, GdnControlOutputs out, Plan plan, Scratch scratch,
-                      CudaExecutionView execution);
 void launch_n96_k2560(const Inputs& in, GdnControlOutputs out, Plan plan, Scratch scratch,
                       CudaExecutionView execution);
 void launch_norm_n96_k5120(const Inputs& in, const Norm& norm, GdnControlOutputs out, NormPlan plan,
                            cudaStream_t stream);
-bool launch_norm_n64_k2048(const Inputs& in, const Norm& norm, GdnControlOutputs out, NormPlan plan,
-                           Scratch scratch, CudaExecutionView execution);
 
 } // namespace ninfer::ops::detail::gdn_control

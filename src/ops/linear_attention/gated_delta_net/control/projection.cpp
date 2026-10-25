@@ -48,8 +48,7 @@ void gdn_norm_control_proj(const Tensor& x, const Tensor& norm_weight, float eps
     const auto plan = control::select_norm_plan(operands.geometry, x.ne[1]);
     auto scope      = workspace.scope();
     const auto scratch =
-        control::allocate_workspace(workspace, operands.geometry, plan.projection, x.ne[1],
-                                    plan.kernel == control::NormKernel::Mma);
+        control::allocate_workspace(workspace, operands.geometry, plan.projection, x.ne[1]);
     const std::array<const Tensor*, 7> tensors{
         &x, &norm_weight, &a_log, &dt_bias, &out.normalized, &out.control.g, &out.control.beta};
     control::validate_storage(&operands, tensors, execution, scratch.partial);
