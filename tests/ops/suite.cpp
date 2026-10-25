@@ -1,7 +1,6 @@
 #include "ops/suite.h"
 
 #include "core/cpu/task_pool.h"
-#include "ops/format_support.h"
 #include "ops/op_tester.h"
 
 #include <algorithm>
@@ -20,7 +19,6 @@ namespace {
 // "fp8/34816x5120/..." or "gdn_input_record/fp8/..."). Formats the target cannot execute are
 // counted as skipped.
 bool supported_on_target(const std::string& id) {
-    if (kSm120Formats) return true;
     std::size_t begin = 0;
     while (begin <= id.size()) {
         const std::size_t end = std::min(id.find('/', begin), id.size());
