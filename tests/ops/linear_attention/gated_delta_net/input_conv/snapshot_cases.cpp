@@ -34,20 +34,15 @@ std::vector<SnapshotCase> cases(Profile p) {
         batch(4, 2, {4, 2}, 631);
         batch(16, 3, {16, 9, 4}, 631);
     } else if (p.format == QType::Q8_G32_FP16) {
-        const auto widths = p.hidden == 2048 ? std::vector{1, 2, 15, 16, 17}
-                                             : std::vector{1,  2,  3,  4,  5,  6,  7,  8,  9,  10,
-                                                           11, 12, 13, 14, 15, 16, 17, 33, 129};
-        for (int t : widths) result.push_back({.width = t, .initial = t == 2 ? 0 : t + 1});
-        if (p.hidden == 2560)
-            for (int t : {1, 8, 16, 17, 65, 192, 1024, 1025, 1152})
-                result.push_back({.width = t, .graph = true});
-        if (p.hidden == 2560)
-            for (int t : {95, 96, 97, 127, 128, 191, 193, 1023, 1151, 1153, 4096})
-                result.push_back({.width = t});
-        for (int b : p.hidden == 2048 ? std::vector{2} : std::vector{2, 3, 4, 5, 6, 7, 8})
-            for (int t : p.hidden == 2048
-                             ? std::vector{16}
-                             : std::vector{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}) {
+        for (int t : {1,  2,  3,  4,  5,  6,  7,  8,  9,  10,
+                      11, 12, 13, 14, 15, 16, 17, 33, 129})
+            result.push_back({.width = t, .initial = t == 2 ? 0 : t + 1});
+        for (int t : {1, 8, 16, 17, 65, 192, 1024, 1025, 1152})
+            result.push_back({.width = t, .graph = true});
+        for (int t : {95, 96, 97, 127, 128, 191, 193, 1023, 1151, 1153, 4096})
+            result.push_back({.width = t});
+        for (int b : {2, 3, 4, 5, 6, 7, 8})
+            for (int t : {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}) {
                 std::vector<int> valid(b);
                 for (int i = 0; i < b; ++i) valid[i] = t - i % t;
                 batch(t, b, valid, 733);
@@ -80,7 +75,7 @@ int snapshot_capacity_contract() {
         capacity_weight(QType::Q4_G64_FP16, 4096, 5120),
         capacity_weight(QType::Q5_G64_FP16, 12288, 5120)};
     const ops::SingleProjectionWeight q8_capacity_weights{
-        capacity_weight(QType::Q8_G32_FP16, 12288, 2048)};
+        capacity_weight(QType::Q8_G32_FP16, 16384, 2560)};
 
     int failures = 0;
     const std::size_t q4_interval =

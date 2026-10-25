@@ -62,10 +62,9 @@ inline Options parse_options(int argc, char** argv) {
     if (!o.valid.empty() && (o.tokens.size() != 1 || o.valid.size() != std::size_t(o.batch) ||
                              *std::max_element(o.valid.begin(), o.valid.end()) > o.tokens.front()))
         throw std::invalid_argument("valid columns must match exact T/B");
-    const bool supported = o.format == "q8"
-                               ? ((o.n == 12288 && o.k == 2048) || (o.n == 16384 && o.k == 2560))
-                               : (o.format == "q4q5" || o.format == "fp8") &&
-                                     o.n == 16384 && o.k == 5120;
+    const bool supported = o.format == "q8" ? (o.n == 16384 && o.k == 2560)
+                                            : (o.format == "q4q5" || o.format == "fp8") &&
+                                                  o.n == 16384 && o.k == 5120;
     if (!supported) throw std::invalid_argument("unsupported format/N/K");
     return o;
 }

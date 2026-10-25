@@ -25,13 +25,12 @@ std::vector<RecordCase> cases(Profile p) {
         result.push_back({4, 2, {4, 2}, 1494});
     } else if (p.format == QType::Q8_G32_FP16) {
         result = {{2, 1, {1}, 1511}, {16, 1, {}, 1521}, {16, 8, {16, 13, 9, 7, 5, 3, 2, 1}, 1531}};
-        if (p.hidden == 2560)
-            for (int b = 1; b <= 8; ++b)
-                for (int t = 2; t <= 16; ++t) {
-                    std::vector<int> valid(b);
-                    for (int row = 0; row < b; ++row) valid[row] = t - row % t;
-                    result.push_back({t, b, valid, 1541U + t + b});
-                }
+        for (int b = 1; b <= 8; ++b)
+            for (int t = 2; t <= 16; ++t) {
+                std::vector<int> valid(b);
+                for (int row = 0; row < b; ++row) valid[row] = t - row % t;
+                result.push_back({t, b, valid, 1541U + t + b});
+            }
     } else {
         for (auto policy : {Policy::A16Only, Policy::AllowA8}) {
             for (int t = 2; t <= 16; ++t) {

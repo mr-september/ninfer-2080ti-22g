@@ -48,7 +48,6 @@ WeightProfile describe_profile(const ProjectionProfile& weights) {
     if (!valid_linear_policy(w.policy))
         throw std::invalid_argument("GDN input: invalid activation permission");
     if (w.qtype == QType::Q8_G32_FP16) {
-        if (w.n == 12288 && w.k == 2048) return {Format::Q8, {2048, 4096}, w.policy};
         if (w.n == 16384 && w.k == 2560) return {Format::Q8, {2560, 6144}, w.policy};
     }
     if (w.n == 16384 && w.k == 5120) {

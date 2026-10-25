@@ -39,16 +39,6 @@ void launch_snapshot(const Tensor& x, const WeightOperands& weights, const Tenso
                                              state.source_slots, state.snapshot_bases, out.query,
                                              out.key, out.value, out.z, stream);
         return;
-    case ConvKernel::Q8Decode:
-        launch_q8_gdn_input_decode_conv_snapshot(x, w, conv, state.history, valid,
-                                                 state.source_slots, state.snapshot_bases,
-                                                 out.query, out.key, out.value, out.z, stream);
-        return;
-    case ConvKernel::Q8SlicedK:
-        launch_q8_gdn_input_splitk_conv_snapshot(x, w, conv, state.history, valid,
-                                                 state.source_slots, state.snapshot_bases,
-                                                 out.query, out.key, out.value, out.z, stream);
-        return;
     case ConvKernel::Q8Window:
     case ConvKernel::Q8Aggregate:
     case ConvKernel::Q8TmaBatch:
@@ -91,11 +81,6 @@ void launch_record(const Tensor& x, const WeightOperands& weights, const Tensor&
                                            state.source_slots, record, out.query, out.key,
                                            out.value, out.z, stream);
         return;
-    case ConvKernel::Q8SlicedK:
-        launch_q8_gdn_input_splitk_conv_record(x, w, conv, state.history, valid, state.source_slots,
-                                               record, out.query, out.key, out.value, out.z,
-                                               stream);
-        return;
     case ConvKernel::Q8Window:
     case ConvKernel::Q8Aggregate:
     case ConvKernel::Q8TmaBatch:
@@ -107,8 +92,6 @@ void launch_record(const Tensor& x, const WeightOperands& weights, const Tensor&
         launch_fp8_gdn_record_fused(x, w, conv, state.history, valid, state.source_slots, record,
                                     out.query, out.key, out.value, out.z, stream);
         return;
-    case ConvKernel::Q8Decode:
-        throw std::logic_error("GDN record selected a one-token kernel");
     case ConvKernel::Materialized:
         break;
     }

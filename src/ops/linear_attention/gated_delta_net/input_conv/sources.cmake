@@ -9,9 +9,6 @@ target_sources(ninfer_ops PRIVATE
   "${CMAKE_CURRENT_LIST_DIR}/q4_q5/projection_independent.cu"
   "${CMAKE_CURRENT_LIST_DIR}/q4_q5/projection_mma.cu"
   "${CMAKE_CURRENT_LIST_DIR}/q8/projection.cpp"
-  "${CMAKE_CURRENT_LIST_DIR}/q8/projection_decode.cu"
-  "${CMAKE_CURRENT_LIST_DIR}/q8/projection_mma.cu"
-  "${CMAKE_CURRENT_LIST_DIR}/q8/sliced_k.cu"
 )
 
 target_sources(ninfer_ops PRIVATE "${CMAKE_CURRENT_LIST_DIR}/projected_conv_parallel.cu")

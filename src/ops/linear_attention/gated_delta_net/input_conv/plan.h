@@ -8,8 +8,6 @@ enum class Compute { A16, A8 };
 enum class ConvKernel {
     Materialized,
     Q4Q5Fused,
-    Q8Decode,
-    Q8SlicedK,
     Q8Window,
     Q8Aggregate,
     Fp8Fused,
