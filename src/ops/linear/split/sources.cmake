@@ -12,6 +12,3 @@ target_sources(ninfer_ops PRIVATE
   "${CMAKE_CURRENT_LIST_DIR}/q8/shapes/n6144_k5120.cu"
 )
 
-include("${CMAKE_CURRENT_LIST_DIR}/bf16/sources.cmake")
-
-include("${CMAKE_CURRENT_LIST_DIR}/q8/sources.cmake")

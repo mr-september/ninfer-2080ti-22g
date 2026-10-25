@@ -10,8 +10,8 @@ using namespace ninfer::bench;
 namespace {
 struct Options {
     measurement::Options timing;
-    std::string format = "q8", policy = "a16";
-    int n = 16384, k = 2560;
+    std::string format = "q4q5", policy = "a16";
+    int n = 16384, k = 5120;
     std::vector<int> tokens{1};
 };
 
@@ -22,7 +22,7 @@ Options parse_options(int argc, char** argv) {
         const std::string_view flag = argv[i];
         if (flag == "--help" || flag == "-h") {
             std::cout << "LinearSplit two-output benchmark\n"
-                         "  --format q4q5|q8|fp8 --n N --k K --policy a16|allow-a8\n"
+                         "  --format q4q5|fp8 --n N --k K --policy a16|allow-a8\n"
                          "  --tokens M[,M...] or --sweep START:END[:STEP]\n";
             measurement::help();
             std::exit(0);
@@ -48,10 +48,8 @@ Options parse_options(int argc, char** argv) {
         throw std::invalid_argument("unknown activation policy");
     if (o.format == "q4q5" && o.policy != "a16")
         throw std::invalid_argument("paired Q4/Q5 weights use A16");
-    const bool supported = o.format == "q8"
-                               ? (o.n == 16384 && o.k == 2560)
-                               : (o.format == "q4q5" || o.format == "fp8") &&
-                                     o.n == 16384 && o.k == 5120;
+    const bool supported =
+        (o.format == "q4q5" || o.format == "fp8") && o.n == 16384 && o.k == 5120;
     if (!supported) throw std::invalid_argument("unsupported format/N/K");
     return o;
 }
@@ -71,11 +69,7 @@ int main(int argc, char** argv) {
             second  = make_row_split_weight(QType::Q5_G64_FP16, 12288, options.k, options.k, 503U);
             weights = ops::PairedProjectionWeights{first.weight, second.weight};
         } else {
-            if (options.format == "q8")
-                first = make_row_split_weight(QType::Q8_G32_FP16, options.n, options.k, options.k,
-                                              501U);
-            else
-                first = make_fp8_weight(options.n, options.k, 501U);
+            first   = make_fp8_weight(options.n, options.k, 501U);
             weights = ops::SingleProjectionWeight{first.weight, policy};
         }
         const int tail = (options.n - 4096) / 2;

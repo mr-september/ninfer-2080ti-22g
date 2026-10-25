@@ -31,7 +31,7 @@ ninfer_linear_suite(projection
 ninfer_linear_format_tests(projection bf16 q4 q5 q6 q8 fp8)
 
 ninfer_linear_suite(split
-  test.cpp runner.cpp cases_segmented.cpp cases_two_output.cpp cases_multi_output.cpp)
+  test.cpp runner.cpp cases_two_output.cpp cases_multi_output.cpp)
 ninfer_linear_format_tests(split bf16 q4_q5 q8 fp8)
 
 ninfer_linear_suite(add

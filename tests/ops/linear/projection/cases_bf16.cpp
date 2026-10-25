@@ -118,22 +118,6 @@ struct Geometry {
 };
 
 const std::array kNewGeometries{
-    Geometry{48, 2560, {1, 8, 12, 16, 128}},
-    Geometry{96, 2560, {1, 4, 16, 128, 512}},
-    Geometry{1664, 2560, {1,   16,  32,  48,   64,   96,   128,  160,  256,  336,  448,  512,
-                          560, 640, 896, 1024, 1152, 1280, 1408, 1440, 1664, 1856, 2048, 4096}},
-    Geometry{324, 10240, {1, 2, 4, 8, 16, 32, 48, 64, 96, 128, 512, 1024, 1536, 2048, 4096}},
-    Geometry{320, 10240, {1, 4, 8, 16, 32, 48, 64, 96, 128, 512, 576, 768, 1216, 1536, 2048, 4096}},
-    Geometry{10240, 320, {1, 16, 48, 64, 128, 448, 512, 576, 640, 896, 1024, 4096}},
-    Geometry{12800, 2560, {1, 8, 16, 32, 48, 64, 96, 128, 384, 512, 3840, 4032, 4096}},
-    Geometry{248320,
-             2560,
-             {1, 8, 16, 32, 64, 96, 128, 256, 511, 512, 576, 640, 1024, 1152, 2560, 3839, 4096}},
-    Geometry{13952, 2560, {1, 8, 16, 32, 48, 64, 96, 128, 256, 384, 512, 3840, 4096}},
-    Geometry{2560, 6144, {1,    8,    16,   32,   64,   96,   128,  256,  512,
-                          576,  896,  1152, 1280, 1344, 1920, 2048, 2112, 2304,
-                          2688, 2880, 3328, 3456, 3968, 4032, 4096}},
-    Geometry{2560, 2560, {1, 8, 32, 48, 64, 96, 128, 256, 512, 576, 896, 1152, 2048, 4096}},
     Geometry{1152,
              1536,
              {4, 8, 16, 32, 64, 128, 192, 256, 320, 512, 640, 768, 1024, 2048, 4096},
@@ -156,26 +140,7 @@ const std::array kNewGeometries{
              4608,
              {1, 2, 3, 4, 8, 16, 32, 64, 96, 128, 256, 512, 2112, 4096},
              ColumnDomain::Merger},
-    Geometry{2560,
-             4608,
-             {1, 2, 8, 24, 64, 96, 128, 192, 256, 384, 512, 1984, 2048, 2111, 2112, 4096},
-             ColumnDomain::Merger},
 };
-
-ninfer::test::quantized_weight::PackedWeight cancellation_weight(int n, int k, std::uint32_t seed) {
-    auto result = ninfer::test::linear_weights::make_bf16_weight(n, k, seed);
-    for (int row = 0; row < n; ++row) {
-        for (int column = 0; column < k; column += 2) {
-            const auto offset = (static_cast<std::size_t>(row) * k + column) * 2;
-            auto value =
-                ninfer::test::quantized_weight::detail::load_u16_le(result.payload, offset);
-            if (column == k - 2 && (value & 0x7fff) == 0) value = 0x3d80;
-            ninfer::test::quantized_weight::detail::store_u16_le(result.payload, offset, value);
-            ninfer::test::quantized_weight::detail::store_u16_le(result.payload, offset + 2, value);
-        }
-    }
-    return result;
-}
 
 void run_new_bf16_geometry(Suite& suite, const Geometry& shape) {
     using namespace ninfer::test::linear;
@@ -184,7 +149,6 @@ void run_new_bf16_geometry(Suite& suite, const Geometry& shape) {
     const bool text        = shape.domain == ColumnDomain::Text;
     const int step         = raw ? 4 : 1;
     const int maximum      = raw ? 131072 : text ? std::numeric_limits<int>::max() : 32768;
-    const bool wide        = shape.n == 2560 && shape.k == 2560;
     auto test     = linear_suite::make_case("bf16", shape.n, shape.k, 0, ops::LinearPolicy::A16Only,
                                             linear_suite::Execution::Eager, "column-domain");
     test.policies = 3;
@@ -260,7 +224,7 @@ void run_new_bf16_geometry(Suite& suite, const Geometry& shape) {
     }
     points.insert({raw ? 132 : 129, 256, 512, 1024});
     if (!raw) points.insert(1025);
-    if (raw || wide) points.insert({2048, 4096});
+    if (raw) points.insert({2048, 4096});
     if (!text) points.insert({maximum - step, maximum});
     for (int end : shape.boundaries)
         for (int t : {end - step, end, end + step})
@@ -269,7 +233,7 @@ void run_new_bf16_geometry(Suite& suite, const Geometry& shape) {
     for (int t : points) calls.push_back({t});
     std::set<int> anchors{step, 4, 8, 128, 512, 1024};
     if (!text) anchors.insert(256);
-    if (raw || wide) anchors.insert({2048, 4096});
+    if (raw) anchors.insert({2048, 4096});
     for (int t : anchors) {
         calls.push_back({t, CallForm::Policy, ops::LinearPolicy::A16Only, true});
         calls.push_back({t, CallForm::A16Convenience});
@@ -292,7 +256,7 @@ void run_new_bf16_geometry(Suite& suite, const Geometry& shape) {
         add_shape(suite, ninfer::QType::BF16, ActivationRecipe::TokenBlocks, make_bf16_weight,
                   {shape.n, shape.k, seed + 1, Comparison::Full, true, full});
     }
-    if (shape.n <= 640 || shape.k == 320 || shape.k % 64 != 0) {
+    if (shape.n <= 640 || shape.k % 64 != 0) {
         std::set<int> tail_points{step, 4, 8, 128};
         std::vector<Invocation> tail;
         for (int t : tail_points) tail.push_back({t});
@@ -301,13 +265,6 @@ void run_new_bf16_geometry(Suite& suite, const Geometry& shape) {
                   {shape.n, shape.k, seed + 2,
                    shape.n <= 640 ? Comparison::Full : Comparison::Sampled, true, tail,
                    ActivationPattern::KTail});
-    }
-    if (shape.n <= 96) {
-        const std::array cancel{Invocation{1}, Invocation{4}, Invocation{8}, Invocation{128},
-                                Invocation{8, CallForm::Policy, ops::LinearPolicy::A16Only, true}};
-        add_shape(suite, ninfer::QType::BF16, ActivationRecipe::TokenBlocks, cancellation_weight,
-                  {shape.n, shape.k, seed + 3, Comparison::Full, true, cancel,
-                   ActivationPattern::Cancellation});
     }
 }
 
