@@ -4,14 +4,6 @@
 
 namespace ninfer::ops::detail {
 
-void launch_q6_a16_mma_r64_t40_k128(const Tensor& x, const Weight& weight, Tensor& out,
-                                    cudaStream_t stream) {
-    launch_q6_a16_mma<q6_instances::MmaR64T40K128>(
-        q6_linear_operands(x, weight),
-        LinearBf16Output{static_cast<__nv_bfloat16*>(out.data), weight.n}, LinearIdentityEpilogue{},
-        stream);
-}
-
 void launch_q6_a16_mma_r64_t48_k128(const Tensor& x, const Weight& weight, Tensor& out,
                                     cudaStream_t stream) {
     launch_q6_a16_mma<q6_instances::MmaR64T48K128>(
@@ -31,14 +23,6 @@ void launch_q6_a16_mma_r64_t56_k128(const Tensor& x, const Weight& weight, Tenso
 void launch_q6_a16_mma_r64_t64_k128(const Tensor& x, const Weight& weight, Tensor& out,
                                     cudaStream_t stream) {
     launch_q6_a16_mma<q6_instances::MmaR64T64K128>(
-        q6_linear_operands(x, weight),
-        LinearBf16Output{static_cast<__nv_bfloat16*>(out.data), weight.n}, LinearIdentityEpilogue{},
-        stream);
-}
-
-void launch_q6_a16_mma_r64_t72_k128(const Tensor& x, const Weight& weight, Tensor& out,
-                                    cudaStream_t stream) {
-    launch_q6_a16_mma<q6_instances::MmaR64T72K128>(
         q6_linear_operands(x, weight),
         LinearBf16Output{static_cast<__nv_bfloat16*>(out.data), weight.n}, LinearIdentityEpilogue{},
         stream);

@@ -61,8 +61,4 @@ void launch_q5_a16_sliced_r32_t64_w2_s1(const Tensor& x, const Weight& w, Tensor
     launch_q5_a16_sliced_k_mma_instance<q5_instances::SlicedR32T64W2S1>(x, w, out, stream);
 }
 
-void launch_q5_a16_sliced_r32_t64_w2_s2(const Tensor& x, const Weight& w, Tensor& out,
-                                        cudaStream_t stream) {
-    launch_q5_a16_sliced_k_mma_instance<q5_instances::SlicedR32T64W2S2>(x, w, out, stream);
-}
 } // namespace ninfer::ops::detail

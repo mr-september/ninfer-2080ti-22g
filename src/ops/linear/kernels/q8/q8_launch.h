@@ -8,7 +8,6 @@ namespace ninfer::ops::detail {
 
 using Q8Launch = void (*)(const Tensor&, const Weight&, Tensor&, cudaStream_t);
 
-void launch_q8_a16_gemv_r4_w1_k16384(const Tensor&, const Weight&, Tensor&, cudaStream_t);
 void launch_q8_a16_simt_r8_t4(const Tensor&, const Weight&, Tensor&, cudaStream_t);
 void launch_q8_a16_simt_r8_t8(const Tensor&, const Weight&, Tensor&, cudaStream_t);
 void launch_q8_a16_mma_r32_t64(const Tensor&, const Weight&, Tensor&, cudaStream_t);

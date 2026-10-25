@@ -57,11 +57,6 @@ void launch_q4_a16_sliced_r32_t32_w2_s2(const Tensor& x, const Weight& w, Tensor
     launch_q4_a16_sliced_instance<q4_instances::SlicedR32T32W2S2>(x, w, out, stream);
 }
 
-void launch_q4_a16_sliced_r32_t64_w2_s1(const Tensor& x, const Weight& w, Tensor& out,
-                                        cudaStream_t stream) {
-    launch_q4_a16_sliced_instance<q4_instances::SlicedR32T64W2S1>(x, w, out, stream);
-}
-
 void launch_q4_a16_sliced_k5120_t16(const Tensor& x, const Weight& w, Tensor& out,
                                     cudaStream_t stream) {
     launch_q4_a16_sliced_instance<q4_instances::SlicedK5120T16>(x, w, out, stream);
