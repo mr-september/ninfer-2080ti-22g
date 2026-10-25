@@ -76,7 +76,7 @@ __launch_bounds__(Block) __global__
 }
 
 // Implements: include/ninfer/ops/rmsnorm.h
-// Match: aligned contiguous BF16, plain epilogue, D=2048, sm_120a.
+// Match: aligned contiguous BF16, plain epilogue, D=2048.
 // Algorithm assumptions: exactly two BF16x2 values per thread; one 512-thread CTA owns one row.
 template <Epilogue Kind>
 __launch_bounds__(512) __global__

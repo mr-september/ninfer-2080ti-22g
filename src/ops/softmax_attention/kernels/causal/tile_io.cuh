@@ -36,7 +36,7 @@ __device__ __forceinline__ std::int64_t causal_stat_index(int head, int token, i
 }
 
 // Keep the explicit empty guard and row/d form: the compact modulo loop
-// caused register spills in sm_120a prefill kernels.
+// caused register spills in the prefill kernels.
 template <typename Geometry>
 __device__ __forceinline__ void causal_zero_rows(__nv_bfloat16* out, int q_head, int row_begin,
                                                  int row_end, int tid, int threads) {

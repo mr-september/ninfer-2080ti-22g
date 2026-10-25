@@ -73,7 +73,7 @@ __launch_bounds__(Block) __global__
 }
 
 // Implements: include/ninfer/ops/rmsnorm.h
-// Match: aligned contiguous BF16, plain or gated epilogue, D=128, sm_120a.
+// Match: aligned contiguous BF16, plain or gated epilogue, D=128.
 // Algorithm assumptions: exactly two BF16x2 values per lane; one warp owns one logical row.
 template <Epilogue Kind, int Block>
 __launch_bounds__(Block) __global__

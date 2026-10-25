@@ -1,10 +1,9 @@
 // Throwing definitions for the routes a Turing build does not compile.
 //
-// The FP8 weight kernels, the FP8 KV-cache kernels, the block-scaled MoE,
-// and the TMA/sparse-attention families need sm_120a instructions or serve models that are
-// not supported on this target. Their sources are excluded in src/ops/CMakeLists.txt; the
-// shared dispatchers still name them, so these definitions keep the link complete and report
-// a clear error if one is ever reached. Generated from the declarations they implement.
+// The FP8 weight kernels, the FP8 KV-cache kernels, and the sparse-attention and
+// hyper-connection families have no Turing kernels in this tree. The shared dispatchers still
+// name them, so these definitions keep the link complete and report a clear error if one is
+// ever reached. Generated from the declarations they implement.
 #include <stdexcept>
 #include <string>
 
