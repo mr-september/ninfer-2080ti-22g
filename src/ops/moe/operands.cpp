@@ -37,48 +37,29 @@ MatrixBytes matrix_bytes(QType type, int rows, int columns) {
 } // namespace
 
 void validate_route_profile(const RouteProfile& p) {
-    require((p.hidden == 2048 && p.experts == 256 && p.top_k == 8) ||
-                (p.hidden == 2560 && p.experts == 512 && p.top_k == 10),
+    require(p.hidden == 2560 && p.experts == 512 && p.top_k == 10,
             "topk softmax route: unsupported geometry");
 }
 
 void validate_expert_profile(const RoutedSwiGLUProfile& p) {
     validate_route_profile({p.ffn.hidden, p.experts, p.top_k});
     const auto& f = p.ffn;
-    if (f.hidden == 2560) {
-        const bool fp8 = f.gate_up_type == QType::FP8_E4M3FN_BLOCK128X128_BF16 &&
-                         f.gate_up_layout == QuantLayout::BlockScaleM128K128 &&
-                         f.gate_up_policy == LinearPolicy::AllowA8;
-        require(f.intermediate == 640 && fp8 && f.down_type == f.gate_up_type &&
-                    f.down_layout == f.gate_up_layout && f.down_policy == f.gate_up_policy,
-                "routed SwiGLU: unsupported block-scaled profile");
-        return;
-    }
-    require(f.intermediate == 512 && f.gate_up_layout == QuantLayout::RowSplit &&
-                f.down_layout == QuantLayout::RowSplit && valid_linear_policy(f.gate_up_policy) &&
-                valid_linear_policy(f.down_policy),
-            "routed SwiGLU: unsupported matrix geometry, layout or policy");
-    require((f.gate_up_type == QType::Q4_G64_FP16 &&
-             (f.down_type == QType::Q5_G64_FP16 || f.down_type == QType::Q6_G64_FP16)) ||
-                (f.gate_up_type == QType::Q8_G32_FP16 && f.down_type == QType::Q8_G32_FP16),
-            "routed SwiGLU: unsupported weight profile");
+    const bool fp8 = f.gate_up_type == QType::FP8_E4M3FN_BLOCK128X128_BF16 &&
+                     f.gate_up_layout == QuantLayout::BlockScaleM128K128 &&
+                     f.gate_up_policy == LinearPolicy::AllowA8;
+    require(f.intermediate == 640 && fp8 && f.down_type == f.gate_up_type &&
+                f.down_layout == f.gate_up_layout && f.down_policy == f.gate_up_policy,
+            "routed SwiGLU: unsupported block-scaled profile");
 }
 
 void validate_shared_profile(const SwiGLUProfile& p, int hidden) {
-    if (hidden == 2560) {
-        require(p.hidden == hidden && p.intermediate == 640 && p.gate_up_type == QType::BF16 &&
-                    p.down_type == QType::BF16 && p.gate_up_layout == QuantLayout::Contiguous &&
-                    p.down_layout == QuantLayout::Contiguous &&
-                    p.gate_up_policy == LinearPolicy::A16Only &&
-                    p.down_policy == LinearPolicy::A16Only,
-                "shared SwiGLU: unsupported BF16 profile");
-        return;
-    }
-    require(p.hidden == hidden && p.intermediate == 512 && p.gate_up_type == QType::Q8_G32_FP16 &&
-                p.down_type == QType::Q8_G32_FP16 && p.gate_up_layout == QuantLayout::RowSplit &&
-                p.down_layout == QuantLayout::RowSplit && valid_linear_policy(p.gate_up_policy) &&
-                valid_linear_policy(p.down_policy),
-            "shared SwiGLU: unsupported matrix geometry, format or policy");
+    require(hidden == 2560 && p.hidden == hidden && p.intermediate == 640 &&
+                p.gate_up_type == QType::BF16 && p.down_type == QType::BF16 &&
+                p.gate_up_layout == QuantLayout::Contiguous &&
+                p.down_layout == QuantLayout::Contiguous &&
+                p.gate_up_policy == LinearPolicy::A16Only &&
+                p.down_policy == LinearPolicy::A16Only,
+            "shared SwiGLU: unsupported BF16 profile");
 }
 
 void validate_moe_profile(const MoeProfile& p) {

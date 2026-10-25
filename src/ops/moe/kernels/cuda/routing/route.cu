@@ -224,12 +224,8 @@ void launch_route_shape(const Tensor& x, const Weight& control, const ExpertRout
 void launch_route(const Tensor& x, const Weight& control, const ExpertRoutes& routes,
                   const Tensor& shared, const RouterPlan& plan, const RouteStorage& storage,
                   const MoeExecutionHints& hints, CudaExecutionView execution) {
-    if (control.k == 2560) {
-        launch_route_shape<SwiGLUH2560I640E512K10>(x, control, routes, shared, plan, storage, hints,
-                                                   execution);
-    } else {
-        launch_route_shape<SwiGLUH2048I512E256K8>(x, control, routes, shared, plan, storage, hints,
-                                                  execution);
-    }
+    if (control.k != 2560) { throw std::invalid_argument("router: unsupported hidden size"); }
+    launch_route_shape<SwiGLUH2560I640E512K10>(x, control, routes, shared, plan, storage, hints,
+                                               execution);
 }
 } // namespace ninfer::ops::detail::moe_cuda::routing
