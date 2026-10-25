@@ -124,7 +124,8 @@ The benchmark corpus is random token ids, so its MTP acceptance (0.377) is far b
 | Image / video input | yes (`--vision`) |
 | MTP speculation with the optimized proposal head | yes, on by default |
 | OpenAI Chat/Responses, Anthropic Messages, streaming | yes |
-| DFlash and DFlash2 speculation | the code and tests are kept; untested end to end, because the usual artifact has no DFlash2 companion weights |
+| DFlash2 speculation | supported for Qwen3.8-27B (`--spec dflash2`; the published artifact includes the companion weights); not yet run end to end on this fork |
+| DFlash speculation | its only drafter targets Qwen3.6-35B-A3B, which has no kernels in this tree |
 | Qwen3.6-35B-A3B | no kernels in this tree (its Ops were removed); its 21.2 GiB artifact also cannot fit a 22 GB card |
 | Qwen4Exp (Flash Next), PLE, NF4, MoE experts | model-side code, planning and formats are kept for the Qwen4 series; the Ops without Turing kernels throw "unsupported", so none of it runs on a 2080 Ti today |
 | FP8 weights and KV | the formats are readable, but there are no Turing kernels; NVFP4 and K8V4 were removed |
