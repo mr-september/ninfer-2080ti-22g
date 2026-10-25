@@ -80,8 +80,7 @@ std::uint32_t parse_u32(std::string_view text, const char* label, bool allow_zer
 KvCacheStorage parse_kv_cache(std::string_view text) {
     if (text == "bf16") { return KvCacheStorage::BFloat16; }
     if (text == "int8") { return KvCacheStorage::Int8Group64; }
-    if (text == "fp8") { return KvCacheStorage::Fp8E4M3Row256; }
-    throw std::invalid_argument("--kv-dtype must be bf16, int8, or fp8");
+    throw std::invalid_argument("--kv-dtype must be bf16 or int8");
 }
 
 std::vector<int> parse_int_list(std::string_view value, const char* label) {
@@ -335,7 +334,7 @@ std::string usage_text(std::string_view program) {
         << "  --max-ctx <tokens>          override auto-sized context capacity\n"
         << "  --prefill-chunk <tokens>    multiple of " << kPrefillChunkAlignment
         << " (default: 1024; CPU expert offload: 4096)\n"
-        << "  --kv-dtype <bf16|int8|fp8>  KV cache storage (default: bf16)\n"
+        << "  --kv-dtype <bf16|int8>  KV cache storage (default: bf16)\n"
         << "  --spec <mtp|dflash|dflash2> speculative backend (default: none)\n"
         << "  --draft-tokens <n>         MTP 1..5; DFlash/DFlash2 1..15\n"
         << "  --lm-head-draft             use the optimized proposal head; requires a speculative "

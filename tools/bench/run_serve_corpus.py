@@ -33,7 +33,6 @@ SAMPLING_MODES = ("stochastic", "greedy")
 KV_CACHE_NAMES = {
     "bf16": "bf16",
     "int8": "int8-group64",
-    "fp8": "fp8-e4m3-row256",
 }
 
 SEEDS = (

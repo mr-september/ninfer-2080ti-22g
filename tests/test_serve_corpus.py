@@ -87,7 +87,7 @@ def test_result_record_parses_request_host_exposure() -> None:
         speculative_backend="mtp",
         draft_tokens=3,
         sampling_mode="greedy",
-        kv_dtype="fp8",
+        kv_dtype="bf16",
         fixture=fixture,
         seed=7,
     )
@@ -145,7 +145,7 @@ def test_result_record_parses_request_host_exposure() -> None:
         spec, "measured-prefill-bindings", payload, response, event
     )
     assert record["schema_version"] == 8
-    assert record["kv_dtype"] == "fp8"
+    assert record["kv_dtype"] == "bf16"
     assert record["metrics"]["engine_host_exposed_ms"] == pytest.approx(15.0)
     assert record["metrics"]["decode_host_us_per_round"] == pytest.approx(5000.0)
     assert record["metrics"]["decode_device_wait_us_per_round"] == pytest.approx(
@@ -164,7 +164,7 @@ def test_arbitrary_artifact_labels_reach_the_requested_backend(tmp_path: Path) -
             suite=["decode-saturation"],
             concurrency=[1],
             sampling="greedy",
-            kv_dtype="fp8",
+            kv_dtype="bf16",
         ),
     )
     assert [(point.target, point.speculative_backend) for point in points] == [
@@ -183,7 +183,7 @@ def test_arbitrary_artifact_labels_reach_the_requested_backend(tmp_path: Path) -
 
 
 @pytest.mark.parametrize(
-    "kv_dtype,cache_name", [("int8", "int8-group64"), ("fp8", "fp8-e4m3-row256")]
+    "kv_dtype,cache_name", [("int8", "int8-group64"), ("bf16", "bf16")]
 )
 @pytest.mark.parametrize("concurrent", [False, True])
 def test_selected_kv_reaches_server_and_is_verified(
@@ -283,7 +283,7 @@ def test_resume_rejects_different_kv_dtype(tmp_path):
         "none",
         0,
         "stochastic",
-        "fp8",
+        "bf16",
         Fixture("fixture", [], False, 8, "test"),
         7,
     )

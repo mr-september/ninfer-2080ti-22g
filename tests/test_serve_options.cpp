@@ -112,11 +112,8 @@ int main() {
     failures += check(resolve_public_model_id(defaults, "artifact-model") == "artifact-model",
                       "artifact model id was not selected by default");
 
-    const ServeOptions fp8 = parse({"ninfer-serve", "model.ninfer", "--kv-dtype", "fp8"});
-    failures += check(fp8.kv_cache == ninfer::KvCacheStorage::Fp8E4M3Row256,
-                      "--kv-dtype fp8 did not select row-scaled E4M3 KV");
     const std::string kv_help = serve_usage_text("ninfer-serve");
-    failures += check(kv_help.find("bf16|int8|fp8") != std::string::npos,
+    failures += check(kv_help.find("bf16|int8") != std::string::npos,
                       "serve help omits a production KV storage mode");
 
     const ServeOptions model_alias =

@@ -40,7 +40,7 @@ constexpr std::size_t kFlushBytes           = std::size_t{256} << 20;
 
 enum class Mode : std::uint8_t { Full, Prefix, All };
 enum class FullGeometryChoice : std::uint8_t { Kv4, Kv2, All };
-enum class KvChoice : std::uint8_t { Bf16, Int8, Fp8, All };
+enum class KvChoice : std::uint8_t { Bf16, Int8, All };
 enum class LayoutChoice : std::uint8_t { Paged, Cyclic, All };
 enum class Execution : std::uint8_t { Eager, Graph, Both };
 enum class CacheMode : std::uint8_t { Cold, Warm, Both };
@@ -101,7 +101,7 @@ struct Result {
                  "error: %s\n"
                  "usage: ninfer_kv_cache_append_bench [--mode full|prefix|all] "
                  "[--full-geometry d256-kv4|d256-kv2|all] "
-                 "[--kv-dtype bf16|int8|fp8|all] "
+                 "[--kv-dtype bf16|int8|all] "
                  "[--layout paged|cyclic|all] [--tokens T,...] [--counts C,...] "
                  "[--cyclic-capacity 2048|4096] [--batch B] "
                  "[--context L] [--execution eager|graph|both] [--cache cold|warm|both] "
@@ -174,12 +174,10 @@ Options parse_options(int argc, char** argv) {
                 options.kv = KvChoice::Bf16;
             else if (value == "int8")
                 options.kv = KvChoice::Int8;
-            else if (value == "fp8")
-                options.kv = KvChoice::Fp8;
             else if (value == "all")
                 options.kv = KvChoice::All;
             else
-                usage("--kv-dtype expects bf16, int8, fp8, or all");
+                usage("--kv-dtype expects bf16, int8, or all");
         } else if (argument == "--layout") {
             const std::string_view value(next("--layout requires a value"));
             if (value == "paged")
@@ -669,8 +667,7 @@ std::vector<FullGeometry> selected_geometries(FullGeometryChoice choice) {
 std::vector<KvCacheStorage> selected_storages(KvChoice choice) {
     if (choice == KvChoice::Bf16) return {KvCacheStorage::BFloat16};
     if (choice == KvChoice::Int8) return {KvCacheStorage::Int8Group64};
-    if (choice == KvChoice::Fp8) return {KvCacheStorage::Fp8E4M3Row256};
-    return {KvCacheStorage::BFloat16, KvCacheStorage::Int8Group64, KvCacheStorage::Fp8E4M3Row256};
+    return {KvCacheStorage::BFloat16, KvCacheStorage::Int8Group64};
 }
 
 template <class Case>
