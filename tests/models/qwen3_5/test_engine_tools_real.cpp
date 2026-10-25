@@ -426,7 +426,7 @@ int main(int argc, char** argv) {
         options.kv_capacity     = ninfer::KvCapacityPolicy::explicit_capacity(
             pressure_mode ? 1024 : options.max_concurrency * 1024);
         options.prefill_chunk                     = 128;
-        options.kv_cache                          = ninfer::KvCacheStorage::Fp8E4M3Row256;
+        options.kv_cache                          = ninfer::KvCacheStorage::Int8Group64;
         options.use_cuda_graph                    = mode != "eager";
         options.context_cache.enabled             = !pressure_mode;
         options.context_cache.device_state_slots  = pressure_mode ? 0 : 8;
