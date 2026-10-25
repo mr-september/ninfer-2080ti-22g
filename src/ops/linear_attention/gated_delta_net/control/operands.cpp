@@ -56,7 +56,7 @@ Geometry describe_profile(const ProjectionProfile& weights) {
     require(valid_linear_policy(a.policy), "invalid activation permission");
     if (!weights.second) {
         require(a.qtype == QType::BF16 &&
-                    a.n == 96 && (a.k == 5120 || a.k == 2560),
+                    a.n == 96 && a.k == 5120,
                 "unsupported parent geometry");
         return {a.n / 2, a.k};
     }
@@ -103,7 +103,6 @@ void validate_projection(const Tensor& x, const Weights& weights, const Tensor& 
 
 void validate_norm(const Tensor& x, const Tensor& weight, float eps, Geometry geometry,
                    const Tensor& normalized) {
-    require(geometry.input_rows != 2560, "norm projection does not admit this geometry");
     require(eps > 0 && std::isfinite(eps), "epsilon must be positive and finite");
     vector(weight, DType::BF16, geometry.input_rows);
     matrix(normalized, DType::BF16, geometry.input_rows, x.ne[1]);

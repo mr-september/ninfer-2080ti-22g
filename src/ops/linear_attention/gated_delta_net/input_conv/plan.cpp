@@ -17,8 +17,6 @@ ConvPlan select_conv_plan(const WeightProfile& weights, Batch batch) {
         if (batch.rows == 1 && (batch.tokens <= 3 || batch.tokens == 5 || batch.tokens == 6))
             plan.kernel = ConvKernel::Q4Q5Fused;
         break;
-    case Format::Q8:
-        return select_q8_conv_plan(weights, batch);
     case Format::Fp8:
         if (batch.rows == 1 && batch.tokens <= 3) plan.kernel = ConvKernel::Fp8Fused;
         break;

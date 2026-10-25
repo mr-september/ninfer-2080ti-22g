@@ -8,9 +8,6 @@ quantized_weight::PackedWeight make_first(Profile p, bool record) {
     case QType::Q4_G64_FP16:
         seed = record ? 1401 : 617;
         break;
-    case QType::Q8_G32_FP16:
-        seed = record ? 1501 : 727;
-        break;
     case QType::FP8_E4M3FN_ROW_BF16:
         seed = record ? 1701 : 929;
         break;

@@ -118,24 +118,6 @@ int validate(Profile p, bool normalize_input, CudaExecutionView execution) {
                            from_device<std::uint32_t>(f.beta.data(), old_b.size()), old_b);
     failed += f.check(name);
     if (f.arena.used() != f.prefix) ++failed;
-    if (p.input_rows == 2560) {
-        failed += rejects(name + " norm domain",
-                          [&] { (void)workspace_capacity(f.weights.prepared, true, 1, 8); });
-        failed += rejects(name + " norm execution domain", [&] {
-            ops::gdn_norm_control_proj(f.input, f.norm_weight, kEps, f.weights.prepared,
-                                       f.a_log_tensor, f.dt_bias_tensor,
-                                       {f.normalized_tensor, f.outputs}, f.arena, execution);
-        });
-        const auto first = std::get<ops::SingleProjectionWeight>(f.weights.prepared).weight;
-        Weight a = first, b = first;
-        a.n = b.n  = 48;
-        a.shape[0] = b.shape[0] = 48;
-        a.padded_shape[0] = b.padded_shape[0] = 48;
-        b.qdata                     = static_cast<const std::byte*>(a.qdata) + 48 * 2560 * 2;
-        ops::ProjectionWeights pair = ops::PairedProjectionWeights{a, b};
-        failed +=
-            rejects(name + " pair domain", [&] { (void)workspace_capacity(pair, false, 1, 8); });
-    }
     return failed;
 }
 

@@ -2,7 +2,6 @@
 #include "ops/linear_attention/gated_delta_net/input_conv/fp8/launch.h"
 #include "ops/linear_attention/gated_delta_net/input_conv/projected_conv.h"
 #include "ops/linear_attention/gated_delta_net/input_conv/q4_q5/launch.h"
-#include "ops/linear_attention/gated_delta_net/input_conv/q8/launch.h"
 #include "ops/linear_attention/gated_delta_net/input_conv/workspace.h"
 #include <stdexcept>
 
@@ -14,9 +13,6 @@ void launch_projection(const Tensor& x, const WeightOperands& weights, Projected
     switch (weights.format) {
     case Format::Q4Q5:
         q4_q5_gdn_input_dispatch(x, w, *weights.second, out.qkv, out.z, stream);
-        break;
-    case Format::Q8:
-        q8_gdn_input_dispatch(x, w, out.qkv, out.z, stream);
         break;
     case Format::Fp8:
         if (plan.compute == Compute::A8)
@@ -38,13 +34,6 @@ void launch_snapshot(const Tensor& x, const WeightOperands& weights, const Tenso
         launch_q4_q5_gdn_input_conv_snapshot(x, w, *weights.second, conv, state.history, valid,
                                              state.source_slots, state.snapshot_bases, out.query,
                                              out.key, out.value, out.z, stream);
-        return;
-    case ConvKernel::Q8Window:
-    case ConvKernel::Q8Aggregate:
-    case ConvKernel::Q8TmaBatch:
-        launch_q8_gdn_conv_n16384_k2560_snapshot(
-            x, w, conv, state.history, valid, state.source_slots, state.snapshot_bases, out.query,
-            out.key, out.value, out.z, plan.kernel, stream);
         return;
     case ConvKernel::Fp8Fused:
         launch_fp8_gdn_snapshot_fused(x, w, conv, state.history, valid, state.source_slots,
@@ -80,13 +69,6 @@ void launch_record(const Tensor& x, const WeightOperands& weights, const Tensor&
         launch_q4_q5_gdn_input_conv_record(x, w, *weights.second, conv, state.history, valid,
                                            state.source_slots, record, out.query, out.key,
                                            out.value, out.z, stream);
-        return;
-    case ConvKernel::Q8Window:
-    case ConvKernel::Q8Aggregate:
-    case ConvKernel::Q8TmaBatch:
-        launch_q8_gdn_conv_n16384_k2560_record(x, w, conv, state.history, valid, state.source_slots,
-                                               record, out.query, out.key, out.value, out.z,
-                                               plan.kernel, stream);
         return;
     case ConvKernel::Fp8Fused:
         launch_fp8_gdn_record_fused(x, w, conv, state.history, valid, state.source_slots, record,

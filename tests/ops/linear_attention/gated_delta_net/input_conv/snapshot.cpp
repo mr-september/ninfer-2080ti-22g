@@ -27,12 +27,6 @@ namespace {
 
 // This criterion belongs to the complete A16 fused projection/conv/snapshot Op.
 constexpr ReductionCriterion kGdnInputProjConvSnapshotA16Tolerance{3.15e-3, 4.0e-3, 3.2e-3};
-// Q8 A16 includes BF16 weight reconstruction and, in the composed arithmetic
-// profile, BF16 projection storage before convolution. The FP64 oracle keeps
-// both intermediates ideal. Allow two BF16 unit roundoffs in L2 for the projection
-// and nonlinear output, with a finite gross cap; fused routes avoid the inner cast.
-constexpr ReductionCriterion kQ8GdnInputProjConvSnapshotA16Tolerance{2.0 / 256.0, 1.0 / 256.0,
-                                                                     2.0 / 256.0};
 constexpr ReductionCriterion kFp8GdnInputProjConvSnapshotA16Tolerance{1.0 / 256.0, 1.0 / 256.0,
                                                                       2.0 / 256.0};
 constexpr ReductionCriterion kFp8GdnInputProjConvSnapshotA8Tolerance{0.04, 1.0 / 256.0, 0.06};
@@ -562,130 +556,6 @@ int run_q4_q5_case(DevicePackedWeight& query_key, DevicePackedWeight& value_z_we
     return failures;
 }
 
-int run_q8_case(DevicePackedWeight& parent, std::int32_t tokens, std::int32_t initial_slot,
-                bool graph = false) {
-    const auto weight                        = parent.view();
-    const std::int32_t kHidden               = weight.k;
-    const std::int32_t kValueRows            = weight.n == 16384 ? 6144 : 4096;
-    const std::int32_t kZRows                = kValueRows;
-    const std::int32_t kChannels             = weight.n - kZRows;
-    constexpr std::int32_t kSnapshotBaseSlot = 1;
-    const std::int32_t slots                 = std::max(tokens + 2, initial_slot + 1);
-    std::vector<float> activation            = make_bf16_activation(kHidden, tokens, 701U + tokens);
-    std::vector<std::uint16_t> activation_bits        = bf16_bits(activation);
-    const std::vector<float> conv_weight              = make_conv_weight(kChannels, 709U);
-    const std::vector<std::uint16_t> conv_weight_bits = bf16_bits(conv_weight);
-    const std::vector<std::uint16_t> state_before =
-        make_state(kChannels, slots, initial_slot, 719U + tokens);
-    const std::vector<std::int32_t> initial_value{initial_slot};
-    const std::vector<std::int32_t> snapshot_base_value{kSnapshotBaseSlot};
-
-    DeviceBuffer device_activation    = to_device(activation_bits);
-    DeviceBuffer device_conv_weight   = to_device(conv_weight_bits);
-    DeviceBuffer device_initial       = to_device(initial_value);
-    DeviceBuffer device_snapshot_base = to_device(snapshot_base_value);
-    GuardedBf16Tensor state(kChannels * 3, slots);
-    state.copy_from_bits(state_before);
-    GuardedBf16Tensor query(kQueryRows, tokens);
-    GuardedBf16Tensor key(kKeyRows, tokens);
-    GuardedBf16Tensor value(kValueRows, tokens);
-    GuardedBf16Tensor z(kZRows, tokens);
-    Tensor x(device_activation.span(), DType::BF16, {kHidden, tokens});
-    Tensor conv(device_conv_weight.span(), DType::BF16, {kChannels, 4});
-    Tensor conv_state(state.span(), DType::BF16, {kChannels, 3, slots});
-    SlottedStateFixture history(conv_state, 2);
-    conv_state = history.tensor;
-    Tensor initial(device_initial.span(), DType::I32, {1});
-    Tensor snapshot_base(device_snapshot_base.span(), DType::I32, {1});
-    Tensor q                          = query.tensor();
-    Tensor k                          = key.tensor();
-    Tensor v                          = value.tensor();
-    Tensor z_output                   = z.tensor();
-    const std::size_t workspace_bytes = ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
-        ops::SingleProjectionWeight{parent.view(), ops::LinearPolicy::A16Only}, 1, tokens, tokens);
-    ninfer::DeviceBuffer workspace_storage(ninfer::test::cuda_environment().context.device(),
-                                           std::max<std::size_t>(1, workspace_bytes));
-    MemoryArena workspace(workspace_storage.span());
-
-    const auto launch = [&](CudaExecutionView cuda) {
-        ops::gdn_input_proj_conv_snapshot(
-            x, ops::SingleProjectionWeight{parent.view(), ops::LinearPolicy::A16Only}, conv,
-            {conv_state, initial, snapshot_base}, Tensor{}, {q, k, v, z_output}, workspace, cuda);
-    };
-    if (graph) {
-        cudaStream_t stream;
-        cudaGraph_t captured;
-        cudaGraphExec_t executable;
-        cuda_synchronize();
-        CUDA_CHECK(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
-        const auto stream_execution =
-            ninfer::test::cuda_environment().context.execution_view(stream);
-        CUDA_CHECK(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal));
-        launch(stream_execution);
-        CUDA_CHECK(cudaStreamEndCapture(stream, &captured));
-        CUDA_CHECK(cudaGraphInstantiate(&executable, captured, nullptr, nullptr, 0));
-        CUDA_CHECK(cudaGraphLaunch(executable, stream));
-        CUDA_CHECK(cudaStreamSynchronize(stream));
-        CUDA_CHECK(cudaMemcpyAsync(state.data(), state_before.data(),
-                                   state_before.size() * sizeof(std::uint16_t),
-                                   cudaMemcpyHostToDevice, stream));
-        activation      = make_bf16_activation(kHidden, tokens, 1701U + tokens);
-        activation_bits = bf16_bits(activation);
-        CUDA_CHECK(cudaMemcpyAsync(device_activation.data(), activation_bits.data(),
-                                   device_activation.size(), cudaMemcpyHostToDevice, stream));
-        CUDA_CHECK(cudaGraphLaunch(executable, stream));
-        CUDA_CHECK(cudaStreamSynchronize(stream));
-        CUDA_CHECK(cudaGraphExecDestroy(executable));
-        CUDA_CHECK(cudaGraphDestroy(captured));
-        CUDA_CHECK(cudaStreamDestroy(stream));
-    } else {
-        launch(cuda_environment().default_execution);
-        cuda_synchronize();
-    }
-
-    const std::size_t initial_base = static_cast<std::size_t>(initial_slot) * 3 * kChannels;
-    const std::span<const std::uint16_t> initial_state(state_before.data() + initial_base,
-                                                       3 * kChannels);
-    const SnapshotOracle oracle = snapshot_oracle(
-        kValueRows, tokens, conv_weight, initial_state, [&](std::int32_t row, std::int32_t token) {
-            return quantized_weight::dot_fp64(
-                parent.host, row, activation.data() + static_cast<std::size_t>(token) * kHidden,
-                kHidden);
-        });
-    history.copy_back();
-    const std::vector<std::uint16_t> state_after = state.bits();
-    const std::string suffix =
-        " Q8 K=" + std::to_string(kHidden) + " A16 T=" + std::to_string(tokens) +
-        " initial=" + std::to_string(initial_slot) + " base=" + std::to_string(kSnapshotBaseSlot);
-    int failures = verify_snapshot_outputs(suffix, query, key, value, kValueRows, tokens, oracle,
-                                           kQ8GdnInputProjConvSnapshotA16Tolerance);
-    failures += compare("snapshot state" + suffix,
-                        gather_state(state_after, kChannels, kValueRows, tokens, kSnapshotBaseSlot),
-                        oracle.state, kQ8GdnInputProjConvSnapshotA16Tolerance);
-    failures += history.verify_guards("snapshot history");
-    failures += state.verify_guards("snapshot state" + suffix);
-    failures += verify_state_effects("snapshot state" + suffix, state_before, state_after,
-                                     kChannels, tokens, slots, kSnapshotBaseSlot);
-    failures += z.verify_guards("snapshot z" + suffix);
-    failures += z.verify_fully_written("snapshot z" + suffix);
-    failures +=
-        compare("snapshot z" + suffix, gather_rows(z.values(), kZRows, 0, kZRows, tokens),
-                projection_oracle(parent.host, kChannels, kZRows, activation, kHidden, tokens),
-                kQ8GdnInputProjConvSnapshotA16Tolerance);
-    failures += verify_preserved("snapshot x" + suffix, device_activation, activation_bits);
-    failures +=
-        verify_preserved("snapshot conv weight" + suffix, device_conv_weight, conv_weight_bits);
-    failures += verify_preserved("snapshot initial slot" + suffix, device_initial, initial_value);
-    failures +=
-        verify_preserved("snapshot base slot" + suffix, device_snapshot_base, snapshot_base_value);
-    failures += parent.verify_preserved("snapshot parent weight" + suffix);
-    if (workspace.used() != 0 || workspace.peak_used() != workspace_bytes) {
-        std::cerr << "snapshot" << suffix << ": workspace query/execution high-water mismatch\n";
-        ++failures;
-    }
-    return failures;
-}
-
 int run_fp8_case(DevicePackedWeight& parent, std::int32_t tokens, ops::LinearPolicy policy,
                  std::int32_t initial_slot, bool convenience = false,
                  bool shared_state_selectors = false) {
@@ -809,8 +679,6 @@ int run_snapshot(Weights& weights, const SnapshotCase& c) {
         case QType::Q4_G64_FP16:
             return run_q4_q5_case(weights.first, *weights.second, c.width, initial,
                                   c.full_reference);
-        case QType::Q8_G32_FP16:
-            return run_q8_case(weights.first, c.width, initial, c.graph);
         case QType::FP8_E4M3FN_ROW_BF16:
             return run_fp8_case(weights.first, c.width, c.policy, initial, c.convenience,
                                 c.shared_selectors);
@@ -824,11 +692,10 @@ int run_snapshot(Weights& weights, const SnapshotCase& c) {
     const auto capacity   = ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
         projection, c.batch, c.width, c.width);
     const auto criterion =
-        p.format == QType::Q8_G32_FP16 ? kQ8GdnInputProjConvSnapshotA16Tolerance
-        : p.format == QType::FP8_E4M3FN_ROW_BF16
+        p.format == QType::FP8_E4M3FN_ROW_BF16
             ? (c.policy == ops::LinearPolicy::A16Only ? kFp8GdnInputProjConvSnapshotA16Tolerance
                                                       : kFp8GdnInputProjConvSnapshotA8Tolerance)
-        : kGdnInputProjConvSnapshotA16Tolerance;
+            : kGdnInputProjConvSnapshotA16Tolerance;
     return run_batched_case(
         std::string(p.name) + "/w" + std::to_string(c.width) + "/b" + std::to_string(c.batch),
         p.hidden, p.value_rows(), p.value_rows(), c.width, c.batch, c.valid, conv, capacity,

@@ -5,7 +5,7 @@
 
 namespace ninfer::ops::detail::gdn_input {
 
-enum class Format { Q4Q5, Q8, Fp8 };
+enum class Format { Q4Q5, Fp8 };
 
 struct Geometry {
     std::int32_t input_rows;

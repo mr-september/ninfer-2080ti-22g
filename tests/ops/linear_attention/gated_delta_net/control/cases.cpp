@@ -20,11 +20,7 @@ void unique(std::vector<Case>& cases) {
 
 std::vector<Case> projection_cases(Profile p) {
     std::vector<Case> outputs{{1}, {4}, {8}, {64}, {128}};
-    if (p.input_rows == 2560)
-        boundaries(outputs,
-                   {1, 4, 8, 192, 448, 512, 896, 1024, 1280, 2048, 2688, 5120, 7168, 8192});
-    else
-        boundaries(outputs, {1, 8, 1024, 2048, 4096});
+    boundaries(outputs, {1, 8, 1024, 2048, 4096});
     outputs.push_back({8192});
     unique(outputs);
     // The paired representation is independently checked at every production route. Related
@@ -34,7 +30,7 @@ std::vector<Case> projection_cases(Profile p) {
     }
     for (auto& c : outputs)
         if (c.columns == 1 || c.columns == 128 || c.columns == 4097) c.execution = Execution::Graph;
-    if (p.input_rows == 2560) {
+    if (p.storage == Storage::Parent) {
         for (auto pattern : {Pattern::ZeroInput, Pattern::ZeroA, Pattern::ZeroB, Pattern::Sparse,
                              Pattern::Cancellation, Pattern::GateEdges}) {
             outputs.push_back({8, pattern, Execution::Graph});
@@ -66,7 +62,6 @@ namespace ninfer::test::gdn_control {
 void add_projection_cases(OpSuite& suite) {
     for (bool normalize : {false, true})
         for (auto profile : kProfiles) {
-            if (normalize && profile.input_rows == 2560) continue;
             const auto prefix =
                 std::string(normalize ? "gdn_norm_control_proj/" : "gdn_control_proj/") +
                 std::to_string(profile.heads) + "x" + std::to_string(profile.input_rows) +

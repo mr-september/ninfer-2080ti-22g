@@ -24,9 +24,6 @@ void execute_projection(const Tensor& x, const Weights& weights, const Tensor& a
     case 5120:
         launch_n96_k5120(in, out, plan, scratch, execution);
         return;
-    case 2560:
-        launch_n96_k2560(in, out, plan, scratch, execution);
-        return;
     }
     throw std::logic_error("gdn_control: missing geometry launcher");
 }

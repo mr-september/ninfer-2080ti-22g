@@ -35,7 +35,6 @@ std::span<const Route> routes(Geometry geometry, bool norm = false) {
         throw std::invalid_argument("gdn_control: unsupported norm geometry");
     }
     if (geometry.heads == 48 && geometry.input_rows == 5120) return kN96K5120;
-    if (geometry.heads == 48 && geometry.input_rows == 2560) return routes_n96_k2560();
     throw std::invalid_argument("gdn_control: unsupported geometry");
 }
 

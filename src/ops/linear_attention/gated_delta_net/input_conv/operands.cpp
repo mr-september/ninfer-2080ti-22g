@@ -20,14 +20,13 @@ void require_selector(const Tensor& t, std::int32_t batch, const char* label) {
 }
 
 void validate_rowsplit(const Weight& w) {
-    const bool q8    = w.qtype == QType::Q8_G32_FP16;
     const bool q5    = w.qtype == QType::Q5_G64_FP16;
-    const auto group = q8 ? 32U : 64U;
+    const auto group = 64U;
     if (w.layout != QuantLayout::RowSplit || w.scale_dtype != DType::FP16 ||
         w.group_size != group || w.group != static_cast<std::int32_t>(group) || w.ndim != 2 ||
         w.shape[0] != w.n || w.shape[1] != w.k || w.padded_shape[0] != w.n ||
         w.padded_shape[1] != w.k || !common::operand::aligned(w.qdata, 16) ||
-        !common::operand::aligned(w.scales, q8 ? 16 : 4) ||
+        !common::operand::aligned(w.scales, 4) ||
         (q5 ? (!common::operand::aligned(w.qhigh, 16) || w.high_plane_bytes == 0)
             : (w.qhigh != nullptr || w.high_plane_bytes != 0)))
         throw std::invalid_argument("GDN input: invalid RowSplit weight representation");
@@ -47,9 +46,6 @@ WeightProfile describe_profile(const ProjectionProfile& weights) {
     const auto& w = weights.first;
     if (!valid_linear_policy(w.policy))
         throw std::invalid_argument("GDN input: invalid activation permission");
-    if (w.qtype == QType::Q8_G32_FP16) {
-        if (w.n == 16384 && w.k == 2560) return {Format::Q8, {2560, 6144}, w.policy};
-    }
     if (w.n == 16384 && w.k == 5120) {
         if (w.qtype == QType::FP8_E4M3FN_ROW_BF16) return {Format::Fp8, {5120, 6144}, w.policy};
     }
@@ -69,8 +65,6 @@ void validate_weights(const WeightOperands& weights) {
     switch (weights.format) {
     case Format::Q4Q5:
         validate_rowsplit(*weights.second);
-        [[fallthrough]];
-    case Format::Q8:
         validate_rowsplit(*weights.first);
         break;
     case Format::Fp8:

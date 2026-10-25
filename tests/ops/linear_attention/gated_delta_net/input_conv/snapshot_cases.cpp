@@ -33,20 +33,6 @@ std::vector<SnapshotCase> cases(Profile p) {
         batch(5, 2, {}, 631);
         batch(4, 2, {4, 2}, 631);
         batch(16, 3, {16, 9, 4}, 631);
-    } else if (p.format == QType::Q8_G32_FP16) {
-        for (int t : {1,  2,  3,  4,  5,  6,  7,  8,  9,  10,
-                      11, 12, 13, 14, 15, 16, 17, 33, 129})
-            result.push_back({.width = t, .initial = t == 2 ? 0 : t + 1});
-        for (int t : {1, 8, 16, 17, 65, 192, 1024, 1025, 1152})
-            result.push_back({.width = t, .graph = true});
-        for (int t : {95, 96, 97, 127, 128, 191, 193, 1023, 1151, 1153, 4096})
-            result.push_back({.width = t});
-        for (int b : {2, 3, 4, 5, 6, 7, 8})
-            for (int t : {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}) {
-                std::vector<int> valid(b);
-                for (int i = 0; i < b; ++i) valid[i] = t - i % t;
-                batch(t, b, valid, 733);
-            }
     } else {
         result = {{.width = 1, .convenience = true, .shared_selectors = true},
                   {3},
@@ -74,8 +60,6 @@ int snapshot_capacity_contract() {
     const ops::PairedProjectionWeights q4_q5_capacity_weights{
         capacity_weight(QType::Q4_G64_FP16, 4096, 5120),
         capacity_weight(QType::Q5_G64_FP16, 12288, 5120)};
-    const ops::SingleProjectionWeight q8_capacity_weights{
-        capacity_weight(QType::Q8_G32_FP16, 16384, 2560)};
 
     int failures = 0;
     const std::size_t q4_interval =
@@ -87,33 +71,6 @@ int snapshot_capacity_contract() {
     if (q4_interval != q4_witness || q4_witness == 0 || q4_right_endpoint != 0) {
         std::cerr << "Q4/Q5 snapshot interval did not retain its non-monotonic T=4 route\n";
         ++failures;
-    }
-    if (ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(q8_capacity_weights, 1, 1, 16) !=
-            0 ||
-        ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(q8_capacity_weights, 1, 1, 17) !=
-            ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(q8_capacity_weights, 1, 17,
-                                                                       17)) {
-        std::cerr << "Q8 snapshot interval did not preserve its zero/nonzero route boundary\n";
-        ++failures;
-    }
-    for (int batch = 1; batch <= 8; ++batch) {
-        for (int first = 1; first <= 16; ++first) {
-            std::size_t peak = 0;
-            for (int last = first; last <= 16; ++last) {
-                const auto capacity = [&](int begin, int end) {
-                    return ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
-                        ops::SingleProjectionWeight{
-                            capacity_weight(QType::Q8_G32_FP16, 16384, 2560),
-                            ops::LinearPolicy::A16Only},
-                        batch, begin, end);
-                };
-                peak = std::max(peak, capacity(last, last));
-                if (capacity(first, last) != peak) {
-                    std::cerr << "Q8 snapshot interval missed its interior high-water\n";
-                    ++failures;
-                }
-            }
-        }
     }
     const auto fp8_snapshot_capacity = [](ops::LinearPolicy policy, std::int32_t batch,
                                           std::int32_t min_width, std::int32_t max_width) {

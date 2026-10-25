@@ -30,8 +30,6 @@ constexpr bool closed(std::span<const Route> routes) {
     return next == std::int64_t(std::numeric_limits<std::int32_t>::max()) + 1;
 }
 
-std::span<const Route> routes_n96_k2560();
-
 struct NormPlan {
     NormKernel kernel;
     Plan projection;

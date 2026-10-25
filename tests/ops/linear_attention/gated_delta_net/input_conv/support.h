@@ -17,7 +17,6 @@ struct Profile {
 };
 
 inline constexpr Profile profiles[]{{QType::Q4_G64_FP16, 5120, "q4_q5"},
-                                    {QType::Q8_G32_FP16, 2560, "q8"},
                                     {QType::FP8_E4M3FN_ROW_BF16, 5120, "fp8"}};
 
 const char* policy_name(ops::LinearPolicy policy);
