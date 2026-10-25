@@ -8,16 +8,12 @@
 #include <stdexcept>
 
 namespace ninfer::ops::detail::gated_delta_net {
-enum class FoldGeometryId { Layers48Heads48, Layers30Heads32, Layers36Heads48 };
+enum class FoldGeometryId { Layers48Heads48 };
 
 inline FoldGeometryId select_fold_geometry(const GdnReplayRecordSpec& spec) {
-    if (spec.qk_heads == 16 && spec.value_heads == 48 && spec.conv_channels == 10240) {
-        if (spec.layers == 48) return FoldGeometryId::Layers48Heads48;
-        if (spec.layers == 36) return FoldGeometryId::Layers36Heads48;
-    }
-    if (spec.layers == 30 && spec.qk_heads == 16 && spec.value_heads == 32 &&
-        spec.conv_channels == 8192)
-        return FoldGeometryId::Layers30Heads32;
+    if (spec.layers == 48 && spec.qk_heads == 16 && spec.value_heads == 48 &&
+        spec.conv_channels == 10240)
+        return FoldGeometryId::Layers48Heads48;
     throw std::invalid_argument("gdn_replay_fold: unsupported record geometry");
 }
 

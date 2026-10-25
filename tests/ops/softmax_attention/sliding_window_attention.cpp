@@ -116,7 +116,7 @@ struct Cache {
     }
 };
 
-// One naive FP64 oracle for both cache windows, every route, and every execution mode. The
+// One naive FP64 oracle for the cache window, every route, and every execution mode. The
 // cached interval and |key_position-query_position| predicate come from the public formula.
 std::vector<double> oracle(const Cache& cache, int width, int batch, const std::vector<float>& q,
                            const std::vector<float>& qk, const std::vector<float>& qv,
@@ -384,18 +384,6 @@ int main(int argc, char** argv) {
     const Recipe boundary{2048, true};
     for (int width : {2, 3, 16})
         add(boundary, width, width == 3 ? 8 : 1, 2048, 2048, Prefix::Full, true);
-    {
-        const Recipe legacy{4096, false};
-        add(legacy, 1, 1, 0, 0, Prefix::Full, false);
-        add(legacy, 16, 1, 1, 1, Prefix::Full, false);
-        add(legacy, 8, 1, 96, 4096, Prefix::Full, true);
-        add(legacy, 16, 1, 4096, 4096, Prefix::Full, true);
-        add(legacy, 2, 2, 8194, 8194, Prefix::Mixed, true);
-        add(legacy, 8, 1, 65, 96, Prefix::Zero, true);
-        add(legacy, 8, 1, 4096, 4096, Prefix::Zero, true);
-        const Recipe edge{4096, true};
-        add(edge, 2, 1, 4096, 4096, Prefix::Full, true);
-    }
     for (const auto& [recipe, cases] : groups) {
         std::vector<OpCase> catalogue;
         for (auto c : cases)

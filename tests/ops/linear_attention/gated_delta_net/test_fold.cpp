@@ -530,12 +530,12 @@ int run_case(const FoldProfile profile, std::int32_t width, std::int32_t rows,
     return failures;
 }
 
-int run_record_fold_rounds(bool q8 = false) {
+int run_record_fold_rounds() {
     using ninfer::test::input_projection::DevicePackedWeight;
     using ninfer::test::input_projection::make_bf16_activation;
 
-    const FoldProfile kProfile{q8 ? 36 : 48, 48, 10240};
-    const std::int32_t kHidden           = q8 ? 2560 : 5120;
+    const FoldProfile kProfile{48, 48, 10240};
+    const std::int32_t kHidden           = 5120;
     constexpr std::int32_t kValueRows    = 6144;
     constexpr std::int32_t kZRows        = 6144;
     constexpr std::int32_t kWidth        = 16;
@@ -544,12 +544,11 @@ int run_record_fold_rounds(bool q8 = false) {
     constexpr std::int32_t kSnapshotBase = 0;
     const float kScale               = 1.0F / std::sqrt(128.0F);
 
-    DevicePackedWeight qk_parent(quantized_weight::make_patterned_weight(
-        q8 ? QType::Q8_G32_FP16 : QType::Q4_G64_FP16, q8 ? 16384 : 4096, kHidden, 1901U));
+    DevicePackedWeight qk_parent(
+        quantized_weight::make_patterned_weight(QType::Q4_G64_FP16, 4096, kHidden, 1901U));
     std::optional<DevicePackedWeight> vz_parent;
-    if (!q8)
-        vz_parent.emplace(
-            quantized_weight::make_patterned_weight(QType::Q5_G64_FP16, 12288, kHidden, 1902U));
+    vz_parent.emplace(
+        quantized_weight::make_patterned_weight(QType::Q5_G64_FP16, 12288, kHidden, 1902U));
     const std::vector<float> activation = make_bf16_activation(kHidden, kWidth, 1903U);
     DeviceBuffer device_x               = to_device_bf16(activation);
     std::vector<std::uint16_t> conv_weight_bits(static_cast<std::size_t>(kProfile.conv_channels) *
@@ -659,19 +658,11 @@ int run_record_fold_rounds(bool q8 = false) {
     Tensor beta(device_beta.span(), DType::FP32, {kProfile.value_heads, kWidth, 1});
 
     const std::size_t snapshot_workspace_bytes =
-        q8 ? ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
-                 ops::SingleProjectionWeight{qk_parent.view(), ops::LinearPolicy::A16Only}, 1,
-                 kWidth, kWidth)
-           : ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
-                 ops::PairedProjectionWeights{qk_parent.view(), vz_parent->view()}, 1, kWidth,
-                 kWidth);
+        ops::gdn_input_proj_conv_snapshot_workspace_capacity_bytes(
+            ops::PairedProjectionWeights{qk_parent.view(), vz_parent->view()}, 1, kWidth, kWidth);
     const std::size_t record_workspace_bytes =
-        q8 ? ops::gdn_input_proj_conv_record_workspace_capacity_bytes(
-                 ops::SingleProjectionWeight{qk_parent.view(), ops::LinearPolicy::A16Only}, 1,
-                 kWidth, kWidth)
-           : ops::gdn_input_proj_conv_record_workspace_capacity_bytes(
-                 ops::PairedProjectionWeights{qk_parent.view(), vz_parent->view()}, 1, kWidth,
-                 kWidth);
+        ops::gdn_input_proj_conv_record_workspace_capacity_bytes(
+            ops::PairedProjectionWeights{qk_parent.view(), vz_parent->view()}, 1, kWidth, kWidth);
     ninfer::DeviceBuffer snapshot_workspace_storage(
         ninfer::test::cuda_environment().context.device(),
         std::max<std::size_t>(256, snapshot_workspace_bytes));
@@ -704,29 +695,16 @@ int run_record_fold_rounds(bool q8 = false) {
         for (std::int32_t layer = 0; layer < kProfile.layers; ++layer) {
             GdnReplayRecordLayer layer_records = records.layer(layer, 1);
             Tensor conv_states = state_pool.layer_view(static_cast<std::uint32_t>(layer)).conv;
-            if (q8) {
-                ops::gdn_input_proj_conv_snapshot(
-                    x, ops::SingleProjectionWeight{qk_parent.view(), ops::LinearPolicy::A16Only},
-                    conv_weight, {conv_states, initial_selector, snapshot_selector}, valid,
-                    {snapshot_query, snapshot_key, snapshot_value, snapshot_z_tensor},
-                    snapshot_workspace, ninfer::test::cuda_environment().default_execution);
-                ops::gdn_input_proj_conv_record(
-                    x, ops::SingleProjectionWeight{qk_parent.view(), ops::LinearPolicy::A16Only},
-                    conv_weight, {conv_states, initial_selector}, valid,
-                    {record_query, record_key, record_value, record_z_tensor}, layer_records.conv,
-                    record_workspace, ninfer::test::cuda_environment().default_execution);
-            } else {
-                ops::gdn_input_proj_conv_snapshot(
-                    x, ops::PairedProjectionWeights{qk_parent.view(), vz_parent->view()},
-                    conv_weight, {conv_states, initial_selector, snapshot_selector}, valid,
-                    {snapshot_query, snapshot_key, snapshot_value, snapshot_z_tensor},
-                    snapshot_workspace, ninfer::test::cuda_environment().default_execution);
-                ops::gdn_input_proj_conv_record(
-                    x, ops::PairedProjectionWeights{qk_parent.view(), vz_parent->view()},
-                    conv_weight, {conv_states, initial_selector}, valid,
-                    {record_query, record_key, record_value, record_z_tensor}, layer_records.conv,
-                    record_workspace, ninfer::test::cuda_environment().default_execution);
-            }
+            ops::gdn_input_proj_conv_snapshot(
+                x, ops::PairedProjectionWeights{qk_parent.view(), vz_parent->view()}, conv_weight,
+                {conv_states, initial_selector, snapshot_selector}, valid,
+                {snapshot_query, snapshot_key, snapshot_value, snapshot_z_tensor},
+                snapshot_workspace, ninfer::test::cuda_environment().default_execution);
+            ops::gdn_input_proj_conv_record(
+                x, ops::PairedProjectionWeights{qk_parent.view(), vz_parent->view()}, conv_weight,
+                {conv_states, initial_selector}, valid,
+                {record_query, record_key, record_value, record_z_tensor}, layer_records.conv,
+                record_workspace, ninfer::test::cuda_environment().default_execution);
 
             Tensor snapshot_q_view = snapshot_query.view({kStateDim, kQkHeads, kWidth, 1});
             Tensor snapshot_k_view = snapshot_key.view({kStateDim, kQkHeads, kWidth, 1});
@@ -812,7 +790,7 @@ int run_record_fold_rounds(bool q8 = false) {
             }
         }
     }
-    failures += qk_parent.verify_preserved(q8 ? "record-fold Q8 parent" : "record-fold Q4 parent");
+    failures += qk_parent.verify_preserved("record-fold Q4 parent");
     if (vz_parent) failures += vz_parent->verify_preserved("record-fold Q5 parent");
     return failures;
 }
@@ -837,20 +815,8 @@ int main(int argc, char** argv) {
     add({48, 48, 10240}, 16, 8, {0, 1, 2, 3, 7, 13, 15, 16}, 1825U, true);
     add({48, 48, 10240}, 16, 1, {16}, 1827U, true);
     add({48, 48, 10240}, 16, 1, {0}, 1829U, true);
-    add({30, 32, 8192}, 2, 1, {2}, 1831U);
-    add({30, 32, 8192}, 6, 1, {6}, 1841U);
-    add({30, 32, 8192}, 6, 2, {2, 5}, 1851U);
-    add({30, 32, 8192}, 16, 8, {0, 1, 2, 3, 16, 7, 12, 5}, 1861U);
-    add({36, 48, 10240}, 2, 1, {2}, 1871U, true);
-    add({36, 48, 10240}, 5, 4, {0, 1, 3, 5}, 1873U);
-    add({36, 48, 10240}, 16, 8, {0, 1, 2, 3, 4, 5, 6, 7}, 1875U, true);
-    add({36, 48, 10240}, 16, 8, {8, 9, 10, 11, 12, 13, 14, 15}, 1877U);
-    add({36, 48, 10240}, 16, 1, {16}, 1879U, true);
-    add({36, 48, 10240}, 16, 1, {0}, 1881U, true);
     suite.add("gdn_fold/record_rounds/q4_q5", [] { return run_record_fold_rounds(); },
               {{"format", "q4_q5"}});
-    suite.add("gdn_fold/record_rounds/q8", [] { return run_record_fold_rounds(true); },
-              {{"format", "q8"}});
 
     return suite.main(argc, argv);
 }

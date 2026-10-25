@@ -19,7 +19,7 @@ constexpr std::int32_t kQHeads  = 32;
 constexpr std::int32_t kKVHeads = 8;
 constexpr float kExpectedScale  = 0.08838834764831844055f;
 
-bool registered_window(std::uint32_t window) { return window == 2048 || window == 4096; }
+bool registered_window(std::uint32_t window) { return window == 2048; }
 
 void require_profile(AttentionHeadGeometry geometry, std::uint32_t window, const char* op) {
     if (!valid_attention_head_geometry(geometry) || geometry.head_dim != kHeadDim ||
@@ -27,7 +27,7 @@ void require_profile(AttentionHeadGeometry geometry, std::uint32_t window, const
         throw std::invalid_argument(std::string(op) + ": unsupported head geometry");
     }
     if (!registered_window(window)) {
-        throw std::invalid_argument(std::string(op) + ": supported windows are 2048 and 4096");
+        throw std::invalid_argument(std::string(op) + ": supported window is 2048");
     }
 }
 

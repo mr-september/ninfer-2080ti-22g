@@ -5,7 +5,7 @@
 
 namespace ninfer::bench::gdn_replay {
 struct Profile {
-    int layers = 36, value_heads = 48, conv_channels = 10240;
+    int layers = 48, value_heads = 48, conv_channels = 10240;
 };
 
 struct Options {

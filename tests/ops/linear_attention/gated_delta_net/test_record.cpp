@@ -316,9 +316,6 @@ int main(int argc, char** argv) {
                   [=] { return run_case(heads, width, batch, valid, seed); },
                   {{"execution", width == 2 || width == 9 || width == 16 ? "graph" : "eager"}});
     };
-    add(32, 2, 1, {}, 1701U);
-    add(32, 16, 1, {7}, 1711U);
-    add(32, 6, 8, {6, 5, 4, 3, 2, 1, 6, 2}, 1721U);
     for (int width = 2; width <= 16; ++width) {
         add(48, width, 1, {}, 1730U + width);
         std::vector<std::int32_t> valid(8);

@@ -45,7 +45,7 @@ struct Options {
     std::vector<std::int32_t> tokens{1, 2, 4, 8, 12, 16};
     std::vector<std::int32_t> contexts{0, 128, 2048, 4095, 4096, 8192, 262144};
     std::vector<std::int32_t> batches{1};
-    std::int32_t window       = 4096;
+    std::int32_t window       = 2048;
     std::int32_t envelope_max = -1;
     Execution execution       = Execution::Graph;
     CacheMode cache           = CacheMode::Cold;
@@ -76,7 +76,7 @@ struct Result {
     std::fprintf(stderr,
                  "error: %s\n"
                  "usage: ninfer_sliding_window_attention_bench "
-                 "[--window 2048|4096] [--tokens 1,...,16] [--batches 1,...,8] "
+                 "[--tokens 1,...,16] [--batches 1,...,8] "
                  "[--context 0,...,262144] [--envelope-max N] "
                  "[--execution eager|graph|both] [--cache cold|warm|both] "
                  "[--warmup N] [--repeat N] [--graph-calls N] [--profile] [--csv-out PATH]\n",
@@ -97,12 +97,6 @@ Options parse_options(int argc, char** argv) {
         } else if (argument == "--batches") {
             options.batches =
                 bench::measurement::integers(next("--batches requires a value"), 1, 8);
-        } else if (argument == "--window") {
-            options.window =
-                bench::measurement::integer(next("--window requires a value"), 2048, 4096);
-            if (options.window != 2048 && options.window != 4096) {
-                usage("--window expects 2048 or 4096");
-            }
         } else if (argument == "--context") {
             options.contexts =
                 bench::measurement::integers(next("--context requires a value"), 0, 262144);

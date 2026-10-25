@@ -52,12 +52,6 @@ void launch_replay_fold(const GdnReplayRecords& records, LinearAttentionStateAll
     case FoldGeometryId::Layers48Heads48:
         return launch_replay_fold_fixed<FoldGeometry48x48>(records, states, rows, active_rows,
                                                            stream);
-    case FoldGeometryId::Layers30Heads32:
-        return launch_replay_fold_fixed<FoldGeometry30x32>(records, states, rows, active_rows,
-                                                           stream);
-    case FoldGeometryId::Layers36Heads48:
-        return launch_replay_fold_fixed<FoldGeometry36x48>(records, states, rows, active_rows,
-                                                           stream);
     }
 }
 

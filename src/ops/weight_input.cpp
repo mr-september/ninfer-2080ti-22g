@@ -166,7 +166,6 @@ ProjectionWeights prepare_projection_weights(std::span<const WeightInput> rows) 
 ProjectionWeights prepare_gdn_control_proj_weights(const WeightInput& a, const WeightInput& b) {
     const auto& shape = matrix(a);
     require(shape == matrix(b) && (shape == std::vector<std::uint64_t>{48, 5120} ||
-                                   shape == std::vector<std::uint64_t>{32, 2048} ||
                                    shape == std::vector<std::uint64_t>{48, 2560}),
             "GDN control: unsupported A/B geometry");
     const std::array inputs{a, b};
