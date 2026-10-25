@@ -119,7 +119,5 @@ struct QuantizedRowLayout {
 
 template <int Heads>
 using Int8G64Layout = QuantizedRowLayout<Heads, 256, 4>;
-template <int Heads>
-using Fp8RowLayout = QuantizedRowLayout<Heads, 256, 1>;
 
 } // namespace ninfer::ops::detail::kv

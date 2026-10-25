@@ -2,7 +2,6 @@
 
 #include "ops/common/numeric/math.h"
 #include "ops/common/quant/integer.cuh"
-#include "ops/common/quant/fp8.cuh"
 
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
@@ -18,38 +17,6 @@ inline constexpr std::int32_t kEmbedGatherQ6GroupsPerBlock = 2;
 inline constexpr std::int32_t kEmbedGatherQ8Group          = common::Q8RowSplitStorage::kGroupK;
 inline constexpr std::int32_t kEmbedGatherQ8D              = 2048;
 inline constexpr std::int32_t kEmbedGatherQ8Groups         = kEmbedGatherQ8D / kEmbedGatherQ8Group;
-inline constexpr std::int32_t kEmbedGatherFp8D             = 5120;
-
-template <int BlocksPerToken, int Threads>
-__launch_bounds__(Threads) __global__
-    void embed_gather_fp8_kernel(const std::int32_t* ids, const std::uint8_t* codes,
-                                 const __nv_bfloat16* scales, __nv_bfloat16* out) {
-    static_assert(kEmbedGatherFp8D % BlocksPerToken == 0);
-    constexpr int kValuesPerBlock = kEmbedGatherFp8D / BlocksPerToken;
-    static_assert(kValuesPerBlock % 4 == 0);
-    constexpr int kWordsPerBlock = kValuesPerBlock / 4;
-
-    const int token   = static_cast<int>(blockIdx.x) / BlocksPerToken;
-    const int split   = static_cast<int>(blockIdx.x) - token * BlocksPerToken;
-    const int row     = ids[token];
-    const float scale = __bfloat162float(scales[row]);
-
-    const int split_offset = split * kValuesPerBlock;
-    const auto* code_row   = codes + static_cast<std::int64_t>(row) * kEmbedGatherFp8D;
-    auto* output_column    = out + static_cast<std::int64_t>(token) * kEmbedGatherFp8D;
-    for (int word_index = static_cast<int>(threadIdx.x); word_index < kWordsPerBlock;
-         word_index += Threads) {
-        const int offset    = split_offset + word_index * 4;
-        const unsigned word = *reinterpret_cast<const unsigned*>(code_row + offset);
-#pragma unroll
-        for (int pair = 0; pair < 2; ++pair) {
-            const float2 decoded =
-                common::fp8_code2_to_float2(static_cast<std::uint16_t>(word >> (pair * 16)));
-            reinterpret_cast<__nv_bfloat162*>(output_column + offset + pair * 2)[0] =
-                __floats2bfloat162_rn(decoded.x * scale, decoded.y * scale);
-        }
-    }
-}
 
 __global__ void embed_gather_dense_kernel(const std::int32_t* ids, const __nv_bfloat16* table,
                                           __nv_bfloat16* out, std::int32_t d, std::int32_t T) {

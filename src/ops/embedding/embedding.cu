@@ -147,19 +147,6 @@ void require_q8_metadata(const Weight& table, const Tensor& out) {
     }
 }
 
-void require_fp8_metadata(const Weight& table, const Tensor& out) {
-    constexpr std::int32_t kVocabulary = 248320;
-    constexpr std::int32_t kHidden     = 5120;
-    if (table.n != kVocabulary || table.k != kHidden || out.ne[0] != kHidden) {
-        throw std::invalid_argument("embedding: unsupported FP8 table shape");
-    }
-    if ((reinterpret_cast<std::uintptr_t>(out.data) &
-         (static_cast<std::uintptr_t>(alignof(std::uint32_t)) - 1)) != 0) {
-        throw std::invalid_argument("embedding: FP8 output must be 4-byte aligned");
-    }
-    (void)common::validate_fp8_weight(table, "embedding");
-}
-
 bool is_empty_T(const Tensor& ids, const Tensor& out) { return ids.ne[0] == 0 || out.ne[1] == 0; }
 
 void require_non_empty_tensors(const Tensor& ids, const Tensor& out) {
@@ -266,18 +253,6 @@ EmbeddingLaunch select_q8(const Weight& table, const Tensor& out) {
     return launch_q8_scalar;
 }
 
-template <int Blocks>
-void launch_fp8(const Tensor& ids, const Weight& table, Tensor& out, cudaStream_t stream) {
-    constexpr int threads = 128;
-    kernels::embed_gather_fp8_kernel<Blocks, threads><<<ids.ne[0] * Blocks, threads, 0, stream>>>(
-        static_cast<const std::int32_t*>(ids.data), static_cast<const std::uint8_t*>(table.qdata),
-        static_cast<const __nv_bfloat16*>(table.scales), static_cast<__nv_bfloat16*>(out.data));
-}
-
-EmbeddingLaunch select_fp8(const Tensor& out) {
-    return out.ne[1] <= 176 ? launch_fp8<10> : launch_fp8<5>;
-}
-
 } // namespace
 
 void embedding(const Tensor& ids, const Weight& table, Tensor& out, CudaExecutionView execution) {
@@ -315,12 +290,6 @@ void embedding(const Tensor& ids, const Weight& table, Tensor& out, CudaExecutio
         if (is_empty_T(ids, out)) { return; }
         require_non_empty_tensors(ids, out);
         select_q8(table, out)(ids, table, out, stream);
-        break;
-    case QType::FP8_E4M3FN_ROW_BF16:
-        require_fp8_metadata(table, out);
-        if (is_empty_T(ids, out)) { return; }
-        require_non_empty_tensors(ids, out);
-        select_fp8(out)(ids, table, out, stream);
         break;
     default:
         throw std::invalid_argument("embedding: unsupported table qtype");

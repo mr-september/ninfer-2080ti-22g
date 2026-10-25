@@ -2,11 +2,9 @@
 #include "core/device.h"
 #include "ops/common/numeric/math.h"
 #include "ops/kv_cache/kernels/write/bf16.cuh"
-#include "ops/kv_cache/kernels/write/fp8.cuh"
 #include "ops/kv_cache/kernels/write/int8.cuh"
 
 #include <stdexcept>
-#include <type_traits>
 
 namespace ninfer::ops::detail::kv {
 namespace {
@@ -40,24 +38,14 @@ template <KvCacheStorage Storage, class G, class Metadata, PagedWriteInstance In
 void launch_quantized(const WriteArguments& a, Metadata metadata, cudaStream_t stream) {
     constexpr bool Page   = Instance == PagedWriteInstance::Page8x256;
     constexpr bool Batch  = Instance == PagedWriteInstance::BatchRows256;
+    static_assert(Storage == KvCacheStorage::Int8Group64);
     constexpr auto kernel = [] {
-        if constexpr (Storage == KvCacheStorage::Int8Group64) {
-            if constexpr (Page)
-                return write_i8_page_kernel<G, Metadata>;
-            else
-                return write_i8_kernel<G, Metadata, Batch>;
-        } else {
-            static_assert(Storage == KvCacheStorage::Fp8E4M3Row256);
-            if constexpr (Page)
-                return write_fp8_page_kernel<G, Metadata>;
-            else if constexpr (Batch)
-                return write_fp8_batch_kernel<G, Metadata::masked>;
-            else
-                return write_fp8_kernel<G, Metadata>;
-        }
+        if constexpr (Page)
+            return write_i8_page_kernel<G, Metadata>;
+        else
+            return write_i8_kernel<G, Metadata, Batch>;
     }();
-    using Code =
-        std::conditional_t<Storage == KvCacheStorage::Int8Group64, std::int8_t, std::uint8_t>;
+    using Code       = std::int8_t;
     using KeyScale   = __half;
     using ValueScale = __half;
     const dim3 grid  = Page ? dim3(common::div_up(a.width + 7, 8), G::KVHeads)
@@ -110,9 +98,9 @@ void storage_dispatch(KvCacheStorage storage, PagedWriteInstance instance, const
     case KvCacheStorage::Int8Group64:
         return launch_instance<KvCacheStorage::Int8Group64, G>(instance, a, metadata, stream);
     case KvCacheStorage::Fp8E4M3Row256:
-        return launch_instance<KvCacheStorage::Fp8E4M3Row256, G>(instance, a, metadata, stream);
+        break;
     }
-    throw std::logic_error("KV write: unsupported storage");
+    throw std::invalid_argument("KV write: FP8 storage has no Turing kernel");
 }
 
 template <class Metadata>

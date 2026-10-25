@@ -30,7 +30,6 @@ constexpr std::int32_t kDFlash2MaskToken  = 248070;
 constexpr std::int32_t kQ6D               = 5120;
 constexpr std::int32_t kQ8VisionD         = 2048;
 constexpr std::int32_t kQ8TextD           = 5120;
-constexpr std::int32_t kFp8D              = 5120;
 constexpr std::int32_t kDenseRows         = 2304;
 constexpr std::int32_t kDenseD            = 1152;
 constexpr std::int32_t kQ6Group           = 64;
@@ -96,19 +95,6 @@ float f16_to_f32(std::uint16_t value) {
     float result;
     std::memcpy(&result, &bits, sizeof(result));
     return result;
-}
-
-double decode_e4m3fn(std::uint8_t word) {
-    const bool negative   = (word & 0x80u) != 0;
-    const std::uint32_t e = (word >> 3) & 0x0fu;
-    const std::uint32_t m = word & 0x07u;
-    if (e == 0x0fu && m == 0x07u) {
-        throw std::invalid_argument("embedding test E4M3FN code is NaN");
-    }
-    const double magnitude =
-        e == 0 ? static_cast<double>(m) * std::ldexp(1.0, -9)
-               : (1.0 + static_cast<double>(m) / 8.0) * std::ldexp(1.0, static_cast<int>(e) - 7);
-    return negative ? -magnitude : magnitude;
 }
 
 std::uint16_t load_u16_le(const std::vector<std::uint8_t>& bytes, std::size_t offset) {
@@ -444,121 +430,6 @@ private:
     std::vector<Q8Row> rows_;
 };
 
-struct Fp8Row {
-    std::int32_t id;
-    std::vector<std::uint8_t> codes;
-    std::uint16_t scale;
-};
-
-class Fp8Table {
-public:
-    Fp8Table()
-        : code_plane_bytes_(static_cast<std::size_t>(kVocab) * kFp8D),
-          scale_offset_(align_up(code_plane_bytes_, 256)),
-          payload_(scale_offset_ + static_cast<std::size_t>(kVocab) * 2) {
-        for (const std::int32_t row : dflash2_fixture_ids()) {
-            if (find(row) == nullptr) add_row(row);
-        }
-    }
-
-    Weight weight() {
-        auto* base = static_cast<std::uint8_t*>(payload_.data());
-        Weight result{};
-        result.qtype            = QType::FP8_E4M3FN_ROW_BF16;
-        result.layout           = QuantLayout::RowScale;
-        result.scale_dtype      = DType::BF16;
-        result.device           = payload_.device();
-        result.payload          = base;
-        result.payload_bytes    = payload_.bytes();
-        result.qdata            = base;
-        result.qhigh            = nullptr;
-        result.scales           = base + scale_offset_;
-        result.high_plane_bytes = 0;
-        result.group_size       = kFp8D;
-        result.group            = kFp8D;
-        result.ndim             = 2;
-        result.shape[0]         = kVocab;
-        result.shape[1]         = kFp8D;
-        result.padded_shape[0]  = kVocab;
-        result.padded_shape[1]  = kFp8D;
-        result.n                = kVocab;
-        result.k                = kFp8D;
-        result.scale_ne[0]      = kVocab;
-        result.scale_nb[0]      = 2;
-        result.scale_nb[1]      = static_cast<std::int64_t>(kVocab) * 2;
-        result.scale_nb[2]      = result.scale_nb[1];
-        result.scale_nb[3]      = result.scale_nb[1];
-        return result;
-    }
-
-    std::vector<double> oracle(const std::vector<std::int32_t>& ids) const {
-        std::vector<double> result(static_cast<std::size_t>(kFp8D) * ids.size());
-        for (std::size_t t = 0; t < ids.size(); ++t) {
-            const Fp8Row* row = find(ids[t]);
-            if (row == nullptr) throw std::out_of_range("FP8 oracle row was not materialized");
-            const double scale = static_cast<double>(bf16_to_f32(row->scale));
-            for (std::int32_t d = 0; d < kFp8D; ++d) {
-                result[t * static_cast<std::size_t>(kFp8D) + d] =
-                    decode_e4m3fn(row->codes[static_cast<std::size_t>(d)]) * scale;
-            }
-        }
-        return result;
-    }
-
-    int verify_unchanged(const char* label) const {
-        int failures = payload_.verify_guards(label);
-        for (const Fp8Row& row : rows_) {
-            std::vector<std::uint8_t> got(row.codes.size());
-            payload_.copy_to_host(got.data(), got.size(), static_cast<std::size_t>(row.id) * kFp8D);
-            failures += verify_exact(label, got, row.codes);
-            std::uint8_t scale_bytes[2]{};
-            payload_.copy_to_host(scale_bytes, sizeof(scale_bytes),
-                                  scale_offset_ + static_cast<std::size_t>(row.id) * 2);
-            const std::uint16_t scale = static_cast<std::uint16_t>(scale_bytes[0]) |
-                                        static_cast<std::uint16_t>(scale_bytes[1] << 8);
-            if (scale != row.scale) {
-                std::cerr << label << " scale changed for row " << row.id << '\n';
-                ++failures;
-            }
-        }
-        return failures;
-    }
-
-private:
-    const Fp8Row* find(std::int32_t id) const {
-        const auto it = std::find_if(rows_.begin(), rows_.end(),
-                                     [id](const Fp8Row& row) { return row.id == id; });
-        return it == rows_.end() ? nullptr : &*it;
-    }
-
-    void add_row(std::int32_t id) {
-        Fp8Row row{id, std::vector<std::uint8_t>(kFp8D),
-                   id == 0    ? std::uint16_t{0}
-                   : id == 1  ? std::uint16_t{1}
-                   : id == 42 ? std::uint16_t{0x0080}
-                   : id == kDFlash2MaskToken
-                       ? f32_to_bf16(1.15625f)
-                       : f32_to_bf16(0.0017f + 0.00031f * static_cast<float>(id % 13))};
-        for (std::int32_t d = 0; d < kFp8D; ++d) {
-            auto code = static_cast<std::uint8_t>(d + id * 37);
-            if ((code & 0x7fu) == 0x7fu) --code;
-            row.codes[d] = id == 0 ? 0 : code;
-        }
-        payload_.copy_from_host(row.codes.data(), row.codes.size(),
-                                static_cast<std::size_t>(id) * kFp8D);
-        const std::uint8_t scale_bytes[]{static_cast<std::uint8_t>(row.scale),
-                                         static_cast<std::uint8_t>(row.scale >> 8)};
-        payload_.copy_from_host(scale_bytes, sizeof(scale_bytes),
-                                scale_offset_ + static_cast<std::size_t>(id) * 2);
-        rows_.push_back(std::move(row));
-    }
-
-    std::size_t code_plane_bytes_;
-    std::size_t scale_offset_;
-    GuardedDeviceBuffer payload_;
-    std::vector<Fp8Row> rows_;
-};
-
 template <typename Table>
 int run_quantized_case(const char* label, Table& table, const std::vector<std::int32_t>& ids,
                        std::int32_t d, bool replay = false, std::size_t output_offset = 0) {
@@ -596,24 +467,6 @@ int run_quantized_case(const char* label, Table& table, const std::vector<std::i
             failures += verify_exact(label, prefix, std::vector<std::uint8_t>(output_offset, 0x7d));
         }
     }
-    return failures;
-}
-
-int validate_fp8(Fp8Table& table) {
-    int failures                        = 0;
-    const std::vector<std::int32_t> ids = {0};
-    GuardedDeviceBuffer device_ids(sizeof(std::int32_t));
-    device_ids.copy_from_host(ids.data(), sizeof(std::int32_t));
-    GuardedDeviceBuffer output(static_cast<std::size_t>(kFp8D) * sizeof(std::uint16_t));
-    Tensor input(device_ids.span(), DType::I32, {1});
-    Tensor result(output.span(), DType::BF16, {kFp8D, 1});
-    Weight invalid      = table.weight();
-    invalid.scale_dtype = DType::FP16;
-    try {
-        ops::embedding(input, invalid, result, ninfer::test::cuda_environment().default_execution);
-        std::cerr << "embedding FP8 accepted malformed row-scale metadata\n";
-        ++failures;
-    } catch (const std::invalid_argument&) {}
     return failures;
 }
 
@@ -744,12 +597,4 @@ void add_embedding_cases(ninfer::test::OpSuite& suite) {
     };
     add_quantized_cases<Q8Table>(suite, "q8", kQ8TextD, false, text_cases(2),
                                  [] { return Q8Table(kQ8TextD); });
-    add_quantized_cases<Fp8Table>(suite, "fp8", kFp8D, false, text_cases(4),
-                                  [] { return Fp8Table{}; });
-    suite.add("embedding/fp8/scale_contract",
-              [] {
-                  Fp8Table table;
-                  return validate_fp8(table);
-              },
-              {{"format", "fp8"}});
 }

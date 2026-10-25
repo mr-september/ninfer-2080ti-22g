@@ -34,7 +34,6 @@ constexpr int kPage               = 64;
 constexpr int kFullHeadDim        = 256;
 constexpr int kFullGroup          = 64;
 constexpr int kFullGroups         = kFullHeadDim / kFullGroup;
-constexpr int kFullFp8Groups      = 1;
 
 struct TestVectorLayout {
     DType code_dtype;
@@ -57,8 +56,7 @@ TestCacheLayout test_cache_layout(KvCacheStorage storage) {
         return {{DType::I8, kFullHeadDim, DType::FP16, kFullGroups},
                 {DType::I8, kFullHeadDim, DType::FP16, kFullGroups}};
     case KvCacheStorage::Fp8E4M3Row256:
-        return {{DType::FP8_E4M3FN, kFullHeadDim, DType::FP16, kFullFp8Groups},
-                {DType::FP8_E4M3FN, kFullHeadDim, DType::FP16, kFullFp8Groups}};
+        break;
     }
     throw std::invalid_argument("unsupported test KV storage");
 }
@@ -92,65 +90,6 @@ std::size_t full_cache_index(int leading_extent, int leading, int head, int posi
 
 std::uint16_t bf16_bits_to_f16_bits(std::uint16_t bits) {
     return f32_to_f16_bits(bf16_to_f32(bits));
-}
-
-void normalized_hadamard_d256_host(std::array<float, kFullHeadDim>& values) {
-    for (int block = 0; block < 8; ++block) {
-        const int block_begin = block * 32;
-        for (int stride = 1; stride <= 16; stride <<= 1) {
-            for (int base = 0; base < 32; base += 2 * stride) {
-                for (int offset = 0; offset < stride; ++offset) {
-                    const int low_index  = block_begin + base + offset;
-                    const int high_index = low_index + stride;
-                    const float low      = values[static_cast<std::size_t>(low_index)];
-                    const float high     = values[static_cast<std::size_t>(high_index)];
-                    values[static_cast<std::size_t>(low_index)]  = low + high;
-                    values[static_cast<std::size_t>(high_index)] = low - high;
-                }
-            }
-        }
-    }
-    for (int span = 1; span < 8; span <<= 1) {
-        for (int base = 0; base < 8; base += 2 * span) {
-            for (int offset = 0; offset < span; ++offset) {
-                for (int lane = 0; lane < 32; ++lane) {
-                    const int low_index  = lane + 32 * (base + offset);
-                    const int high_index = lane + 32 * (base + offset + span);
-                    const float low      = values[static_cast<std::size_t>(low_index)];
-                    const float high     = values[static_cast<std::size_t>(high_index)];
-                    values[static_cast<std::size_t>(low_index)]  = low + high;
-                    values[static_cast<std::size_t>(high_index)] = low - high;
-                }
-            }
-        }
-    }
-    for (float& value : values) value *= 0x1p-4f;
-}
-
-void encode_full_fp8_row(const std::array<float, kFullHeadDim>& values,
-                         std::vector<std::uint8_t>& codes, int head, int position,
-                         int physical_page, int kv_heads, std::vector<std::uint16_t>& scales) {
-    float absmax = 0.0f;
-    for (const float value : values) absmax = std::max(absmax, std::abs(value));
-    std::uint16_t scale_bits = 0;
-    float scale              = 0.0f;
-    if (absmax != 0.0f) {
-        const float raw_scale = absmax / 448.0f;
-        const float bounded   = std::clamp(raw_scale, std::ldexp(1.0f, -24), 65504.0f);
-        scale_bits            = f32_to_f16_bits(bounded);
-        scale                 = f16_bits_to_f32(scale_bits);
-    }
-    const float inverse = scale == 0.0f ? 0.0f : 1.0f / scale;
-    for (int d = 0; d < kFullHeadDim; ++d) {
-        const auto target =
-            full_cache_index(kFullHeadDim, d, head, position, physical_page, kv_heads);
-        codes[target] =
-            scale == 0.0f
-                ? 0
-                : encode_e4m3fn_rne_satfinite(values[static_cast<std::size_t>(d)] * inverse);
-    }
-    scales[full_cache_index(kFullFp8Groups, 0, head, position, physical_page, kv_heads)] =
-        scale_bits;
 }
 
 void encode_full_group(const std::vector<float>& source, std::size_t source_base,
@@ -209,23 +148,6 @@ int full_append_case(int kv_heads, KvCacheStorage storage, int tokens = 3) {
     for (int i = 0; i < kFullGroup; ++i) {
         host_k[full_input_index(i, 0, 0, kv_heads)]              = 0.0f;
         host_v[full_input_index(kFullGroup + i, 0, 0, kv_heads)] = 0.0f;
-    }
-    if (storage == KvCacheStorage::Fp8E4M3Row256) {
-        for (int d = 0; d < kFullHeadDim; ++d) {
-            host_k[full_input_index(d, 0, 0, kv_heads)] = 0.0f;
-            host_v[full_input_index(d, 0, 0, kv_heads)] = 0.0f;
-        }
-        host_v[full_input_index(0, 1, 0, kv_heads)] = 448.0f;
-        host_v[full_input_index(1, 1, 0, kv_heads)] = 1.0625f;
-        host_v[full_input_index(0, 0, 1, kv_heads)] = std::ldexp(1.0f, -20);
-        host_v[full_input_index(0, 1, 1, kv_heads)] = bf16_to_f32(0x7f7fU);
-        // With absmax=49, d1/s is exactly an E4M3 midpoint while d1*FP32(1/s) is one
-        // FP32 ulp above it. This row locks the codec's ordered reciprocal-multiply semantics.
-        for (int d = 0; d < kFullHeadDim; ++d) {
-            host_v[full_input_index(d, 0, 2, kv_heads)] = 0.0f;
-        }
-        host_v[full_input_index(0, 0, 2, kv_heads)] = 49.0f;
-        host_v[full_input_index(1, 0, 2, kv_heads)] = 0.0013885498046875f;
     }
     std::vector<std::uint16_t> input_k(input_count);
     std::vector<std::uint16_t> input_v(input_count);
@@ -330,59 +252,6 @@ int full_append_case(int kv_heads, KvCacheStorage storage, int tokens = 3) {
                                  expected_scale_v);
         failures += scale_k.verify_guards((label + " k scale guards").c_str());
         failures += scale_v.verify_guards((label + " v scale guards").c_str());
-    } else if (storage == KvCacheStorage::Fp8E4M3Row256) {
-        std::vector<std::uint8_t> expected_k(k_code_count, 0x55U);
-        std::vector<std::uint8_t> expected_v(v_code_count, 0xaaU);
-        auto expected_scale_k = patterned_bits(k_scale_count, 0x01234567u);
-        auto expected_scale_v = patterned_bits(v_scale_count, 0x89abcdefu);
-        cache_k.copy_from_host(expected_k.data(), expected_k.size());
-        cache_v.copy_from_host(expected_v.data(), expected_v.size());
-        scale_k.copy_from_host(expected_scale_k.data(),
-                               expected_scale_k.size() * sizeof(std::uint16_t));
-        scale_v.copy_from_host(expected_scale_v.data(),
-                               expected_scale_v.size() * sizeof(std::uint16_t));
-        cache.k_scale_pages =
-            Tensor(scale_k.span(), DType::FP16, {kFullFp8Groups, kPage, kv_heads, physical_pages});
-        cache.v_scale_pages =
-            Tensor(scale_v.span(), DType::FP16, {kFullFp8Groups, kPage, kv_heads, physical_pages});
-        for (int token = 0; token < tokens; ++token) {
-            const int position = positions[static_cast<std::size_t>(token)];
-            const int page     = mapping[static_cast<std::size_t>(position / kPage)];
-            for (int head = 0; head < kv_heads; ++head) {
-                std::array<float, kFullHeadDim> k_row{};
-                std::array<float, kFullHeadDim> v_row{};
-                for (int d = 0; d < kFullHeadDim; ++d) {
-                    const auto source                  = full_input_index(d, head, token, kv_heads);
-                    k_row[static_cast<std::size_t>(d)] = host_k[source];
-                    v_row[static_cast<std::size_t>(d)] = host_v[source];
-                }
-                normalized_hadamard_d256_host(k_row);
-                encode_full_fp8_row(k_row, expected_k, head, position, page, kv_heads,
-                                    expected_scale_k);
-                encode_full_fp8_row(v_row, expected_v, head, position, page, kv_heads,
-                                    expected_scale_v);
-            }
-        }
-        ops::kv_cache_append(k, v, position_tensor, cache,
-                             ninfer::test::cuda_environment().default_execution);
-        cuda_synchronize();
-        const std::string label =
-            "kv_cache_append full fp8-row256 Hkv=" + std::to_string(kv_heads) +
-            " T=" + std::to_string(tokens) + " P=" + std::to_string(first_position);
-        failures +=
-            verify_exact((label + " k codes").c_str(),
-                         from_device<std::uint8_t>(cache_k.data(), k_code_count), expected_k);
-        failures +=
-            verify_exact((label + " v codes").c_str(),
-                         from_device<std::uint8_t>(cache_v.data(), v_code_count), expected_v);
-        failures += verify_exact((label + " k scales").c_str(),
-                                 from_device<std::uint16_t>(scale_k.data(), k_scale_count),
-                                 expected_scale_k);
-        failures += verify_exact((label + " v scales").c_str(),
-                                 from_device<std::uint16_t>(scale_v.data(), v_scale_count),
-                                 expected_scale_v);
-        failures += scale_k.verify_guards((label + " k scale guards").c_str());
-        failures += scale_v.verify_guards((label + " v scale guards").c_str());
     }
     const std::string label = "kv_cache_append full Hkv=" + std::to_string(kv_heads) +
                               " T=" + std::to_string(tokens) +
@@ -404,7 +273,7 @@ int full_append_case(int kv_heads, KvCacheStorage storage, int tokens = 3) {
 
 void add_full_append_cases(ninfer::test::OpSuite& suite) {
     for (auto storage :
-         {KvCacheStorage::BFloat16, KvCacheStorage::Int8Group64, KvCacheStorage::Fp8E4M3Row256}) {
+         {KvCacheStorage::BFloat16, KvCacheStorage::Int8Group64}) {
         const std::string format = kv_cache_storage_name(storage);
         for (int heads : {4, 2})
             suite.add("append/full/" + format + "/h" + std::to_string(heads) + "/t3",

@@ -35,7 +35,6 @@ enum class Profile {
     Q6D5120,
     Q8D5120,
     Q8D2048,
-    Fp8D5120,
 };
 
 struct ProfileSpec {
@@ -55,8 +54,6 @@ constexpr ProfileSpec profile_spec(Profile profile) {
         return {"q8-d5120", QType::Q8_G32_FP16, 5120, 32};
     case Profile::Q8D2048:
         return {"q8-d2048", QType::Q8_G32_FP16, 2048, 32};
-    case Profile::Fp8D5120:
-        return {"fp8-d5120", QType::FP8_E4M3FN_ROW_BF16, 5120, 5120};
     }
     throw std::logic_error("unknown embedding profile");
 }
@@ -66,9 +63,7 @@ Profile parse_profile(const char* raw) {
     if (!std::strcmp(raw, "q6-d5120")) return Profile::Q6D5120;
     if (!std::strcmp(raw, "q8-d5120")) return Profile::Q8D5120;
     if (!std::strcmp(raw, "q8-d2048")) return Profile::Q8D2048;
-    if (!std::strcmp(raw, "fp8-d5120")) return Profile::Fp8D5120;
-    throw std::invalid_argument(
-        "--format must be bf16-d2560, q6-d5120, q8-d5120, q8-d2048, or fp8-d5120");
+    throw std::invalid_argument("--format must be bf16-d2560, q6-d5120, q8-d5120, or q8-d2048");
 }
 
 std::uint64_t align_up(std::uint64_t value, std::uint64_t alignment) {
@@ -100,12 +95,9 @@ PackedLayout packed_layout(const ProfileSpec& spec) {
         layout.high_plane_bytes  = static_cast<std::uint64_t>(kVocab) * groups * 16;
         layout.scale_plane_offset =
             layout.high_plane_offset + align_up(layout.high_plane_bytes, 256);
-    } else if (spec.qtype == QType::Q8_G32_FP16) {
+    } else {
         layout.code_plane_bytes =
             static_cast<std::uint64_t>(kVocab) * groups * static_cast<std::uint64_t>(spec.group);
-        layout.scale_plane_offset = align_up(layout.code_plane_bytes, 256);
-    } else {
-        layout.code_plane_bytes   = static_cast<std::uint64_t>(kVocab) * spec.d;
         layout.scale_plane_offset = align_up(layout.code_plane_bytes, 256);
     }
     layout.scale_plane_bytes = static_cast<std::uint64_t>(kVocab) * groups * 2;
@@ -121,9 +113,8 @@ Weight make_weight(const ProfileSpec& spec, const PackedLayout& layout, ConstMem
     table.payload_bytes    = layout.payload_bytes;
     table.high_plane_bytes = layout.high_plane_bytes;
     table.qtype            = spec.qtype;
-    table.layout =
-        spec.qtype == QType::FP8_E4M3FN_ROW_BF16 ? QuantLayout::RowScale : QuantLayout::RowSplit;
-    table.scale_dtype     = spec.qtype == QType::FP8_E4M3FN_ROW_BF16 ? DType::BF16 : DType::FP16;
+    table.layout          = QuantLayout::RowSplit;
+    table.scale_dtype     = DType::FP16;
     table.group_size      = spec.group;
     table.shape[0]        = kVocab;
     table.shape[1]        = spec.d;
@@ -139,13 +130,6 @@ Weight make_weight(const ProfileSpec& spec, const PackedLayout& layout, ConstMem
     if (spec.qtype == QType::BF16) {
         table.layout = QuantLayout::Contiguous;
         table.scales = nullptr;
-    }
-    if (spec.qtype == QType::FP8_E4M3FN_ROW_BF16) {
-        table.scale_ne[0] = kVocab;
-        table.scale_nb[0] = 2;
-        table.scale_nb[1] = static_cast<std::int64_t>(kVocab) * 2;
-        table.scale_nb[2] = table.scale_nb[1];
-        table.scale_nb[3] = table.scale_nb[1];
     }
     return table;
 }
@@ -256,7 +240,7 @@ Options parse_options(int argc, char** argv) {
         if (arg == "--help") {
             std::puts(
                 "usage: ninfer_embedding_bench [--format "
-                "bf16-d2560|q6-d5120|q8-d5120|q8-d2048|fp8-d5120] "
+                "bf16-d2560|q6-d5120|q8-d5120|q8-d2048] "
                 "[--tokens T,...] [--id-pattern normal|repeated|masked] [--block-width 2..16] "
                 "[--execution "
                 "eager|graph] [--cache cold|warm] [--graph-calls 1..64] [--warmup N] [--repeat N] "
@@ -289,8 +273,7 @@ Options parse_options(int argc, char** argv) {
             throw std::invalid_argument("unknown option " + arg);
     }
     if (o.profiles.empty())
-        o.profiles = {Profile::Bf16D2560, Profile::Q6D5120, Profile::Q8D5120, Profile::Q8D2048,
-                      Profile::Fp8D5120};
+        o.profiles = {Profile::Bf16D2560, Profile::Q6D5120, Profile::Q8D5120, Profile::Q8D2048};
     if (o.tokens.empty())
         for (int t = 1; t <= 128; ++t) o.tokens.push_back(t);
     if ((o.execution != "eager" && o.execution != "graph") ||
