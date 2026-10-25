@@ -172,12 +172,9 @@ void add_rmsnorm_cases(ninfer::test::OpSuite& suite) {
     add("rmsnorm offset [5120,1]", {5120, 1}, true, 1101U);
     add("rmsnorm offset [5120,128]", {5120, 128}, true, 1102U);
     add("rmsnorm offset [5120,1024]", {5120, 1024}, true, 1107U);
-    add("rmsnorm offset [2048,7]", {2048, 7}, true, 1103U);
     add("rmsnorm offset [256,24,7]", {256, 24, 7}, true, 1104U);
     add("rmsnorm offset [256,2,1]", {256, 2}, true, 1105U);
     add("rmsnorm offset [256,4,48]", {256, 4, 48}, true, 1106U);
-    add("rmsnorm plain [2048,1]", {2048, 1}, false, 1201U);
-    add("rmsnorm plain [2048,128]", {2048, 128}, false, 1202U);
     add("rmsnorm plain [128,32,7]", {128, 32, 7}, false, 1203U);
     add("rmsnorm plain [128,8,128]", {128, 8, 128}, false, 1204U);
     add("rmsnorm offset unaligned [128,32]", {128, 32}, true, 1301U, 4.0F, true);
@@ -222,14 +219,4 @@ void add_rmsnorm_cases(ninfer::test::OpSuite& suite) {
         const auto label = "rmsnorm offset2560 rows=" + std::to_string(rows);
         add(label.c_str(), {2560, 1, rows}, true, 2300U + rows, 4.f, false, rows != 1);
     }
-    for (int rows : {1, 8, 128, 1024, 4096}) {
-        const auto label  = "rmsnorm offset10240 rows=" + std::to_string(rows);
-        const bool replay = rows == 8 || rows == 128 || rows == 1024;
-        add(label.c_str(), {10240, 1, rows}, true, 2100U + rows, 4.f, false, replay,
-            rows == 128 ? 16 : 0);
-    }
-    for (float scale : {0.0f, 1.e-5f, 4096.f})
-        add("rmsnorm offset10240 scale", {10240, 1, 3}, true, 2201U, scale);
-    add("rmsnorm offset10240 unaligned", {10240, 1, 7}, true, 2202U, 4.f, true, true);
-    add("rmsnorm plain10240", {10240, 1, 3}, false, 2203U);
 }

@@ -34,7 +34,6 @@ enum class Profile {
     Bf16D2560,
     Q6D5120,
     Q8D5120,
-    Q8D2048,
 };
 
 struct ProfileSpec {
@@ -52,8 +51,6 @@ constexpr ProfileSpec profile_spec(Profile profile) {
         return {"q6-d5120", QType::Q6_G64_FP16, 5120, 64};
     case Profile::Q8D5120:
         return {"q8-d5120", QType::Q8_G32_FP16, 5120, 32};
-    case Profile::Q8D2048:
-        return {"q8-d2048", QType::Q8_G32_FP16, 2048, 32};
     }
     throw std::logic_error("unknown embedding profile");
 }
@@ -62,8 +59,7 @@ Profile parse_profile(const char* raw) {
     if (!std::strcmp(raw, "bf16-d2560")) return Profile::Bf16D2560;
     if (!std::strcmp(raw, "q6-d5120")) return Profile::Q6D5120;
     if (!std::strcmp(raw, "q8-d5120")) return Profile::Q8D5120;
-    if (!std::strcmp(raw, "q8-d2048")) return Profile::Q8D2048;
-    throw std::invalid_argument("--format must be bf16-d2560, q6-d5120, q8-d5120, or q8-d2048");
+    throw std::invalid_argument("--format must be bf16-d2560, q6-d5120, or q8-d5120");
 }
 
 std::uint64_t align_up(std::uint64_t value, std::uint64_t alignment) {
@@ -240,7 +236,7 @@ Options parse_options(int argc, char** argv) {
         if (arg == "--help") {
             std::puts(
                 "usage: ninfer_embedding_bench [--format "
-                "bf16-d2560|q6-d5120|q8-d5120|q8-d2048] "
+                "bf16-d2560|q6-d5120|q8-d5120] "
                 "[--tokens T,...] [--id-pattern normal|repeated|masked] [--block-width 2..16] "
                 "[--execution "
                 "eager|graph] [--cache cold|warm] [--graph-calls 1..64] [--warmup N] [--repeat N] "
@@ -273,7 +269,7 @@ Options parse_options(int argc, char** argv) {
             throw std::invalid_argument("unknown option " + arg);
     }
     if (o.profiles.empty())
-        o.profiles = {Profile::Bf16D2560, Profile::Q6D5120, Profile::Q8D5120, Profile::Q8D2048};
+        o.profiles = {Profile::Bf16D2560, Profile::Q6D5120, Profile::Q8D5120};
     if (o.tokens.empty())
         for (int t = 1; t <= 128; ++t) o.tokens.push_back(t);
     if ((o.execution != "eager" && o.execution != "graph") ||
@@ -302,7 +298,7 @@ void run_profile(Profile profile, const Options& o, std::ofstream& csv) {
     const auto weight = make_weight(spec, layout, payload.span());
     const int max_t   = *std::max_element(o.tokens.begin(), o.tokens.end());
     std::vector<int> host_ids(max_t);
-    const int mask = spec.d == 2048 ? 248077 : 248070;
+    const int mask = 248070;
     for (int i = 0; i < max_t; ++i) {
         const int normal = (static_cast<std::int64_t>(i) * 9973 + 12345) % 248077;
         host_ids[i]      = o.pattern == "repeated"                      ? 12345

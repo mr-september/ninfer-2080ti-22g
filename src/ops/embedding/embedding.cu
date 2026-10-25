@@ -203,21 +203,6 @@ EmbeddingLaunch select_q6(const Weight& table, const Tensor& out) {
                : launch_q6<false>;
 }
 
-template <bool Grouped>
-void launch_q8_2048(const Tensor& ids, const Weight& table, Tensor& out, cudaStream_t stream) {
-    const auto* codes  = static_cast<const std::uint8_t*>(table.qdata);
-    const auto* scales = static_cast<const std::uint8_t*>(table.scales);
-    if constexpr (Grouped)
-        kernels::embed_gather_q8_grouped_2048_kernel<<<ids.ne[0] * kernels::kEmbedGatherQ8Groups,
-                                                       32, 0, stream>>>(
-            static_cast<const std::int32_t*>(ids.data), codes, scales,
-            static_cast<__nv_bfloat16*>(out.data));
-    else
-        kernels::embed_gather_q8_row_2048_kernel<<<ids.ne[0], 256, 0, stream>>>(
-            static_cast<const std::int32_t*>(ids.data), codes, scales,
-            static_cast<__nv_bfloat16*>(out.data));
-}
-
 template <int Blocks, bool PairStore>
 void launch_q8_packed(const Tensor& ids, const Weight& table, Tensor& out, cudaStream_t stream) {
     constexpr int threads = 128;
@@ -236,13 +221,6 @@ void launch_q8_scalar(const Tensor& ids, const Weight& table, Tensor& out, cudaS
 }
 
 EmbeddingLaunch select_q8(const Weight& table, const Tensor& out) {
-    if (out.ne[0] == kernels::kEmbedGatherQ8D &&
-        table.padded_shape[1] == kernels::kEmbedGatherQ8D) {
-        if (out.ne[1] <= 6) return launch_q8_2048<true>;
-        if (common::operand::aligned(table.qdata, 8) && common::operand::aligned(out.data, 4))
-            return launch_q8_2048<false>;
-        return launch_q8_scalar;
-    }
     if (out.ne[0] == 5120 && table.padded_shape[1] == 5120 &&
         common::operand::aligned(table.qdata, 4)) {
         const bool paired = common::operand::aligned(out.data, 4);

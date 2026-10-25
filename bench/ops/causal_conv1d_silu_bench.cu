@@ -1,10 +1,10 @@
 // Performance bench for the BF16 depthwise causal width-4 convolution + SiLU Op.
 //
 // Examples:
-//   ./ninfer_causal_conv1d_silu_bench --decode --channels 8192
-//   ./ninfer_causal_conv1d_silu_bench --prefill --channels 8192 --tokens 1024
-//   ./ninfer_causal_conv1d_silu_bench --distinct --channels 8192 --tokens 6
-//   ./ninfer_causal_conv1d_silu_bench --snapshot --channels 8192 --tokens 6 --slots 7
+//   ./ninfer_causal_conv1d_silu_bench --decode --channels 10240
+//   ./ninfer_causal_conv1d_silu_bench --prefill --channels 10240 --tokens 1024
+//   ./ninfer_causal_conv1d_silu_bench --distinct --channels 10240 --tokens 6
+//   ./ninfer_causal_conv1d_silu_bench --snapshot --channels 10240 --tokens 6 --slots 7
 // Printed logical GB/s is informational; NCU determines the applicable resource roofline.
 #include "ninfer/ops/causal_conv1d_silu.h"
 #include "core/buffer.h"
@@ -29,7 +29,7 @@ constexpr std::size_t kFlushBytes = std::size_t{256} << 20;
 
 struct Options {
     measurement::Options timing;
-    std::int32_t channels     = 8192;
+    std::int32_t channels     = 10240;
     std::int32_t tokens       = 1024;
     std::int32_t slots        = 7;
     std::int32_t initial_slot = 6;

@@ -74,8 +74,8 @@ void require_non_empty_accessible(const Tensor& x, const Tensor& weight, const T
     common::operand::contiguous_nonnull(out, "causal_conv1d", "out", device);
 }
 
-detail::CausalConvSplitGeometry require_split_geometry(const Tensor& x, const Tensor& out0,
-                                                       const Tensor& out1, const Tensor& out2) {
+void require_split_geometry(const Tensor& x, const Tensor& out0, const Tensor& out1,
+                            const Tensor& out2) {
     if (out0.dtype != DType::BF16 || out1.dtype != DType::BF16 || out2.dtype != DType::BF16) {
         throw std::invalid_argument("causal_conv1d: split destinations must be BF16");
     }
@@ -87,11 +87,8 @@ detail::CausalConvSplitGeometry require_split_geometry(const Tensor& x, const Te
         throw std::invalid_argument("causal_conv1d: split destinations must match the x column "
                                     "count");
     }
-    if (x.ne[0] == 8192 && out0.ne[0] == 2048 && out1.ne[0] == 2048 && out2.ne[0] == 4096) {
-        return detail::CausalConvSplitGeometry::Rows2048x2048x4096;
-    }
     if (x.ne[0] == 10240 && out0.ne[0] == 2048 && out1.ne[0] == 2048 && out2.ne[0] == 6144) {
-        return detail::CausalConvSplitGeometry::Rows2048x2048x6144;
+        return;
     }
     throw std::invalid_argument("causal_conv1d: split received an unregistered row profile");
 }
@@ -214,7 +211,7 @@ void causal_conv1d_silu_split(const Tensor& x, const Tensor& weight, const Tenso
     require_weight_shape(weight, x.ne[0]);
     require_state_shape(conv_state_in, x.ne[0]);
     require_state_shape(conv_state_out, x.ne[0]);
-    const detail::CausalConvSplitGeometry geometry = require_split_geometry(x, out0, out1, out2);
+    require_split_geometry(x, out0, out1, out2);
 
     const std::int64_t n = common::operand::numel(x, "causal_conv1d");
     (void)common::operand::numel(weight, "causal_conv1d");
@@ -241,7 +238,7 @@ void causal_conv1d_silu_split(const Tensor& x, const Tensor& weight, const Tenso
     require_split_nonoverlap(x, weight, conv_state_in, conv_state_out, out0, out1, out2);
 
     detail::launch_causal_conv_split(x, weight, conv_state_in, conv_state_out, out0, out1, out2,
-                                     geometry, stream);
+                                     stream);
 }
 
 void causal_conv1d_silu(const Tensor& x, const Tensor& weight, Tensor& conv_state, Tensor& out,

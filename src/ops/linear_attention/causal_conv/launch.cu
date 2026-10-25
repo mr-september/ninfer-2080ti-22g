@@ -105,22 +105,6 @@ void launch_token_parallel_split_geometry(const Tensor& x, const Tensor& weight,
     CUDA_CHECK(cudaGetLastError());
 }
 
-void launch_token_parallel_split(const Tensor& x, const Tensor& weight, const Tensor& conv_state_in,
-                                 Tensor& conv_state_out, Tensor& out0, Tensor& out1, Tensor& out2,
-                                 CausalConvSplitGeometry geometry, cudaStream_t stream) {
-    switch (geometry) {
-    case CausalConvSplitGeometry::Rows2048x2048x4096:
-        launch_token_parallel_split_geometry<2048, 2048, 4096>(
-            x, weight, conv_state_in, conv_state_out, out0, out1, out2, stream);
-        return;
-    case CausalConvSplitGeometry::Rows2048x2048x6144:
-        launch_token_parallel_split_geometry<2048, 2048, 6144>(
-            x, weight, conv_state_in, conv_state_out, out0, out1, out2, stream);
-        return;
-    }
-    throw std::logic_error("causal_conv1d: unhandled split geometry");
-}
-
 template <std::int32_t Rows0, std::int32_t Rows1, std::int32_t Rows2>
 void launch_prefill_split_geometry(const Tensor& x, const Tensor& weight,
                                    const Tensor& conv_state_in, Tensor& conv_state_out,
@@ -144,22 +128,6 @@ void launch_prefill_split_geometry(const Tensor& x, const Tensor& weight,
     CUDA_CHECK(cudaGetLastError());
 
     launch_causal_conv_state(x, conv_state_in, conv_state_out, stream);
-}
-
-void launch_prefill_split(const Tensor& x, const Tensor& weight, const Tensor& conv_state_in,
-                          Tensor& conv_state_out, Tensor& out0, Tensor& out1, Tensor& out2,
-                          CausalConvSplitGeometry geometry, cudaStream_t stream) {
-    switch (geometry) {
-    case CausalConvSplitGeometry::Rows2048x2048x4096:
-        launch_prefill_split_geometry<2048, 2048, 4096>(x, weight, conv_state_in, conv_state_out,
-                                                        out0, out1, out2, stream);
-        return;
-    case CausalConvSplitGeometry::Rows2048x2048x6144:
-        launch_prefill_split_geometry<2048, 2048, 6144>(x, weight, conv_state_in, conv_state_out,
-                                                        out0, out1, out2, stream);
-        return;
-    }
-    throw std::logic_error("causal_conv1d: unhandled split geometry");
 }
 
 void launch_single_token(const Tensor& x, const Tensor& weight, const Tensor& conv_state_in,
@@ -306,13 +274,14 @@ void launch_causal_conv(const Tensor& x, const Tensor& weight, const Tensor& sta
 
 void launch_causal_conv_split(const Tensor& x, const Tensor& weight, const Tensor& state_in,
                               Tensor& state_out, Tensor& out0, Tensor& out1, Tensor& out2,
-                              CausalConvSplitGeometry geometry, cudaStream_t stream) {
+                              cudaStream_t stream) {
     const auto route = select_causal_conv_split_plan(x.ne[1]);
     if (route == CausalConvRoute::TokenParallel)
-        launch_token_parallel_split(x, weight, state_in, state_out, out0, out1, out2, geometry,
-                                    stream);
+        launch_token_parallel_split_geometry<2048, 2048, 6144>(x, weight, state_in, state_out, out0,
+                                                               out1, out2, stream);
     else
-        launch_prefill_split(x, weight, state_in, state_out, out0, out1, out2, geometry, stream);
+        launch_prefill_split_geometry<2048, 2048, 6144>(x, weight, state_in, state_out, out0, out1,
+                                                        out2, stream);
 }
 
 void launch_causal_conv_state(const Tensor& x, const Tensor& state_in, Tensor& state_out,

@@ -246,7 +246,6 @@ struct Options {
     bool text           = false;
     bool vision         = false;
     bool geometry27     = false;
-    bool geometry35     = false;
     bool geometryDflash = true;
     bool axes1          = true;
     bool axes3          = true;
@@ -273,10 +272,9 @@ Options parse_options(int argc, char** argv) {
         } else if (!std::strcmp(arg, "--geometry")) {
             const std::string selected(value());
             options.geometry27     = selected == "27b" || selected == "all";
-            options.geometry35     = selected == "35b" || selected == "all";
             options.geometryDflash = selected == "dflash" || selected == "all";
-            if (!options.geometry27 && !options.geometry35 && !options.geometryDflash) {
-                throw std::invalid_argument("--geometry must be dflash, 27b, 35b, or all");
+            if (!options.geometry27 && !options.geometryDflash) {
+                throw std::invalid_argument("--geometry must be dflash, 27b, or all");
             }
         } else if (!std::strcmp(arg, "--axes")) {
             const std::string selected(value());
@@ -300,7 +298,7 @@ Options parse_options(int argc, char** argv) {
         } else if (!std::strcmp(arg, "--profile")) {
             options.profile = true;
         } else if (!std::strcmp(arg, "--help")) {
-            std::cout << "RoPE: --text --geometry dflash|27b|35b|all --axes 1|3|both --form "
+            std::cout << "RoPE: --text --geometry dflash|27b|all --axes 1|3|both --form "
                          "pair|q|k|all --tokens T[,T...]\nVision: --vision --patches P[,P...]\n";
             measurement::help();
             std::exit(0);
@@ -310,7 +308,7 @@ Options parse_options(int argc, char** argv) {
     }
     if (!options.text && !options.vision) { options.text = options.vision = true; }
     if (options.profile && (!options.text || options.vision || !options.geometryDflash ||
-                            options.geometry27 || options.geometry35 || !options.pair ||
+                            options.geometry27 || !options.pair ||
                             options.single_q || options.single_k || options.tokens.size() != 1)) {
         throw std::invalid_argument("--profile requires one DFlash Text pair token extent");
     }
@@ -345,11 +343,6 @@ int main(int argc, char** argv) {
                         if (options.pair) { run_text<24, 4>(tokens, axes, benchmark); }
                         if (options.single_q) { run_text_single<24>(tokens, axes, benchmark); }
                         if (options.single_k) { run_text_single<4>(tokens, axes, benchmark); }
-                    }
-                    if (options.geometry35) {
-                        if (options.pair) { run_text<16, 2>(tokens, axes, benchmark); }
-                        if (options.single_q) { run_text_single<16>(tokens, axes, benchmark); }
-                        if (options.single_k) { run_text_single<2>(tokens, axes, benchmark); }
                     }
                 }
             }

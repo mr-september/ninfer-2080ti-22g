@@ -232,9 +232,9 @@ int packed_rejection_case(std::int32_t T) {
 // The entry promises that a bad argument is rejected the same way whatever the column count.
 // One case per rejected class, on both sides of the route bound.
 int split_rejection_case(std::int32_t T) {
-    constexpr std::int32_t C  = 8192;
+    constexpr std::int32_t C  = 10240;
     constexpr std::int32_t KD = 2048;
-    constexpr std::int32_t VD = 4096;
+    constexpr std::int32_t VD = 6144;
     const std::size_t n       = static_cast<std::size_t>(C) * static_cast<std::size_t>(T);
     GuardedDeviceBuffer x(n * sizeof(std::uint16_t));
     GuardedDeviceBuffer weight(static_cast<std::size_t>(C) * 4 * sizeof(std::uint16_t));
@@ -256,7 +256,7 @@ int split_rejection_case(std::int32_t T) {
     const Tensor bad_dtype(weight.data(), weight.device(), DType::FP32, {C, 4});
     Tensor bad_rank(q.data(), q.device(), DType::BF16, {KD, T, 2});
     Tensor bad_profile(q.data(), q.device(), DType::BF16, {KD + 1, T});
-    Tensor other_profile(v.data(), v.device(), DType::BF16, {6144, T});
+    Tensor other_profile(v.data(), v.device(), DType::BF16, {4096, T});
     Tensor bad_dest_dtype(q.data(), q.device(), DType::FP32, {KD, T});
     auto null_dest = tq;
     null_dest.data = nullptr;
@@ -293,7 +293,7 @@ int split_rejection_case(std::int32_t T) {
     expect_rejected(is_rejected(tx, tw, tsi, tso, bad_profile, tk, tv),
                     "a row profile that is not registered");
     expect_rejected(is_rejected(tx, tw, tsi, tso, tq, tk, other_profile),
-                    "the other geometry's row profile on these channels");
+                    "a value extent other than the registered row profile");
     expect_rejected(is_rejected(tx, tw, tsi, tso, bad_dest_dtype, tk, tv), "an FP32 destination");
     expect_rejected(is_rejected(tx, tw, tsi, tso, null_dest, tk, tv), "a null destination");
     expect_rejected(is_rejected(tx, tw, tsi, tso, short_dest, tk, tv),
@@ -799,9 +799,9 @@ int main(int argc, char** argv) {
     ordinary(kQwen27Channels, 32, StateCall::DistinctEntry, 2032U);
     continuation_slot(kQwen27Channels, 65, 6, 4, 2065U);
 
-    // The peer 35B-A3B geometry is a separate real channel extent.
-    constexpr std::int32_t kQwen35Channels = 8192;
-    ordinary(kQwen35Channels, 257, StateCall::InPlaceEntry, 3257U);
+    // A second channel extent for the channel-agnostic routes.
+    constexpr std::int32_t kSecondChannels = 8192;
+    ordinary(kSecondChannels, 257, StateCall::InPlaceEntry, 3257U);
 
     // Snapshot decode, small-T boundary/interior, sequence route, slot 0 initialization, and
     // continuation from selected slots. A nonzero destination base proves that snapshots are not
@@ -811,32 +811,28 @@ int main(int argc, char** argv) {
     snapshot(kQwen27Channels, 7, 9, 3, 1, 4007U);
     snapshot(kQwen27Channels, 15, 18, 14, 1, 4015U);
     snapshot(kQwen27Channels, 16, 18, 17, 1, 4016U);
-    snapshot(kQwen35Channels, 17, 20, 16, 1, 4017U);
+    snapshot(kSecondChannels, 17, 20, 16, 1, 4017U);
     // Above the small-T bound the snapshot entry takes the sequence-snapshot kernel.
-    snapshot(kQwen35Channels, 40, 44, 40, 1, 4040U);
+    snapshot(kSecondChannels, 40, 44, 40, 1, 4040U);
 
-    batched_snapshot(kQwen35Channels, 1, {8, 9, 10, 11, 12, 13, 14, 15}, {0, 1, 2, 3, 4, 5, 6, 7},
+    batched_snapshot(kSecondChannels, 1, {8, 9, 10, 11, 12, 13, 14, 15}, {0, 1, 2, 3, 4, 5, 6, 7},
                      {}, 16, 5001U);
     batched_snapshot(kQwen27Channels, 6, {18, 19, 20}, {0, 6, 12}, {6, 3, 1}, 21, 5006U);
     // Row 0 reads slot 15 and overwrites it only after the final valid column. This is the
     // production same-row alias pattern; row 1 remains fully disjoint.
-    batched_snapshot(kQwen35Channels, 16, {15, 33}, {0, 16}, {16, 7}, 34, 5016U);
+    batched_snapshot(kSecondChannels, 16, {15, 33}, {0, 16}, {16, 7}, 34, 5016U);
 
-    // The split entry: both channel geometries, across the column counts that select each of its
+    // The split entry: the registered 27B row profile, across the column counts that select each of its
     // two routes and the boundary between them.
     for (const std::int32_t T : {1, 2, 7, 15, 16, 17, 32, 33, 63, 64, 65, 257, 1024}) {
         split(kQwen27Channels, 2048, 2048, 6144, T, false, false,
               6000U + static_cast<std::uint32_t>(T));
-        split(kQwen35Channels, 2048, 2048, 4096, T, false, false,
-              7000U + static_cast<std::uint32_t>(T));
     }
 
-    // The exact-alias state form, on both geometries, across every route boundary.
+    // The exact-alias state form, across every route boundary.
     for (const std::int32_t T : {1, 2, 15, 16, 17, 32, 33, 64, 65, 257}) {
         split(kQwen27Channels, 2048, 2048, 6144, T, true, false,
               6100U + static_cast<std::uint32_t>(T));
-        split(kQwen35Channels, 2048, 2048, 4096, T, true, false,
-              7100U + static_cast<std::uint32_t>(T));
     }
 
     // Destinations offset by a pair: four-byte aligned, which the contract admits, but not the
@@ -844,8 +840,6 @@ int main(int argc, char** argv) {
     for (const std::int32_t T : {16, 33, 257}) {
         split(kQwen27Channels, 2048, 2048, 6144, T, false, true,
               6200U + static_cast<std::uint32_t>(T));
-        split(kQwen35Channels, 2048, 2048, 4096, T, false, true,
-              7200U + static_cast<std::uint32_t>(T));
     }
 
     split(kQwen27Channels, 2048, 2048, 6144, 17, true, false, 8017U, true);

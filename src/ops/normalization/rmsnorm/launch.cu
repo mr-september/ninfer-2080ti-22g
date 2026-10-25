@@ -55,25 +55,10 @@ void launch_instance(const Tensor& x, const Tensor& weight, const Tensor* gate, 
             return;
         }
         break;
-    case Instance::D2048:
-        if constexpr (Kind == Epilogue::Plain) {
-            rmsnorm_d2048_bf16x2_kernel<Kind>
-                <<<static_cast<unsigned>(rows), 512, 0, stream>>>(x2, w2, g2, out2, rows, eps);
-            return;
-        }
-        break;
     case Instance::D5120:
         if constexpr (!is_gated<Kind>) {
             rmsnorm_cta_bf16x2_kernel<Kind, 256, 10, true, 5120>
                 <<<static_cast<unsigned>(rows), 256, 0, stream>>>(x2, w2, nullptr, out2, d, rows,
-                                                                  eps);
-            return;
-        }
-        break;
-    case Instance::D10240:
-        if constexpr (Kind == Epilogue::Offset) {
-            rmsnorm_cta_bf16x2_kernel<Kind, 512, 10, true, 10240>
-                <<<static_cast<unsigned>(rows), 512, 0, stream>>>(x2, w2, nullptr, out2, d, rows,
                                                                   eps);
             return;
         }

@@ -64,18 +64,12 @@ Selection select_rope(const RopeArguments& a, int multiprocessors) {
         if (a.second) {
             if (first_heads == 24 && second_heads == 4)
                 return select_r64<24, 4>(axes, tokens, multiprocessors);
-            if (first_heads == 16 && second_heads == 2)
-                return select_r64<16, 2>(axes, tokens, multiprocessors);
         } else {
             switch (first_heads) {
             case 24:
                 return select_r64<24, 0>(axes, tokens, multiprocessors);
             case 4:
                 return select_r64<4, 0>(axes, tokens, multiprocessors);
-            case 16:
-                return select_r64<16, 0>(axes, tokens, multiprocessors);
-            case 2:
-                return select_r64<2, 0>(axes, tokens, multiprocessors);
             }
         }
     }

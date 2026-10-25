@@ -28,7 +28,6 @@ constexpr std::int32_t kLastFrontendToken = 248076;
 constexpr std::int32_t kMaskToken         = 248077; // existing DFlash
 constexpr std::int32_t kDFlash2MaskToken  = 248070;
 constexpr std::int32_t kQ6D               = 5120;
-constexpr std::int32_t kQ8VisionD         = 2048;
 constexpr std::int32_t kQ8TextD           = 5120;
 constexpr std::int32_t kDenseRows         = 2304;
 constexpr std::int32_t kDenseD            = 1152;
@@ -585,8 +584,6 @@ void add_embedding_cases(ninfer::test::OpSuite& suite) {
               {{"format", "bf16"}, {"execution", "eager"}});
     add_quantized_cases<Q6Table>(suite, "q6", kQ6D, true, {{1}, {7}, {128}},
                                  [] { return Q6Table{}; });
-    add_quantized_cases<Q8Table>(suite, "q8", kQ8VisionD, true, {{1}, {6}, {16}, {1024}},
-                                 [] { return Q8Table(kQ8VisionD); });
     const auto text_cases = [](int offset) {
         std::vector<Case> cases{{1}, {7}, {128}, {1, false, 0, true}};
         for (int t :

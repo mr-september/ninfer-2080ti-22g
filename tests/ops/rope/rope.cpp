@@ -493,8 +493,6 @@ void add_rope_cases(ninfer::test::OpSuite& suite) {
     }
     pair({"27b text decode", 256, 64, 1, 1, kTextTheta}, 24, 4, 31);
     pair({"27b text mrope prefill", 256, 64, 3, 128, kTextTheta}, 24, 4, 4096);
-    pair({"35b text native-context tail", 256, 64, 1, 7, kTextTheta}, 16, 2, 262'137);
-    pair({"35b text mrope", 256, 64, 3, 7, kTextTheta}, 16, 2, 2048, 16, 8);
 
     for (int delta : {0, 1}) {
         suite.add("rope/pair/sm_capacity" + std::to_string(delta), [=] {
@@ -515,7 +513,6 @@ void add_rope_cases(ninfer::test::OpSuite& suite) {
 
     // MTP bulk K append uses the single-tensor form; proposal tail uses the pair form above.
     single({"27b mtp k mrope", 256, 64, 3, 128, kTextTheta}, 4, 8192);
-    single({"35b mtp k text", 256, 64, 1, 5, kTextTheta}, 2, 16384, 8);
 
     suite.add("rope/vision_packed",
               [] { return run_vision_packed_case(cuda_environment().default_execution); });
@@ -527,6 +524,6 @@ void add_rope_cases(ninfer::test::OpSuite& suite) {
               {{"execution", "graph"}});
 
     // DFlash proposal consumes 2..16 tokens; context append uses the single-K form.
-    pair({"35b dflash proposal", 128, 128, 1, 16, kTextTheta}, 32, 8, 262'128);
-    single({"35b dflash context k", 128, 128, 1, 128, kTextTheta}, 8, 131'072, 16);
+    pair({"dflash proposal", 128, 128, 1, 16, kTextTheta}, 32, 8, 262'128);
+    single({"dflash context k", 128, 128, 1, 128, kTextTheta}, 8, 131'072, 16);
 }
