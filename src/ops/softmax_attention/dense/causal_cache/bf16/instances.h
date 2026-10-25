@@ -4,7 +4,7 @@
 
 namespace ninfer::ops::detail {
 
-enum class Bf16KvInstance { Grouped32, Grouped64, Tiled64, Tiled128, GroupedDecode };
+enum class Bf16KvInstance { Grouped32, Grouped64, Tiled64, GroupedDecode };
 
 struct Bf16KvInstanceDescription {
     int query_rows;
@@ -26,7 +26,6 @@ NINFER_BF16_KV_INSTANCE(Grouped64, true, Bf16KvGroupedMmaSchedule<64, 32>);
 // The tuned tiles stage (Q + 2K) rows of 256 BF16 in shared memory: 96 KiB, over the 64 KiB a
 // Turing CTA may use. A 32x32 tile stages 48 KiB.
 NINFER_BF16_KV_INSTANCE(Tiled64, false, Bf16KvTiledMmaSchedule<32, 32>);
-NINFER_BF16_KV_INSTANCE(Tiled128, false, Bf16KvTiledMmaSchedule<32, 32>);
 NINFER_BF16_KV_INSTANCE(GroupedDecode, true, Bf16KvGroupedMmaSchedule<16, 32, 2, 2, 1>);
 #undef NINFER_BF16_KV_INSTANCE
 
@@ -39,7 +38,6 @@ constexpr Bf16KvInstanceDescription bf16_kv_instance_description(Bf16KvInstance 
         NINFER_BF16_KV_DESCRIBE(Grouped32);
         NINFER_BF16_KV_DESCRIBE(Grouped64);
         NINFER_BF16_KV_DESCRIBE(Tiled64);
-        NINFER_BF16_KV_DESCRIBE(Tiled128);
 #undef NINFER_BF16_KV_DESCRIBE
     }
     return {};

@@ -40,7 +40,6 @@ constexpr std::size_t kFlushBytes = std::size_t{256} << 20;
 
 
 enum class Entry : std::uint8_t { Append, Cached, Both };
-enum class GeometryChoice : std::uint8_t { H24Kv4, H16Kv2, All };
 enum class KvChoice : std::uint8_t { Bf16, Int8, All };
 enum class Execution : std::uint8_t { Eager, Graph, Both };
 enum class CacheMode : std::uint8_t { Cold, Warm, Both };
@@ -54,11 +53,9 @@ struct Geometry {
 };
 
 constexpr Geometry kH24Kv4{"d256-h24-kv4", 24, 4};
-constexpr Geometry kH16Kv2{"d256-h16-kv2", 16, 2};
 
 struct Options {
     Entry entry             = Entry::Both;
-    GeometryChoice geometry = GeometryChoice::All;
     KvChoice kv             = KvChoice::All;
     Execution execution     = Execution::Graph;
     CacheMode cache         = CacheMode::Cold;
@@ -110,7 +107,6 @@ struct Result {
                  "error: %s\n"
                  "usage: ninfer_causal_softmax_attention_bench "
                  "[--entry append|cached|both] "
-                 "[--geometry d256-h24-kv4|d256-h16-kv2|all] "
                  "[--kv-dtype bf16|int8|all] [--batch B,...] [--tokens W,...] "
                  "[--context L,...] [--row-contexts L0,...] [--valid-columns V0,...] "
                  "[--table-rows R0,...] "
@@ -169,16 +165,6 @@ Options parse_options(int argc, char** argv) {
                 options.entry = Entry::Both;
             else
                 usage("--entry expects append, cached, or both");
-        } else if (argument == "--geometry") {
-            const std::string_view value(next("--geometry requires a value"));
-            if (value == "d256-h24-kv4")
-                options.geometry = GeometryChoice::H24Kv4;
-            else if (value == "d256-h16-kv2")
-                options.geometry = GeometryChoice::H16Kv2;
-            else if (value == "all")
-                options.geometry = GeometryChoice::All;
-            else
-                usage("--geometry expects d256-h24-kv4, d256-h16-kv2, or all");
         } else if (argument == "--kv-dtype") {
             const std::string_view value(next("--kv-dtype requires a value"));
             if (value == "bf16")
@@ -303,11 +289,11 @@ Options parse_options(int argc, char** argv) {
         usage("cached entry is B=1 only");
     }
     if (options.profile &&
-        (options.entry == Entry::Both || options.geometry == GeometryChoice::All ||
+        (options.entry == Entry::Both ||
          options.kv == KvChoice::All || options.batches.size() != 1 || options.tokens.size() != 1 ||
          (options.row_contexts.empty() && options.contexts.size() != 1) ||
          options.execution == Execution::Both || options.cache == CacheMode::Both)) {
-        usage("--profile requires one entry, geometry, dtype, B, W, row profile, execution, and "
+        usage("--profile requires one entry, dtype, B, W, row profile, execution, and "
               "cache");
     }
     return options;
@@ -799,11 +785,7 @@ void profile(Case& data, Entry entry, const Geometry& geometry, KvCacheStorage s
     CUDA_CHECK(cudaProfilerStop());
 }
 
-std::vector<Geometry> selected_geometries(GeometryChoice choice) {
-    if (choice == GeometryChoice::H24Kv4) { return {kH24Kv4}; }
-    if (choice == GeometryChoice::H16Kv2) { return {kH16Kv2}; }
-    return {kH24Kv4, kH16Kv2};
-}
+std::vector<Geometry> selected_geometries() { return {kH24Kv4}; }
 
 std::vector<KvCacheStorage> selected_storages(KvChoice choice) {
     if (choice == KvChoice::Bf16) { return {KvCacheStorage::BFloat16}; }
@@ -860,7 +842,7 @@ int main(int argc, char** argv) {
         const auto cuda       = device.execution_view();
         const auto stream     = cuda.stream();
         bench::L2FlushBuffer flush(kFlushBytes);
-        const std::vector<Geometry> geometries     = selected_geometries(options.geometry);
+        const std::vector<Geometry> geometries     = selected_geometries();
         const std::vector<KvCacheStorage> storages = selected_storages(options.kv);
 
         if (options.profile) {

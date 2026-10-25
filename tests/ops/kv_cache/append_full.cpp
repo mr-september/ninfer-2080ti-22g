@@ -275,11 +275,10 @@ void add_full_append_cases(ninfer::test::OpSuite& suite) {
     for (auto storage :
          {KvCacheStorage::BFloat16, KvCacheStorage::Int8Group64}) {
         const std::string format = kv_cache_storage_name(storage);
-        for (int heads : {4, 2})
-            suite.add("append/full/" + format + "/h" + std::to_string(heads) + "/t3",
-                      [=] { return full_append_case(heads, storage); }, {{"format", format}});
+        suite.add("append/full/" + format + "/h4/t3", [=] { return full_append_case(4, storage); },
+                  {{"format", format}});
         if (storage != KvCacheStorage::BFloat16)
-            suite.add("append/full/" + format + "/h2/t129",
-                      [=] { return full_append_case(2, storage, 129); }, {{"format", format}});
+            suite.add("append/full/" + format + "/h4/t129",
+                      [=] { return full_append_case(4, storage, 129); }, {{"format", format}});
     }
 }

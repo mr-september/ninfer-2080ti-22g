@@ -61,10 +61,7 @@ void execute_grouped(const Tensor& q, const Tensor& positions, float scale,
     const auto partial = allocate_causal_partials(workspace, plan.query_heads, plan.width,
                                                   plan.partition.capacity, plan.batch);
     const auto p = make_causal_operands(q, positions, out, scale, plan.envelope.max_visible_keys);
-    if (plan.query_heads == 24)
-        grouped_instance<CausalD256H24Kv4>(p, view, input, plan.partition, partial.view(), stream);
-    else
-        grouped_instance<CausalD256H16Kv2>(p, view, input, plan.partition, partial.view(), stream);
+    grouped_instance<CausalD256H24Kv4>(p, view, input, plan.partition, partial.view(), stream);
 }
 
 template <class G, int Tokens>
@@ -96,19 +93,12 @@ void execute_parallel(const CausalAttentionOperands& p, Int8KvReadView cache,
     auto scope         = workspace.scope();
     const auto partial = allocate_causal_partials(workspace, plan.query_heads, plan.width,
                                                   plan.partition.capacity, plan.batch);
-    if (plan.query_heads == 24)
-        parallel_grouped<CausalD256H24Kv4, Int8KvCausalPlan::kTokenTile>(p, cache, plan.partition,
-                                                                         partial.view(), stream);
-    else
-        parallel_grouped<CausalD256H16Kv2, Int8KvCausalPlan::kTokenTile>(p, cache, plan.partition,
-                                                                         partial.view(), stream);
+    parallel_grouped<CausalD256H24Kv4, Int8KvCausalPlan::kTokenTile>(p, cache, plan.partition,
+                                                                     partial.view(), stream);
 }
 
 void tiled(const CausalAttentionOperands& p, Int8KvReadView cache, cudaStream_t stream) {
-    if (p.query_heads == 24)
-        launch_int8_kv_tiled_mma<CausalD256H24Kv4, Int8KvTiledInstance>(p, cache, stream);
-    else
-        launch_int8_kv_tiled_mma<CausalD256H16Kv2, Int8KvTiledInstance>(p, cache, stream);
+    launch_int8_kv_tiled_mma<CausalD256H24Kv4, Int8KvTiledInstance>(p, cache, stream);
 }
 
 } // namespace
@@ -122,7 +112,7 @@ void int8_kv_append_attention(const Tensor& q, const Tensor& k, const Tensor& v,
     const auto plan           = select_int8_kv_causal_plan(q.ne[1], q.ne[2], q.ne[3], envelope,
                                                            execution.multiprocessor_count());
     if (plan.family != Int8KvFamily::Grouped) {
-        kv::launch_paged_write(select_int8_kv_write(k.ne[1], k.ne[2], k.ne[3]), k, v, positions,
+        kv::launch_paged_write(select_int8_kv_write(k.ne[3]), k, v, positions,
                                valid, rows, cache, stream);
         const auto p = make_causal_operands(q, positions, out, scale, envelope.max_visible_keys);
         const auto view =

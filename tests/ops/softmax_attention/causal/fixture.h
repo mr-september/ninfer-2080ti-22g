@@ -86,7 +86,6 @@ struct Geometry {
 
 constexpr Geometry kGeometries[] = {
     {"d256-h24-kv4", 24, 4},
-    {"d256-h16-kv2", 16, 2},
 };
 
 ops::AttentionHeadGeometry op_geometry(const Geometry& geometry);

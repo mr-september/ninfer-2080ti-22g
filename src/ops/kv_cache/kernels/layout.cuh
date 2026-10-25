@@ -16,7 +16,7 @@ static_assert(kPagedKVPageSize == (1 << kPageShift));
 
 template <int Heads>
 struct D256Geometry {
-    static_assert(Heads == 2 || Heads == 4);
+    static_assert(Heads == 4);
     static constexpr int KVHeads = Heads;
 };
 

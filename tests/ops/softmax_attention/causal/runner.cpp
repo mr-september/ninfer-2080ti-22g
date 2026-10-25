@@ -452,7 +452,7 @@ int run_batch_case(CudaExecutionView execution, const Geometry& geometry, KvCach
 int verify_workspace_capacity_contract(CudaExecutionView execution, KvCacheStorage storage) {
     int failures = 0;
     constexpr ops::CausalAttentionExecutionEnvelope envelope{1, 1025};
-    constexpr ops::AttentionHeadGeometry geometry{kHeadDim, 16, 2};
+    constexpr ops::AttentionHeadGeometry geometry{kHeadDim, 24, 4};
     const std::size_t interval = ops::causal_softmax_attention_workspace_capacity_bytes(
         geometry, storage, envelope, 1, 1, 17, execution.multiprocessor_count());
     std::size_t witness = 0;
@@ -489,17 +489,16 @@ int verify_workspace_capacity_contract(CudaExecutionView execution, KvCacheStora
     // Device capacity is a planning input. Host-only queries cover batched decode
     // and single-request prefill on several SM counts without launching synthetic devices.
     for (const int sm_count : {96, 160, 170, 192}) {
-        constexpr ops::AttentionHeadGeometry capacity_geometry{kHeadDim, 24, 4};
         constexpr ops::CausalAttentionExecutionEnvelope capacity_envelope{1, 131072};
         for (const int batch : {1, 3}) {
             const int max_width = batch == 1 ? 257 : 16;
             std::size_t largest = 0;
             for (int width = 1; width <= max_width; ++width)
                 largest = std::max(largest, ops::causal_softmax_attention_workspace_capacity_bytes(
-                                                capacity_geometry, storage, capacity_envelope,
-                                                batch, width, width, sm_count));
+                                                geometry, storage, capacity_envelope, batch,
+                                                width, width, sm_count));
             const auto capacity = ops::causal_softmax_attention_workspace_capacity_bytes(
-                capacity_geometry, storage, capacity_envelope, batch, 1, max_width, sm_count);
+                geometry, storage, capacity_envelope, batch, 1, max_width, sm_count);
             if (capacity != largest) {
                 std::cerr << "causal_softmax_attention capacity interval mismatch for SM="
                           << sm_count << " B=" << batch << '\n';
@@ -518,7 +517,7 @@ int verify_workspace_capacity_contract(CudaExecutionView execution, KvCacheStora
 
     try {
         (void)ops::causal_softmax_attention_workspace_capacity_bytes(
-            {kHeadDim, 16, 2}, storage, {1, ops::kCausalAttentionMaximumVisibleKeys}, 1, 1, 1,
+            geometry, storage, {1, ops::kCausalAttentionMaximumVisibleKeys}, 1, 1, 1,
             execution.multiprocessor_count());
     } catch (const std::invalid_argument&) {
         std::cerr << "causal_softmax_attention rejected its maximum visible-key envelope\n";
@@ -526,7 +525,7 @@ int verify_workspace_capacity_contract(CudaExecutionView execution, KvCacheStora
     }
     try {
         (void)ops::causal_softmax_attention_workspace_capacity_bytes(
-            {kHeadDim, 16, 2}, storage, {1, ops::kCausalAttentionMaximumVisibleKeys + 1}, 1, 1, 1,
+            geometry, storage, {1, ops::kCausalAttentionMaximumVisibleKeys + 1}, 1, 1, 1,
             execution.multiprocessor_count());
         std::cerr << "causal_softmax_attention accepted an envelope outside the launcher domain\n";
         ++failures;

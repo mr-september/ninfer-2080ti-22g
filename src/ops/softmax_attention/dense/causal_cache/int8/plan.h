@@ -23,6 +23,6 @@ std::size_t int8_kv_workspace_bytes(int heads, int batch, int min_width, int max
                                     CausalAttentionExecutionEnvelope envelope,
                                     int multiprocessor_count);
 
-kv::PagedWriteInstance select_int8_kv_write(int heads, int width, int batch);
+kv::PagedWriteInstance select_int8_kv_write(int batch);
 
 } // namespace ninfer::ops::detail

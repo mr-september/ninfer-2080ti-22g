@@ -39,7 +39,6 @@ constexpr std::int32_t kPagedPrefixCapacity = 4096;
 constexpr std::size_t kFlushBytes           = std::size_t{256} << 20;
 
 enum class Mode : std::uint8_t { Full, Prefix, All };
-enum class FullGeometryChoice : std::uint8_t { Kv4, Kv2, All };
 enum class KvChoice : std::uint8_t { Bf16, Int8, All };
 enum class LayoutChoice : std::uint8_t { Paged, Cyclic, All };
 enum class Execution : std::uint8_t { Eager, Graph, Both };
@@ -52,11 +51,9 @@ struct FullGeometry {
 };
 
 constexpr FullGeometry kFullKv4{"d256-kv4", 4};
-constexpr FullGeometry kFullKv2{"d256-kv2", 2};
 
 struct Options {
     Mode mode                        = Mode::All;
-    FullGeometryChoice full_geometry = FullGeometryChoice::All;
     KvChoice kv                      = KvChoice::All;
     LayoutChoice layout              = LayoutChoice::All;
     Execution execution              = Execution::Graph;
@@ -100,7 +97,6 @@ struct Result {
     std::fprintf(stderr,
                  "error: %s\n"
                  "usage: ninfer_kv_cache_append_bench [--mode full|prefix|all] "
-                 "[--full-geometry d256-kv4|d256-kv2|all] "
                  "[--kv-dtype bf16|int8|all] "
                  "[--layout paged|cyclic|all] [--tokens T,...] [--counts C,...] "
                  "[--cyclic-capacity 2048|4096] [--batch B] "
@@ -158,16 +154,6 @@ Options parse_options(int argc, char** argv) {
                 options.mode = Mode::All;
             else
                 usage("--mode expects full, prefix, or all");
-        } else if (argument == "--full-geometry") {
-            const std::string_view value(next("--full-geometry requires a value"));
-            if (value == "d256-kv4")
-                options.full_geometry = FullGeometryChoice::Kv4;
-            else if (value == "d256-kv2")
-                options.full_geometry = FullGeometryChoice::Kv2;
-            else if (value == "all")
-                options.full_geometry = FullGeometryChoice::All;
-            else
-                usage("--full-geometry expects d256-kv4, d256-kv2, or all");
         } else if (argument == "--kv-dtype") {
             const std::string_view value(next("--kv-dtype requires a value"));
             if (value == "bf16")
@@ -254,8 +240,8 @@ Options parse_options(int argc, char** argv) {
         usage("--profile requires one mode, one T, one execution, and one cache state");
     }
     if (options.profile && options.mode == Mode::Full &&
-        (options.full_geometry == FullGeometryChoice::All || options.kv == KvChoice::All)) {
-        usage("full --profile requires one full geometry and one KV dtype");
+        options.kv == KvChoice::All) {
+        usage("full --profile requires one KV dtype");
     }
     if (options.profile && options.mode == Mode::Prefix &&
         (options.layout == LayoutChoice::All || options.counts.size() != 1)) {
@@ -658,11 +644,7 @@ void profile_case(Case& data, const char* label, const Options& options,
     CUDA_CHECK(cudaProfilerStop());
 }
 
-std::vector<FullGeometry> selected_geometries(FullGeometryChoice choice) {
-    if (choice == FullGeometryChoice::Kv4) return {kFullKv4};
-    if (choice == FullGeometryChoice::Kv2) return {kFullKv2};
-    return {kFullKv4, kFullKv2};
-}
+std::vector<FullGeometry> selected_geometries() { return {kFullKv4}; }
 
 std::vector<KvCacheStorage> selected_storages(KvChoice choice) {
     if (choice == KvChoice::Bf16) return {KvCacheStorage::BFloat16};
@@ -747,7 +729,7 @@ int main(int argc, char** argv) {
         CUDA_CHECK(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
         const auto cuda = ninfer::bench::device_context().execution_view(stream);
         bench::L2FlushBuffer flush(kFlushBytes);
-        const std::vector<FullGeometry> geometries = selected_geometries(options.full_geometry);
+        const std::vector<FullGeometry> geometries = selected_geometries();
         const std::vector<KvCacheStorage> storages = selected_storages(options.kv);
 
         if (options.profile) {

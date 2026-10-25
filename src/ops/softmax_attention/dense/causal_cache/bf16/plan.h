@@ -25,6 +25,6 @@ std::size_t bf16_kv_workspace_bytes(int query_heads, int batch, int min_width, i
                                     CausalAttentionExecutionEnvelope envelope,
                                     int multiprocessor_count);
 
-kv::PagedWriteInstance select_bf16_kv_write(int heads);
+kv::PagedWriteInstance select_bf16_kv_write();
 
 } // namespace ninfer::ops::detail

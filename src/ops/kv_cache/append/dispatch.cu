@@ -6,11 +6,9 @@
 namespace ninfer::ops::detail {
 namespace {
 
-kv::PagedWriteInstance select_append(KvCacheStorage storage, int heads, int tokens) {
-    using Instance = kv::PagedWriteInstance;
-    if (storage == KvCacheStorage::BFloat16)
-        return heads == 4 ? Instance::Copy128 : Instance::Copy96;
-    return tokens >= 128 && heads == 2 ? Instance::Page8x256 : Instance::WarpRows256;
+kv::PagedWriteInstance select_append(KvCacheStorage storage) {
+    return storage == KvCacheStorage::BFloat16 ? kv::PagedWriteInstance::Copy128
+                                               : kv::PagedWriteInstance::WarpRows256;
 }
 
 int select_cyclic_threads(int max_count, int batch) { return max_count * batch <= 128 ? 64 : 128; }
@@ -35,7 +33,7 @@ void launch_cyclic(const Tensor& k, const Tensor& v, const Tensor& positions, co
 
 void kv_cache_append_dispatch(const Tensor& k, const Tensor& v, const Tensor& positions,
                               PagedKVLayerView cache, cudaStream_t stream) {
-    kv::launch_paged_write(select_append(cache.storage, k.ne[1], k.ne[2]), k, v, positions, cache,
+    kv::launch_paged_write(select_append(cache.storage), k, v, positions, cache,
                            stream);
 }
 

@@ -36,20 +36,13 @@ WriteArguments arguments(const Tensor& k, const Tensor& v, const Tensor& positio
 
 template <KvCacheStorage Storage, class G, class Metadata, PagedWriteInstance Instance>
 void launch_quantized(const WriteArguments& a, Metadata metadata, cudaStream_t stream) {
-    constexpr bool Page   = Instance == PagedWriteInstance::Page8x256;
     constexpr bool Batch  = Instance == PagedWriteInstance::BatchRows256;
     static_assert(Storage == KvCacheStorage::Int8Group64);
-    constexpr auto kernel = [] {
-        if constexpr (Page)
-            return write_i8_page_kernel<G, Metadata>;
-        else
-            return write_i8_kernel<G, Metadata, Batch>;
-    }();
+    constexpr auto kernel = write_i8_kernel<G, Metadata, Batch>;
     using Code       = std::int8_t;
     using KeyScale   = __half;
     using ValueScale = __half;
-    const dim3 grid  = Page ? dim3(common::div_up(a.width + 7, 8), G::KVHeads)
-                            : dim3(common::div_up(a.width * G::KVHeads, 8), 1, Batch ? a.batch : 1);
+    const dim3 grid  = dim3(common::div_up(a.width * G::KVHeads, 8), 1, Batch ? a.batch : 1);
     kernel<<<grid, 256, 0, stream>>>(
         a.k, a.v, a.positions, metadata, static_cast<Code*>(a.keys), static_cast<Code*>(a.values),
         static_cast<KeyScale*>(a.key_scales), static_cast<ValueScale*>(a.value_scales), a.width);
@@ -59,10 +52,9 @@ template <KvCacheStorage Storage, class G, class Metadata>
 void launch_instance(PagedWriteInstance instance, const WriteArguments& a, Metadata metadata,
                      cudaStream_t stream) {
     if constexpr (Storage == KvCacheStorage::BFloat16) {
-        if (a.batch != 1 ||
-            (instance != PagedWriteInstance::Copy96 && instance != PagedWriteInstance::Copy128))
+        if (a.batch != 1 || instance != PagedWriteInstance::Copy128)
             throw std::logic_error("KV write: invalid BF16 instance");
-        const int threads = instance == PagedWriteInstance::Copy128 ? 128 : 96;
+        constexpr int threads = 128;
         const auto units  = static_cast<std::int64_t>(a.width) * G::KVHeads * (256 / 8);
         const int blocks  = common::div_up(units, static_cast<std::int64_t>(threads));
         write_bf16_kernel<G, Metadata><<<blocks, threads, 0, stream>>>(
@@ -73,9 +65,6 @@ void launch_instance(PagedWriteInstance instance, const WriteArguments& a, Metad
         switch (instance) {
         case PagedWriteInstance::WarpRows256:
             return launch_quantized<Storage, G, Metadata, PagedWriteInstance::WarpRows256>(
-                a, metadata, stream);
-        case PagedWriteInstance::Page8x256:
-            return launch_quantized<Storage, G, Metadata, PagedWriteInstance::Page8x256>(
                 a, metadata, stream);
         case PagedWriteInstance::BatchRows256:
             if constexpr (requires { Metadata::masked; })
@@ -104,12 +93,9 @@ void storage_dispatch(KvCacheStorage storage, PagedWriteInstance instance, const
 }
 
 template <class Metadata>
-void geometry_dispatch(int heads, KvCacheStorage storage, PagedWriteInstance instance,
+void geometry_dispatch(KvCacheStorage storage, PagedWriteInstance instance,
                        const WriteArguments& a, Metadata metadata, cudaStream_t stream) {
-    if (heads == 4)
-        storage_dispatch<D256Geometry<4>>(storage, instance, a, metadata, stream);
-    else
-        storage_dispatch<D256Geometry<2>>(storage, instance, a, metadata, stream);
+    storage_dispatch<D256Geometry<4>>(storage, instance, a, metadata, stream);
     CUDA_CHECK(cudaGetLastError());
 }
 
@@ -117,7 +103,7 @@ void geometry_dispatch(int heads, KvCacheStorage storage, PagedWriteInstance ins
 
 void launch_paged_write(PagedWriteInstance instance, const Tensor& k, const Tensor& v,
                         const Tensor& positions, PagedKVLayerView cache, cudaStream_t stream) {
-    geometry_dispatch(k.ne[1], cache.storage, instance, arguments(k, v, positions, cache),
+    geometry_dispatch(cache.storage, instance, arguments(k, v, positions, cache),
                       DirectMetadata{static_cast<const std::int32_t*>(cache.block_table.data)},
                       stream);
 }
@@ -131,8 +117,8 @@ void launch_paged_write(PagedWriteInstance instance, const Tensor& k, const Tens
             static_cast<const std::int32_t*>(cache.block_tables.data),
             static_cast<const std::int32_t*>(valid_columns.data),
             static_cast<const std::int32_t*>(table_rows.data), cache.block_tables.ne[0]};
-        geometry_dispatch(k.ne[1], cache.storage, instance, arguments(k, v, positions, cache),
-                          metadata, stream);
+        geometry_dispatch(cache.storage, instance, arguments(k, v, positions, cache), metadata,
+                          stream);
     };
     if (valid_columns.data)
         launch.template operator()<true>();

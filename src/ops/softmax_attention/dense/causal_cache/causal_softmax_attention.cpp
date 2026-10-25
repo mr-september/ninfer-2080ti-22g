@@ -27,8 +27,7 @@ constexpr std::int32_t kMaximumBatchSize    = 8;
 
 void require_causal_geometry(AttentionHeadGeometry geometry, const char* op) {
     if (!valid_attention_head_geometry(geometry) || geometry.head_dim != kHeadDim ||
-        !((geometry.query_heads == 24 && geometry.kv_heads == 4) ||
-          (geometry.query_heads == 16 && geometry.kv_heads == 2))) {
+        geometry.query_heads != 24 || geometry.kv_heads != 4) {
         throw std::invalid_argument(std::string(op) + ": unsupported head geometry");
     }
 }

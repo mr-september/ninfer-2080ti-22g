@@ -44,22 +44,10 @@ void grouped_instance(const CausalAttentionOperands& p, Bf16KvCacheView<Writable
     }
 }
 
-void tiled(const CausalAttentionOperands& p, Bf16KvReadView cache, const Bf16KvCausalPlan& plan,
-           cudaStream_t stream) {
-    const auto invoke = [&]<class G>() {
-        if (plan.instance == Bf16KvInstance::Tiled128)
-            launch_bf16_kv_tiled_mma<
-                G, typename Bf16KvInstanceTraits<Bf16KvInstance::Tiled128>::Schedule>(p, cache,
-                                                                                      stream);
-        else
-            launch_bf16_kv_tiled_mma<
-                G, typename Bf16KvInstanceTraits<Bf16KvInstance::Tiled64>::Schedule>(p, cache,
-                                                                                     stream);
-    };
-    if (p.query_heads == 24)
-        invoke.template operator()<CausalD256H24Kv4>();
-    else
-        invoke.template operator()<CausalD256H16Kv2>();
+void tiled(const CausalAttentionOperands& p, Bf16KvReadView cache, cudaStream_t stream) {
+    launch_bf16_kv_tiled_mma<CausalD256H24Kv4,
+                             typename Bf16KvInstanceTraits<Bf16KvInstance::Tiled64>::Schedule>(
+        p, cache, stream);
 }
 
 template <class Input>
@@ -73,10 +61,7 @@ void execute_grouped(const Tensor& q, Input input, const Tensor& positions, floa
     const auto p = make_causal_operands(q, positions, out, scale, plan.envelope.max_visible_keys);
     const auto view    = bf16_kv_cache_view<Input::writes_cache>(cache, valid, rows);
     const auto partial = storage.view();
-    if (p.query_heads == 24)
-        grouped_instance<CausalD256H24Kv4>(p, view, input, plan, partial, stream);
-    else
-        grouped_instance<CausalD256H16Kv2>(p, view, input, plan, partial, stream);
+    grouped_instance<CausalD256H24Kv4>(p, view, input, plan, partial, stream);
 }
 } // namespace
 
@@ -89,10 +74,10 @@ void bf16_kv_append_attention(const Tensor& q, const Tensor& k, const Tensor& v,
     const auto plan           = select_bf16_kv_causal_plan(q.ne[1], q.ne[2], q.ne[3], envelope,
                                                            execution.multiprocessor_count());
     if (!plan.grouped()) {
-        kv::launch_paged_write(select_bf16_kv_write(k.ne[1]), k, v, positions, valid_columns,
+        kv::launch_paged_write(select_bf16_kv_write(), k, v, positions, valid_columns,
                                table_rows, cache, stream);
         tiled(make_causal_operands(q, positions, out, scale, envelope.max_visible_keys),
-              bf16_kv_cache_view<false>(cache, &valid_columns, &table_rows), plan, stream);
+              bf16_kv_cache_view<false>(cache, &valid_columns, &table_rows), stream);
     } else {
         execute_grouped(q,
                         CausalAppendInput{static_cast<const __nv_bfloat16*>(k.data),
@@ -112,7 +97,7 @@ void bf16_kv_cached_attention(const Tensor& q, const Tensor& positions, float sc
     const auto view = single_row_paged_kv_batch_view(cache);
     if (!plan.grouped()) {
         tiled(make_causal_operands(q, positions, out, scale, envelope.max_visible_keys),
-              bf16_kv_cache_view<false>(view), plan, stream);
+              bf16_kv_cache_view<false>(view), stream);
     } else {
         execute_grouped(q, CausalCachedInput{}, positions, scale, view, nullptr, nullptr, plan,
                         workspace, out, stream);

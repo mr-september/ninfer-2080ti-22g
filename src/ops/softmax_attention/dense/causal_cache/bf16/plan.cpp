@@ -12,20 +12,16 @@ constexpr int kGroupedPrefillMaxWidth = 256;
 Bf16KvCausalPlan select_bf16_kv_causal_plan(int heads, int width, int batch,
                                             CausalAttentionExecutionEnvelope envelope,
                                             int multiprocessor_count) {
-    if (multiprocessor_count <= 0 || (heads != 24 && heads != 16) || width < 1 || batch < 1 ||
+    if (multiprocessor_count <= 0 || heads != 24 || width < 1 || batch < 1 ||
         batch > 8 || (batch > 1 && width > 16) || envelope.min_visible_keys == 0 ||
         envelope.min_visible_keys > envelope.max_visible_keys ||
         envelope.max_visible_keys > kCausalAttentionMaximumVisibleKeys)
         throw std::invalid_argument("BF16 attention: invalid plan inputs");
-    const int kv_heads = heads == 24 ? 4 : 2, group = heads / kv_heads;
+    constexpr int kv_heads = 4, group = 24 / kv_heads;
     const auto ceil_div = [](int a, int b) { return (a + b - 1) / b; };
     const int visible   = envelope.max_visible_keys;
     if (width > kGroupedPrefillMaxWidth) {
-        const auto instance =
-            heads == 16 && width >= 1024 && width % 128 == 0 && visible - width >= 8192
-                ? Bf16KvInstance::Tiled128
-                : Bf16KvInstance::Tiled64;
-        return {instance, {}, heads, width, batch, envelope};
+        return {Bf16KvInstance::Tiled64, {}, heads, width, batch, envelope};
     }
     const int rows                  = width * group;
     const auto instance             = width == 1   ? Bf16KvInstance::GroupedDecode
@@ -67,8 +63,6 @@ std::size_t bf16_kv_workspace_bytes(int heads, int batch, int min_width, int max
     return maximum;
 }
 
-kv::PagedWriteInstance select_bf16_kv_write(int heads) {
-    return heads == 4 ? kv::PagedWriteInstance::Copy128 : kv::PagedWriteInstance::Copy96;
-}
+kv::PagedWriteInstance select_bf16_kv_write() { return kv::PagedWriteInstance::Copy128; }
 
 } // namespace ninfer::ops::detail

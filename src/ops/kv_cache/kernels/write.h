@@ -5,10 +5,8 @@
 namespace ninfer::ops::detail::kv {
 
 enum class PagedWriteInstance {
-    Copy96,
     Copy128,
     WarpRows256,
-    Page8x256,
     BatchRows256,
 };
 

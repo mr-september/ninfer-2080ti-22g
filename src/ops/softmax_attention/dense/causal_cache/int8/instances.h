@@ -15,7 +15,7 @@ struct Int8KvGroupedInstance {
                                                                : kRowTiles <= 2 ? 8
                                                                                 : 2 * kRowTiles,
                                               kWideKeys ? 64 : 32, kWideKeys ? 1 : 2>;
-    using Merge                     = Int8KvMergeSchedule<G::QHeads == 24 ? 256 : 64>;
+    using Merge                     = Int8KvMergeSchedule<256>;
 };
 
 // 64x64 stages 92 KiB, too large for a Turing CTA; 64x32 stages 54 KiB and doubles the warps per
