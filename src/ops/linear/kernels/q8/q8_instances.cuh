@@ -5,11 +5,6 @@
 #include "ops/linear/kernels/q8/q8_schedule.cuh"
 
 namespace ninfer::ops::detail {
-template <int TileTokens, int ActiveTokens>
-using Q8SlicedKDefault = Q8A16SlicedKMmaSchedule<
-    TileTokens, 8, 1, TileTokens == 8 ? 5 : (TileTokens == 16 ? 4 : (TileTokens == 24 ? 3 : 2)),
-    (ActiveTokens > 4 ? Q8ScaleAccess::Shared : Q8ScaleAccess::Direct)>;
-
 namespace q8_instances {
 using MmaR32T64  = Q8A16MmaSchedule<32, 64, 64, 32, 16, 2, 3>;
 using MmaR32T96  = Q8A16MmaSchedule<32, 96, 64, 32, 16, 2, 2>;
