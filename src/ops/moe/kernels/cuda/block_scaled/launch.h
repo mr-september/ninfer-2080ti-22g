@@ -17,8 +17,6 @@ struct Plan {
     bool vector                = false;
     bool atomic_output         = false;
     bool single_block_grouping = false;
-    // GU consumes the original expert-major jobs; only down may reorder them.
-    bool column_major_down = false;
 
     SharedAlgorithm shared_algorithm = SharedAlgorithm::Vector;
     // Complete may widen shared/control tiles independently of routed-shared.
@@ -64,9 +62,5 @@ void launch_shared(const Tensor& x, const ScaledSwiGLUTerm& shared, const Expert
 void launch_control_shared(const Tensor& x, const MoeWeights& weights, const ExpertRoutes& routes,
                            const Tensor& shared, float* scores, const Storage& storage,
                            const Plan& plan, CudaExecutionView execution);
-
-// Overwrites job_experts/job_columns after GU has finished on the same stream.
-// Counts, offsets, packed assignments and all quantized payloads remain unchanged.
-void launch_column_jobs(Groups groups, int tokens, int columns, CudaExecutionView execution);
 
 } // namespace ninfer::ops::detail::moe_cuda::block_scaled
