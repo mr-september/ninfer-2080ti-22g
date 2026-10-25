@@ -126,7 +126,7 @@ ninfer_bench --weights <artifact.ninfer>
           [--grammar-file <path> | --json-schema-file <path> | --json-object | --regex <pattern> | --choice <text> ...]
           [--mixed-constraints]
           [--max-ctx <tokens>] [--prefill-chunk <tokens>]
-          [--kv-dtype <bf16|int8|fp8>]
+          [--kv-dtype <bf16|int8>]
           [--spec <mtp|dflash|dflash2> --draft-tokens <n>] [--lm-head-draft]
           [--device <id>] [--no-cuda-graph] [--profile-measured]
           [-o, --output <table|json|csv>] [--output-file <path>]
@@ -376,7 +376,7 @@ cmake --build build/dev -j --target ninfer_candidate_selector_bench
 ## Embedding Op benchmark
 
 `ninfer_embedding_bench` measures BF16 `[248320,2560]`, Q6 `[248320,5120]`,
-Q8 `[248320,5120]`, Q8 `[248320,2048]`, and row-scaled FP8 `[248320,5120]`. The default sweep is
+Q8 `[248320,5120]`, and Q8 `[248320,2048]`. The default sweep is
 T=1..128; `--tokens` selects other matrix extents. This is an Op column domain, independent of a
 particular speculative algorithm's draft count.
 
@@ -397,12 +397,12 @@ call of one format and one extent for kernel profiling.
 ```bash
 cmake --build build/dev -j --target ninfer_embedding_bench
 ./build/dev/bench/ninfer_embedding_bench --format q8-d5120 --execution graph --cache cold
-./build/dev/bench/ninfer_embedding_bench --format fp8-d5120 \
+./build/dev/bench/ninfer_embedding_bench --format q8-d5120 \
   --tokens 8,16,24,32,40,48,56,64 --id-pattern masked --block-width 8
-./build/dev/bench/ninfer_embedding_bench --format fp8-d5120 \
+./build/dev/bench/ninfer_embedding_bench --format q8-d5120 \
   --tokens 16,32,48,64,80,96,112,128 --id-pattern masked --block-width 16 \
   --cache warm --graph-calls 32 --csv-out /tmp/embedding.csv
-./build/dev/bench/ninfer_embedding_bench --format fp8-d5120 --tokens 128 --profile
+./build/dev/bench/ninfer_embedding_bench --format q8-d5120 --tokens 128 --profile
 ```
 
 ## Feature scatter benchmarks
@@ -488,7 +488,6 @@ Parent storage is a contiguous BF16 `[2H,K]` matrix, with A before B; pair stora
 | `control` | 48 | — | none; explicit `--input-rows` and `--weights` are rejected |
 | `projection` | 48 | 2560 | `parent` |
 | `projection`, `norm-projection` | 48 | 5120 | `parent` or `pair` |
-| `projection`, `norm-projection` | 32 | 2048 | `parent` |
 
 Defaults are `projection`, H=48, K=2560, `parent`, tokens=1 and batch=1. Norm-projection requires
 an explicit supported K. `--tokens T[,T...]` or `--sweep START:END[:STEP]` selects T, with
@@ -506,8 +505,6 @@ cmake --build build/dev -j --target ninfer_gdn_control_bench
   --op norm-projection --heads 48 --input-rows 5120 --weights pair \
   --tokens 1,2,4,8,9,16,32,64,128 --execution graph --cache warm \
   --csv-out /tmp/gdn-norm-warm.csv
-./build/dev/bench/ninfer_gdn_control_bench \
-  --op norm-projection --heads 32 --input-rows 2048 --tokens 16,17,128
 ./build/dev/bench/ninfer_gdn_control_bench \
   --op control --heads 48 --batch 8 --tokens 1,7,16 --execution both --cache warm
 ```
@@ -606,7 +603,7 @@ inclusive interval. Capacity and actual workspace high-water are reported separa
 
 `ninfer_gdn_input_proj_bench` selects `--op snapshot|record`. `--format` and the actual
 `--n`/`--k` identify the stored matrix; `--policy a16|allow-a8` reports the caller's
-activation permission. Supported geometries are Q8 `[12288,2048]` and `[16384,2560]`, and
+activation permission. Supported geometries are Q8 `[16384,2560]` and
 Q4/Q5 or FP8 `[16384,5120]`. Q4/Q5 uses the two stored parents `[4096,5120]` and
 `[12288,5120]`. Convolution uses physical T and B, with optional device
 valid-prefix extents supplied by `--valid-columns`.
@@ -1016,39 +1013,6 @@ FP8 `[16384,5120]`, and paired Q4/Q5 `[4096+12288,5120]`. It uses the common
 ```
 
 Stateful projection/convolution remains in `ninfer_gdn_input_proj_bench`.
-
-## MoE benchmark
-
-`ninfer_moe_bench` calls the public MoE interfaces over the 35B Q4+Q5/Q6 and Q8+Q8 profiles.
-`--op complete` measures router, routed/shared SwiGLU and BF16 residual addition; `route` measures
-routing only. `routed` and `routed-shared` consume routes prepared outside timing and write FP32.
-The latter includes the shared branch. Their `--subset all|mask-ones|mask-zeros|none` selects the
-logical expert assignments; the fixture's mask assigns odd IDs to the 1 side.
-
-```bash
-./build/dev/bench/ninfer_moe_bench --codec q4-q5 --tokens 1 --execution graph --cache both
-./build/dev/bench/ninfer_moe_bench --codec all --sweep 1:64:1 --distribution trace-like \
-  --execution graph --cache both --warmup 10 --repeat 80 --csv-out /tmp/moe.csv
-./build/dev/bench/ninfer_moe_bench --op routed-shared --codec q4-q5 --tokens 32 \
-  --subset mask-ones --execution graph --cache cold
-```
-
-Graph replay is the default and authoritative timing mode. External event nodes bracket only the
-public Op's device work. Input preparation, residual reset, L2 eviction, Graph setup/prime, Host
-submission and synchronization are outside that interval. `eager` measures the same public call.
-Cold samples flush 256 MiB; warm samples reuse the working set. `trace-like` provides repeated but
-changing experts; `independent` and `same` cover low and full overlap. Production code alone chooses
-the implementation.
-
-CSV rows identify the Op, subset, selected assignment count, distribution, cache state and execution
-mode. They report median/min/p95 latency, workspace, useful encoded-weight bandwidth and logical
-FLOP/s. `unique_weight_gbps` counts each selected expert once, plus the control/shared matrices
-actually used by that Op; it is a useful-traffic lower bound, not measured DRAM traffic.
-`memory_lower_bound_us` divides these bytes by theoretical device bandwidth. For a measured
-roofline, substitute sustained bandwidth and include private reloads, staging traffic and padded
-computation when interpreting the gap. Logical FLOP/s counts only the requested matrix products.
-The complete call uses empty external read-ahead hints; next-projection cache warming and its
-downstream effect are covered by Engine measurements.
 
 ## Q8 context K/V LinearPair benchmark
 

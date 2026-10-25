@@ -153,7 +153,7 @@ Engine 在大权重读取前消费无地址的 `ModelProfile`，规划固定权�
 MoE backing。权重加载后以少量物理 KV 页校准完整的 Graph 集合，保留实际 context、batch、
 speculative 配置与拓扑共享关系；临时 Host context cache 为零。校准资源销毁后重新取得可用显存，
 扣除 Graph 重建估计，再确定正式 KV 与 expert cache 容量。静态容量曲线只计算显式 backing。
-Qwen3.5 MoE 与 Qwen4Exp 均优先尝试全量 GPU 放置；5090 的候选还包括 Host Main experts
+Qwen3.5 MoE 与 Qwen4Exp 均优先尝试全量 GPU 放置；显存不足时的候选还包括 Host Main experts
 及 Program 所有的 GPU 副本。候选由原生 Startup 提供，
 ModelProfile 只记录表示与几何；Runtime 不解释 MoE cache/team 计划。候选不同时持有模型，
 见[Expert 权重缓存](expert-weight-cache.md)。

@@ -17,10 +17,10 @@ PLE 流水、MTP/Vision、CUDA Graph 和完整 continuation 的提交规则。
 | 原生 MTP | draft 数 1–5，支持 Text/Vision、1–8 路、采样 penalty 和约束输出 |
 | CUDA Graph | ordinary、MTP draft/target/Finish、单列 control；Main 使用分段图 |
 | KV 存储 | BF16、INT8-G64、FP8-row256；index keys 固定 BF16 |
-| 上下文复用 | 完整 StateImage 与 Main/MTP 页组、Device 前缀命中、Snapshot/Replay；5090 还提供 Host 副本 |
+| 上下文复用 | 完整 StateImage 与 Main/MTP 页组、Device 前缀命中、Snapshot/Replay；还提供 Host 副本 |
 | 前端与服务 | thinking、thinking budget、tool call、GBNF/JSON/schema/choice/regex；共用 Qwen Frontend 和现有 HTTP 协议 |
 | CausalScoring | 公共 Engine 的单路 Text 评分；不启用 Vision 或 speculative backend |
-| Expert 放置 | Main 支持 GPU resident；5090 还提供 registered Host backing、GPU 缓存及整层流式执行；MTP/shared 固定 GPU |
+| Expert 放置 | Main 支持 GPU resident；还提供 registered Host backing、GPU 缓存及整层流式执行；MTP/shared 固定 GPU |
 | PLE | V3 磁盘表、Host hash/NF4 解码、有界行缓存、增量准备和双槽 H2D |
 
 当前限制：

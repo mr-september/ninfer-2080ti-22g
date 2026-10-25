@@ -155,9 +155,8 @@ Omitting `--mode` selects MTP0 and MTP3; repeat `--mode` to select a subset. Use
 Qwen3.6-35B-A3B DFlash K=7 and `dflash2_7` for Qwen3.8-27B DFlash2 K=7, with companion weights
 in the selected artifact. `--sampling greedy` selects exact argmax; the default is stochastic.
 Run commands with a selected Python 3.11 interpreter, as in the model-page reproduction entries.
-Both serving runners accept `--kv-dtype bf16|int8|fp8` (default: `int8`).
-Specify it explicitly when recording a new campaign; the Qwen3.8 performance profile uses
-`--kv-dtype fp8`. The runner verifies the loaded KV representation and records the selection in
+Both serving runners accept `--kv-dtype bf16|int8` (default: `int8`).
+Specify it explicitly when recording a new campaign. The runner verifies the loaded KV representation and records the selection in
 its results. A serial run cannot resume records collected with a different KV dtype.
 
 The serial runner writes `run.jsonl`, `summary.csv`, `summary.md`, and per-server logs under

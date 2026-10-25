@@ -11,7 +11,6 @@ tags:
   - multimodal
   - conversational
   - cuda
-  - rtx-5090
 model-index:
   - name: Qwen3.8-27B-NInfer
     results:
@@ -97,6 +96,8 @@ model-index:
 
 # Qwen3.8-27B for NInfer
 
+> This is the upstream (Neroued/ninfer) card for the artifact, kept with the fork's local model files. The artifact file is unchanged. The evaluation and performance figures below were measured by upstream on an RTX 5090 and have not been repeated on the RTX 2080 Ti; links to `Neroued/ninfer` point at upstream. This fork's requirements are in the Requirements section and its scope in the repository README.
+
 This model card is the version-controlled source for
 [neroued/Qwen3.8-27B-NInfer](https://huggingface.co/neroued/Qwen3.8-27B-NInfer).
 
@@ -140,12 +141,12 @@ retain their stated MTP configurations and revisions.
 
 ## Requirements
 
-- [NInfer](https://github.com/Neroued/ninfer) revision
+- this repository, built from source (upstream
   [`98dada0e`](https://github.com/Neroued/ninfer/commit/98dada0e03cb073fd07f905400b5904bc6e82759)
-  or later, built from source;
-- 64-bit Linux;
-- NVIDIA GeForce RTX 5090 (`sm_120a`);
-- CUDA Toolkit 13.1 or newer.
+  introduced the DFlash2 runtime support);
+- 64-bit Windows 11 or Linux;
+- NVIDIA GeForce RTX 2080 Ti with 22 GB (`sm_75`);
+- CUDA Toolkit 12.9.
 
 Already have the official v2 file? [Upgrade it locally](https://github.com/Neroued/ninfer/blob/master/docs/weight-conversion.md#upgrade-an-existing-v2-artifact)
 without downloading the weights again.
@@ -164,7 +165,7 @@ hf download neroued/Qwen3.8-27B-NInfer \
   --prompt "Explain prefill and decode in three sentences." \
   --max-context 32768 \
   --max-new 8192 \
-  --kv-dtype fp8 \
+  --kv-dtype int8 \
   --spec mtp --draft-tokens 3 \
   --lm-head-draft
 ```
@@ -178,21 +179,18 @@ For images, videos, and structured chat history, see the
 ./build/apps/ninfer-serve models/qwen3_8_27b.ninfer \
   --host 127.0.0.1 \
   --port 8080 \
-  --max-context 240000 \
-  --kv-capacity 240000 \
-  --max-concurrency 2 \
-  --kv-dtype fp8 \
-  --device-state-slots 2 \
+  --max-context 65536 \
+  --kv-capacity 65536 \
+  --max-concurrency 1 \
+  --kv-dtype int8 \
   --spec mtp --draft-tokens 3 \
   --lm-head-draft \
   --preserve-thinking
 ```
 
-Each request has a 240,000-token logical ceiling. The shared 240,000-token Device KV pool grows
-with resident execution; resource pressure can pause a request for later Snapshot or Replay
-recovery. Either request may use the full pool while running alone. Two extra Device StateImages
-and the default shared pinned Host budget (8 GiB plus eight model StateImages) retain state, KV
-and pause snapshots.
+Each request has a 65,536-token logical ceiling and the shared Device KV pool holds 65,536 tokens;
+resource pressure can pause a request for later Snapshot or Replay recovery. The default shared
+pinned Host budget (2 GiB plus eight model StateImages) retains state, KV and pause snapshots.
 
 See the [HTTP serving guide](https://github.com/Neroued/ninfer/blob/master/docs/serving.md) for the
 API surface and the [resource scheduling reference](https://github.com/Neroued/ninfer/blob/master/docs/maintainer/resource-scheduling-and-context-cache.md)
@@ -207,7 +205,7 @@ The artifact supports:
 - MTP speculative decoding with draft windows from one to five;
 - DFlash2 with draft windows from one to fifteen using the included
   DFlash2 companion weights (`--spec dflash2 --draft-tokens 7`, optionally `--lm-head-draft`);
-- BF16, INT8, FP8, NVFP4, and K8V4 KV cache;
+- BF16 and INT8 group-64 KV cache;
 - CUDA Graph decode and compatible-prefix reuse;
 - startup-bounded small-scale concurrent serving with true batched decode;
 - the NInfer CLI;
@@ -242,7 +240,7 @@ card reports no AIME results.
 
 ## Limits
 
-- NInfer executes on one RTX 5090 and one CUDA device, with a startup-fixed capacity of 1–8 active
+- NInfer executes on one CUDA device (the RTX 2080 Ti in this fork), with a startup-fixed capacity of 1–8 active
   requests per Engine.
 - It does not provide large-scale continuous batching, priority/QoS scheduling,
   multi-GPU execution, CPU/GPU offload, or distributed serving.

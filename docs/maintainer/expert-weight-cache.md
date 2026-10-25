@@ -60,7 +60,7 @@ Qwen3.5 的 bank ID 按 Main 层顺序建立，选中的 MTP bank 追加在末�
 `Parameters` 保存 bank 身份、矩阵 profile 与 Use 元数据，可以描述 CPU 来源。
 workspace 查询消费数学 profile；完整 GPU FFN 显式接受 resident/cached CUDA bank，
 混合单层执行另外借用原生 Host bank 和交接资源。
-Qwen3.5 MoE 与 Qwen4Exp 均支持完整 GPU 放置；5090 预算不足时可选择 Host Main experts
+Qwen3.5 MoE 与 Qwen4Exp 均支持完整 GPU 放置；显存预算不足时可选择 Host Main experts
 和 Program GPU cache。Qwen4Exp 的 block-FP8 MTP experts 常驻 GPU，
 模型编排见 [Qwen4Exp 执行](qwen4_exp-execution.md)。
 
@@ -170,7 +170,7 @@ Host 的 release 不代表 GPU 已完成读取。CUDA 提交失败后停止接�
   它与独立 Op 共用 kernel 机制，保有自己的格式/shape 分派和调优策略；全 GPU Main/MTP
   通过这一入口执行。
 
-CUDA 数学支持 35B 的整数 expert profiles，以及 Flash Next 的 block-FP8 profiles，
+CUDA 数学入口只接受 Flash Next 的 block-FP8 profiles（Turing 上无 kernel，抛出 unsupported），
 通过同一组 [MoE 语义入口](../../include/ninfer/ops/moe.h)消费实际表示与 activation Use。
 CPU 支持 Q4+Q5 和 Q4+Q6，输入为 BF16，
 SiLU 与 down 输入保持 FP32，不量化激活；CPU block-FP8 尚未实现。

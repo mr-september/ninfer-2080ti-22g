@@ -598,7 +598,7 @@ The table lists executable defaults. The startup example selects a two-lane 64K 
 | `--request-log-jsonl FILE` | append full-precision server/request records | disabled |
 | `--response-store-max-records N` | maximum locally retained Responses objects | `1024` |
 | `--response-store-max-mib N` | total local Response envelope/Item/context budget | `256` |
-| `--kv-dtype bf16\|int8\|fp8` | KV-cache storage (`fp8` has no Turing kernels) | `int8` |
+| `--kv-dtype bf16\|int8` | KV-cache storage | `int8` |
 | `--spec none\|mtp\|dflash\|dflash2` | speculative backend | `mtp` |
 | `--draft-tokens N` | MTP `1..5`; DFlash/DFlash2 `1..15` (DFlash needs it explicitly) | `3` |
 | `--lm-head-draft` / `--no-lm-head-draft` | force the optimized or the full proposal head | automatic: optimized when the artifact has one |

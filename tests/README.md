@@ -96,7 +96,7 @@ injects event-record failures and checks graph consumption against independently
 
 CPU topology/task-pool tests link the C++ `ninfer_cpu` target and need no GPU:
 `ctest --test-dir build/dev -R '^ninfer_cpu_.*_test$' --output-on-failure`.
-GPU MoE is in `ninfer_moe_test`. Shared fixtures and mathematical oracles are common.
+GPU MoE is in `ninfer_moe_block_scaled_test`; `ninfer_moe_test` holds the expert-input usage contract. Shared fixtures and mathematical oracles are common.
 `ninfer_cpu_tensor_test` covers executor-based Tensor/arena computation;
 `ninfer_memory_test` covers portable CPU storage and views. Frontend and HTTP transport tests
 cover the task-pool consumers, including restricted media affinity and HTTP queue saturation.
@@ -205,30 +205,17 @@ NINFER_TEST_ARTIFACT=$PWD/out/qwen3_8_27b.ninfer \
   ctest --test-dir build/dev -R ninfer_qwen3_5_score_real_test --output-on-failure
 ```
 
-`ninfer_moe_test` qualifies the integer routing, complete MoE and routed SwiGLU profiles.
+`ninfer_moe_test` checks the expert-input usage contract (host only).
 `ninfer_moe_block_scaled_test` qualifies block-FP8 A8/G128 experts with BF16
 control/shared and small-token A16 routes. It uses independent FP64 formulas and encoded-weight
 decoders, covering per-expert divisors, K128 scales, zero groups, affine/indexed banks, masks,
 changed Graph contents, private route boundaries and workspace guards.
 `ninfer_elementwise_test --suite sum_contributions` covers FP32 partial summation with optional
 BF16 residual.
-Their independent FP64 oracles start from represented inputs and decoded logical weights. The MoE
-suite covers the resident codec profiles, FP32/BF16 outputs, residual modes, expert masks, strided/indexed
-banks, empty GPU assignments, Graph relocation and workspace guards. The complete MoE retains
-its existing numerical samples and criteria.
-
-`ninfer_moe_execution_test` qualifies the shared single-layer execution and the Program-owned
-multi-layer fixed-cache and streaming-window schedule against the same independent complete-MoE oracle. It uses registered native Host banks and the real ExpertCache,
-covering Write/AddResidual outputs, absent CPU-only replicas, explicit region replacement,
-All/None/partial partitions, bank IDs independent of traversal order, variable frame reuse through
-T=1024, delayed bridge progress, failed acquisition and asynchronous teardown. Eager and segmented
-Graph handoffs use the same oracle; Graph cases also cover expert relocation and streaming-window
-transitions through the real cache schedule. The compact Graph calibration storage also runs
-All/None/partial contributions against the same oracle while reusing one bank window.
+Their independent FP64 oracles start from represented inputs and decoded logical weights.
 
 ```bash
-ctest --test-dir build/dev -R '^ninfer_moe(_mixed|_block_scaled|_cpu_groupwise_int(_avx2|_fma)?)?_test$' --output-on-failure
-ctest --test-dir build/dev -R '^ninfer_moe_execution_test$' --output-on-failure
+ctest --test-dir build/dev -R '^ninfer_moe(_block_scaled)?_test$' --output-on-failure
 ```
 
 Run the 35B-A3B MoE route independently:
@@ -256,12 +243,12 @@ across a resource tier, prefix continuation, and workspace bounds:
 
 ```bash
 NINFER_TEST_ARTIFACT=$PWD/out/qwen3_6_27b.ninfer \
-NINFER_PREFIX_REAL_SCENARIO=attention NINFER_TEST_KV_DTYPE=fp8 \
+NINFER_PREFIX_REAL_SCENARIO=attention NINFER_TEST_KV_DTYPE=int8 \
 NINFER_TEST_SPECULATIVE=mtp NINFER_TEST_BATCH=2 \
   ./build/dev/tests/ninfer_qwen3_5_prefix_real_test
 ```
 
-KV choices are `bf16`, `int8`, and `fp8`; backend choices are `none`, `mtp`,
+KV choices are `bf16` and `int8`; backend choices are `none`, `mtp`,
 `dflash`, and `dflash2`, requiring an artifact with the selected component. Batch defaults to 2;
 `NINFER_TEST_DRAFT_TOKENS` overrides the default MTP3 or DFlash7 block. The DFlash2-specific
 integration executable also accepts all three KV names as its fifth positional argument and rejects
@@ -436,8 +423,8 @@ NINFER_TEST_ARTIFACT=out/qwen3_8_27b.ninfer \
   build/dev/tests/ninfer_qwen3_5_dflash2_real_test 2 0 0 2 int8
 ```
 
-Arguments are K, Graph enabled, optimized head enabled, maximum B, target KV (`bf16`, `int8`, or
-`fp8`), Vision enabled, and extra Device StateImage slots. Defaults are
+Arguments are K, Graph enabled, optimized head enabled, maximum B, target KV (`bf16` or
+`int8`), Vision enabled, and extra Device StateImage slots. Defaults are
 `15 1 1 8 bf16 0 3`. Run GPU integration tests serially. The individual Op suites remain the
 numerical/state-transition oracle; the fixed Engine fixture does not define bit parity across
 arbitrary floating-point routes.
