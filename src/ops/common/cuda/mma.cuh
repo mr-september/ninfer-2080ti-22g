@@ -167,16 +167,6 @@ __device__ __forceinline__ void mma_s8(int& c0, int& c1, int& c2, int& c3, unsig
     mma_s8_m8n8k16(c2, c3, a3, b1);
 }
 
-__device__ __forceinline__ void mma_fp8_e4m3(float& c0, float& c1, float& c2, float& c3,
-                                             unsigned a0, unsigned a1, unsigned a2, unsigned a3,
-                                             unsigned b0, unsigned b1) {
-    // Only the sm_120a routes call this; fail loudly rather than leave the accumulator untouched.
-    (void)c0; (void)c1; (void)c2; (void)c3;
-    (void)a0; (void)a1; (void)a2; (void)a3;
-    (void)b0; (void)b1;
-    __trap();
-}
-
 __device__ __forceinline__ void mma_tf32_bits(float& c0, float& c1, float& c2, float& c3,
                                               unsigned a0, unsigned a1, unsigned a2, unsigned a3,
                                               unsigned b0, unsigned b1) {
