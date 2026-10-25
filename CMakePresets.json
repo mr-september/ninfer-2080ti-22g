@@ -16,7 +16,8 @@
         "NINFER_BUILD_ENGINE": "ON",
         "NINFER_BUILD_APPS": "ON",
         "BUILD_TESTING": "OFF",
-        "NINFER_BUILD_BENCHMARKS": "OFF"
+        "NINFER_BUILD_BENCHMARKS": "OFF",
+        "NINFER_CUDA_LINEINFO": "OFF"
       }
     },
     {
@@ -30,7 +31,8 @@
       "inherits": "release",
       "cacheVariables": {
         "BUILD_TESTING": "ON",
-        "NINFER_BUILD_BENCHMARKS": "ON"
+        "NINFER_BUILD_BENCHMARKS": "ON",
+        "NINFER_CUDA_LINEINFO": "ON"
       }
     },
     {
@@ -64,7 +66,8 @@
       "inherits": "windows",
       "cacheVariables": {
         "BUILD_TESTING": "ON",
-        "NINFER_BUILD_BENCHMARKS": "ON"
+        "NINFER_BUILD_BENCHMARKS": "ON",
+        "NINFER_CUDA_LINEINFO": "ON"
       }
     },
     {

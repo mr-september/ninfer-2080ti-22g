@@ -11,7 +11,7 @@ function(ninfer_cuda_library target)
   set_target_properties(${target} PROPERTIES
     CUDA_SEPARABLE_COMPILATION ON
     CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-  target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>)
+  target_compile_options(${target} PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<BOOL:${NINFER_CUDA_LINEINFO}>>:-lineinfo>)
 endfunction()
 
 function(ninfer_cuda_non_rdc_archive target)
@@ -19,7 +19,7 @@ function(ninfer_cuda_non_rdc_archive target)
     POSITION_INDEPENDENT_CODE ON
     CUDA_SEPARABLE_COMPILATION OFF
     CUDA_RESOLVE_DEVICE_SYMBOLS OFF)
-  target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-lineinfo>)
+  target_compile_options(${target} PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<BOOL:${NINFER_CUDA_LINEINFO}>>:-lineinfo>)
 endfunction()
 
 # Product executables read argv and paths as UTF-8 on Windows (a no-op on other platforms).

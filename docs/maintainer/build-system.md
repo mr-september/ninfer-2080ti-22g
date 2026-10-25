@@ -193,7 +193,7 @@ not repeat the Ops device link or embed its fatbins.
 no external device calls and use whole-translation-unit compilation for instruction support
 (such as `setmaxnreg`) or measured register allocation. Their owning family manifests register
 these sources into the non-RDC target; host launchers connect them to the normal Ops. All three
-CUDA targets retain `-lineinfo`.
+CUDA targets carry `-lineinfo` when `NINFER_CUDA_LINEINFO` is ON (the default, and the `dev`, `ops` and Windows development presets); the `release` and `windows` presets turn it OFF. The line table adds no instructions: per-kernel SASS is identical either way.
 
 Source-list maintenance must preserve language, architecture, RDC mode, device-link ownership
 and numerical compiler options. Splitting a manifest does not reduce kernel instantiation work
