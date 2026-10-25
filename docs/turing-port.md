@@ -10,7 +10,7 @@ This fork builds NInfer for NVIDIA Turing (RTX 2080 Ti 22 GB, `CMAKE_CUDA_ARCHIT
 
 | Area | sm_75 |
 |---|---|
-| Artifacts | `groupwise-int` (Q4/Q5/Q6/Q8 + BF16 tensors): Qwen3.8-27B is the only tested model. Qwen3.6-27B and Qwen3.6-35B-A3B are untested (op-level kernels only; the 21.2 GiB 35B-A3B artifact does not fit 22 GB) |
+| Artifacts | `groupwise-int` (Q4/Q5/Q6/Q8 + BF16 tensors): Qwen3.8-27B is the only tested model. Qwen3.6-27B is untested; Qwen3.6-35B-A3B has no kernels in this tree (its dense shapes and groupwise-int MoE experts were removed, and its 21.2 GiB artifact does not fit 22 GB) |
 | NVFP4 / FP8 weights | unsupported; the routes link throwing definitions |
 | KV cache | `bf16`, `int8`; `fp8`, `nvfp4`, `k8v4` unsupported |
 | Speculation | MTP (tested); DFlash is untested and tied to 35B-A3B |
@@ -440,6 +440,12 @@ Exact gates against `v0.1.0` (RTX 2080 Ti, Windows 11, driver 610.88, CUDA 12.9,
 Speed, interleaved A/B against the `v0.1.0` executables (4 rounds each, `ninfer_bench`, same session): pp512 +1.2%, tg256 -0.3%, pp8192 -2.0%, pp65536 +3.5%, tg32 +1.0% (medians; per-pair changes range from -5.1% to +12.5%). The same executable moves by this much between rounds on this machine, and device code is identical, so none of this is a measured change.
 
 Linux: the Docker `dev` stage compiled the tree (CUDA 13.1.2, GCC 13) and its CTest ran 141 tests: 119 pass, 22 skip (FP8 cases and real-model tests without an artifact path). One of two full runs showed a single failure of `ninfer_linear_swiglu_q4_test` whose output was not captured; the second full run and 26 isolated runs passed. The real 27B loading test passed (771 parents, 15.7 GB, 113 s) and the product image answered a chat request through the mounted model.
+
+### After `v0.2.0`: unreachable launchers and 35B-A3B Ops (2026-10-25)
+
+A static pass removed the launchers and kernels that no kept route calls (orphans of the `NINFER_SM75` fold and of the 35B-A3B shape pruning), the FP8 KV-write and FP8 embedding kernels, the whole groupwise-int MoE kernel set (every instance was a 35B-A3B shape; the Turing build has no MoE route left), the Q8 GDN-input kernels for `[12288,2048]` and the GDN control `n64_k2048` kernel. `--kv-dtype` accepts `bf16` and `int8` only.
+
+Gates against the `v0.2.0` results (same machine and toolchain): release (228 steps) and dev (1,586 steps) builds compile cleanly; `ninfer-logit-compare` (int8 and bf16 KV), greedy ids, CLI transcripts and MTP counters, protocol-B perplexity and the startup memory lines are identical (the free-VRAM line moved from 4.63 to 5.41 GiB with desktop load); CTest passes the same 134 tests. Object-level SASS hashes: 153 release objects, 2,529 kernels (3,368 at `v0.2.0`); no surviving kernel changed apart from the known nondeterministic K=2560 Q8 GDN family and one nondeterministic `q5_a16_sliced_k_mma` compile (two compiles of one source differ). The raw hashes of `write.cu` and `q5_a16_mma.cu` moved only because the hashed `cuobjdump` text pads its comment column to the object's longest line; recompiling the previous sources reproduces the old hashes and the two agree once whitespace is normalised. Executables are 452 to 455 MB (517 to 519 MB at `v0.2.0`) and the compiled ops objects total 364 MB (385 MB). Not run: the A/B smoke, the `ninfer-serve` startup check and the Docker Linux CTest.
 
 ## Maintainer notes
 
