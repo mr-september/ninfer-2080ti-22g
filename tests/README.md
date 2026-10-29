@@ -218,17 +218,7 @@ Their independent FP64 oracles start from represented inputs and decoded logical
 ctest --test-dir build/dev -R '^ninfer_moe(_block_scaled)?_test$' --output-on-failure
 ```
 
-Run the 35B-A3B MoE route independently:
-
-```bash
-NINFER_TEST_ARTIFACT=$PWD/out/qwen3_6_35b_a3b.ninfer \
-  ctest --test-dir build/dev -R ninfer_qwen3_5_moe_real_test --output-on-failure
-```
-
-`ninfer_qwen3_5_moe_offload_real_test` uses the same artifact with a 16 GiB Device budget and
-segmented CUDA Graph execution (`NINFER_TEST_EAGER=1` selects eager). It covers MTP, prefix reuse, Vision, per-layer expert priorities,
-eight resident rows, and stable small-T cache reuse. The DFlash and
-preemption real tests also accept `NINFER_TEST_EAGER=1`; combine it with
+The DFlash and preemption real tests accept `NINFER_TEST_EAGER=1`; combine it with
 `NINFER_VRAM_BUDGET_MIB` to exercise eager offload, or set only the budget for Graph offload.
 CausalScoring always uses eager execution.
 
