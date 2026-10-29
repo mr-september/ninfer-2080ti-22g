@@ -515,13 +515,6 @@ and four streams. Input/output residual and normalized tensors are BF16 `[2560,4
 embedding/block tensors are BF16 `[2560,M]`, and activated injection is FP32 `[4,M]`.
 `add-norm` selects the unit-weight overload without an injection operand.
 
-`block-mix` and `final-mix` measure the complete public `hc_mix` overloads, including both BF16
-projections, nonlinearities, four-stream mean and Block injection. They consume normalized BF16
-`[2560,4,M]`, native compact BF16 Down/Up parents and caller-owned workspace. The fixture seeds
-nonuniform inputs/weights, allocates only the selected form’s operands, and queries/allocates scratch
-before timing. No norm or residual combine is included; internal routes remain production-owned.
-These are new capabilities without a preexisting production Mix baseline.
-
 `combine-then-norm` times public `hc_combine` followed by `hc_grouped_rmsnorm` as one interval.
 `add-then-norm` uses the same composition with an all-one FP32 injection prepared before timing.
 These are explicit two-Op decomposition comparisons for a new capability, with no preexisting
@@ -533,8 +526,7 @@ available for `combine`, `combine-norm`, `add-norm` and the staged comparisons. 
 restored on the measurement stream before each interval, then cold mode flushes the cache. `--tokens T[,T...]`
 or mutually exclusive `--sweep START:END[:STEP]`, together with `--batch B`, gives M=T*B.
 Timing flags, defaults and CSV statistics follow the [RMSNorm benchmark](#rmsnorm-op-benchmark);
-HC adds `alias` and `condition_us`. Residual forms have zero workspace; Mix reports its public
-point capacity and actual arena peak, excluding public buffers. `--condition-us N`
+HC adds `alias` and `condition_us`. All forms have zero workspace. `--condition-us N`
 defaults to 200: register-only GPU work precedes restoration and optional eviction, outside the
 timed Op body. This gives both cache modes an activity prelude without warming operand data or
 locking clocks. It also allows eager submissions to queue behind the prelude; use
@@ -547,7 +539,6 @@ The logical count includes each public input read and output write, with shared 
 once per call; the named two-Op compositions include the intermediate residual reread.
 The reference uses the target's nominal memory bandwidth. Private repeated loads and internal
 staging are excluded, and cache retention/writeback can make the logical rate exceed DRAM bandwidth.
-Mix leaves these fields empty because its contractions require separate work accounting.
 
 ```bash
 cmake --build build/dev -j --target ninfer_gated_residual_bench
@@ -563,13 +554,6 @@ cmake --build build/dev -j --target ninfer_gated_residual_bench
   --op add-norm --tokens 1,7,16 --batch 8 --execution both --cache warm
 ./build/dev/bench/ninfer_gated_residual_bench \
   --op combine-norm --tokens 1,128 --execution eager --cache warm --condition-us 0
-./build/dev/bench/ninfer_gated_residual_bench \
-  --op block-mix --sweep 1:128 --execution graph --cache both \
-  --warmup 10 --repeat 61 --csv-out /tmp/hc-block-mix.csv
-./build/dev/bench/ninfer_gated_residual_bench \
-  --op final-mix --tokens 1,4,8,64,128,512,1024 --execution both --cache both
-./build/dev/bench/ninfer_gated_residual_bench \
-  --op block-mix --tokens 1,7,16 --batch 8 --execution both --cache warm
 ```
 
 ## Dynamic grouped-convolution prepare Op benchmark

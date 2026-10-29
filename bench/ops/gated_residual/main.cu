@@ -1,15 +1,12 @@
 #include "fixture.cuh"
-#include "mix_fixture.cuh"
 #include "conditioning.cuh"
 #include "common/roofline.h"
-
-#include <optional>
 
 using namespace ninfer;
 using namespace ninfer::bench;
 
 namespace {
-std::optional<std::size_t> logical_bytes(hc::Op op, int columns) {
+std::size_t logical_bytes(hc::Op op, int columns) {
     const auto block     = std::size_t(hc::kWidth) * columns * 2;
     const auto residual  = block * hc::kStreams;
     const auto weight    = std::size_t(hc::kWidth) * hc::kStreams * 2;
@@ -28,9 +25,6 @@ std::optional<std::size_t> logical_bytes(hc::Op op, int columns) {
     case hc::Op::CombineThenNorm:
     case hc::Op::AddThenNorm:
         return 4 * residual + block + injection + weight;
-    case hc::Op::BlockMix:
-    case hc::Op::FinalMix:
-        return std::nullopt;
     }
     throw std::logic_error("unknown HC Op");
 }
@@ -69,25 +63,17 @@ int main(int argc, char** argv) {
                         row.workspace_peak  = f.workspace_peak();
                         auto extra = std::string(options.in_place ? "inplace," : "disjoint,") +
                                      std::to_string(options.condition_us);
-                        if (const auto bytes =
-                                logical_bytes(options.op, hc::columns(tokens, options.batch)))
-                            extra +=
-                                ',' + std::to_string(*bytes) + ',' +
-                                format_metric(*bytes / (result.gpu.median_us * 1000.0), 3, "") +
-                                ',' +
-                                format_metric(*bytes / (kRoofline.memory_gbs * 1000.0), 3, "");
-                        else
-                            extra += ",,,";
+                        const auto bytes =
+                            logical_bytes(options.op, hc::columns(tokens, options.batch));
+                        extra += ',' + std::to_string(bytes) + ',' +
+                                 format_metric(bytes / (result.gpu.median_us * 1000.0), 3, "") +
+                                 ',' +
+                                 format_metric(bytes / (kRoofline.memory_gbs * 1000.0), 3, "");
                         csv.write(row, result, execution, cache, extra);
                     }
             };
-            if (hc::mixes(options.op)) {
-                hc::MixFixture f(options, tokens);
-                measure(f);
-            } else {
-                hc::Fixture f(options, tokens);
-                measure(f);
-            }
+            hc::Fixture f(options, tokens);
+            measure(f);
         }
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n';

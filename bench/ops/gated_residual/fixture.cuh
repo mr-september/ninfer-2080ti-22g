@@ -73,9 +73,6 @@ struct Fixture {
             ops::hc_combine(h, b, j, r, e);
             ops::hc_grouped_rmsnorm(r, w, kEpsilon, z, e);
             break;
-        case Op::BlockMix:
-        case Op::FinalMix:
-            throw std::logic_error("Mix requires its projection fixture");
         }
     }
 

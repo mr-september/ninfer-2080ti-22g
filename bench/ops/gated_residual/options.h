@@ -14,9 +14,7 @@ enum class Op {
     CombineNorm,
     AddNorm,
     CombineThenNorm,
-    AddThenNorm,
-    BlockMix,
-    FinalMix
+    AddThenNorm
 };
 
 inline const char* name(Op op) {
@@ -35,15 +33,9 @@ inline const char* name(Op op) {
         return "combine-then-norm";
     case Op::AddThenNorm:
         return "add-then-norm";
-    case Op::BlockMix:
-        return "block-mix";
-    case Op::FinalMix:
-        return "final-mix";
     }
     throw std::logic_error("invalid HC benchmark Op");
 }
-
-inline bool mixes(Op op) { return op == Op::BlockMix || op == Op::FinalMix; }
 
 inline bool combines(Op op) {
     return op == Op::Combine || op == Op::CombineNorm || op == Op::AddNorm ||
@@ -75,7 +67,7 @@ inline Options parse(int argc, char** argv) {
             std::cout
                 << "HC gated residual Op benchmark\n"
                    "  --op expand-norm|grouped-rmsnorm|combine|combine-norm|add-norm\n"
-                   "       |combine-then-norm|add-then-norm|block-mix|final-mix\n"
+                   "       |combine-then-norm|add-then-norm\n"
                    "  --alias disjoint|inplace --batch B --condition-us N\n"
                    "  --tokens T[,T...] or --sweep START:END[:STEP]\n"
                    "H=2560, streams=4, M=tokens*batch. Staged comparisons time both public Ops.\n"
@@ -89,7 +81,7 @@ inline Options parse(int argc, char** argv) {
             bool found = false;
             for (auto op :
                  {Op::ExpandNorm, Op::GroupedNorm, Op::Combine, Op::CombineNorm, Op::AddNorm,
-                  Op::CombineThenNorm, Op::AddThenNorm, Op::BlockMix, Op::FinalMix})
+                  Op::CombineThenNorm, Op::AddThenNorm})
                 if (value == name(op)) {
                     o.op  = op;
                     found = true;
