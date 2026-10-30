@@ -26,7 +26,7 @@ hf download neroued/Qwen3.8-27B-NInfer qwen3_8_27b.ninfer --local-dir models
 | GPU | GeForce RTX 2080 Ti with 22 GB (`sm_75`). The weights alone take 15.4 GiB on the device (14.7 GiB without MTP), so 11 GB cards cannot run this model |
 | Driver | the binaries use the CUDA 12.9 runtime, so use a driver that supports it (576.02 or newer on Windows); only 610.88 was tested |
 | Host RAM | the defaults pin about 1.3 GiB for the embedding table and 0.8 to 3.2 GiB of host context (the server halves its default host context when free RAM is short, as it did here); tested with 32 GB. Page-locked memory has to be free RAM |
-| Disk | 18.2 GB for the model; the release zip is 1.6 GB |
+| Disk | 18.2 GB for the model; the release zip is 0.28 GiB |
 | Windows | Windows 10/11 x64 |
 | Linux | 64-bit Linux, WSL2 or Docker with the NVIDIA container toolkit |
 
@@ -130,7 +130,7 @@ The benchmark corpus is random token ids, so its MTP acceptance (0.377) is far b
 | Qwen4Exp (Flash Next), PLE, NF4, MoE experts | model-side code, planning and formats are kept for the Qwen4 series; the Ops without Turing kernels throw "unsupported", so none of it runs on a 2080 Ti today |
 | FP8 weights and KV | the formats are readable, but there are no Turing kernels; NVFP4 and K8V4 were removed |
 
-Checked on one 2080 Ti 22 GB with Qwen3.8-27B `groupwise-int` (2026-10-30, the `v0.3.0` tree): on native Windows the full CTest suite (134 tests, all pass), protocol-B perplexity (4.796799, identical to `v0.1.0` in every digit and domain), `ninfer-logit-compare` and greedy CLI transcripts including the vision examples (bit-identical to `v0.1.0`), the startup memory plan and `ninfer-serve` startup lines, per-kernel SASS hashes of the compiled device objects (2,529 kernels, identical to the post-cut-down reference), the release zip's `ninfer.exe` started from an empty directory with a stripped `PATH`, and a speed smoke against `v0.1.0` that was inconclusive (session noise of about 14%; device code is identical). On Linux the Docker dev build compiled the whole tree and its CTest ran 141 tests (119 pass, 22 skip: FP8 cases and real-model tests that need an artifact path, 0 fail), 50 repeats of `ninfer_linear_swiglu_q4_test` pass, and the real 27B loading test passed. Earlier checks on the same kernels covered CLI text, image and image+video prompts, a 64k-token needle retrieval, and `ninfer-serve` with OpenAI chat, SSE streaming, Responses, Anthropic messages, tool calls and two concurrent requests. See [Tests](tests/README.md).
+Checked on one 2080 Ti 22 GB with Qwen3.8-27B `groupwise-int` (2026-10-30, the `v0.3.0` tree): on native Windows the full CTest suite (all pass), protocol-B perplexity (4.796799, identical to `v0.1.0` in every digit and domain), `ninfer-logit-compare` and greedy CLI transcripts including the vision examples (bit-identical to `v0.1.0`), the startup memory plan and `ninfer-serve` startup lines, per-kernel SASS hashes of the compiled device objects (2,529 kernels, identical to the post-cut-down reference), the release zip's `ninfer.exe` started from an empty directory with a stripped `PATH`, and a speed smoke against `v0.1.0` that was inconclusive (session noise of about 14%; device code is identical). On Linux the Docker dev build compiled the whole tree and its CTest ran 141 tests (119 pass, 22 skip: FP8 cases and real-model tests that need an artifact path, 0 fail), 50 repeats of `ninfer_linear_swiglu_q4_test` pass, and the real 27B loading test passed. Earlier checks on the same kernels covered CLI text, image and image+video prompts, a 64k-token needle retrieval, and `ninfer-serve` with OpenAI chat, SSE streaming, Responses, Anthropic messages, tool calls and two concurrent requests. See [Tests](tests/README.md).
 
 ## Known limitations
 
@@ -160,7 +160,7 @@ The `zlib` and `dav1d` features in `vcpkg.json` provide the PNG and AV1 decoders
 
 Presets are named `release`, `dev` (adds tests and benchmarks) and `ops` (Core, Artifact and Ops only), and each builds in `build/<preset-name>/`; the Windows presets are `windows`, `windows-dev` and `windows-ops`. The build requires `CMAKE_CUDA_ARCHITECTURES=75`. Machine-specific compiler and Python paths belong in the ignored `CMakeUserPresets.json`. On Linux the executables find the shared libraries in the same build's `lib/` directory through a relative RPATH, so keep it beside `apps/` when moving build outputs. See [build organization](docs/maintainer/build-system.md).
 
-The Q8 split-K kernels make the build slow: it took 10.6 minutes on 16 logical cores at full parallelism with FFmpeg already in vcpkg's cache (measured on the previous base). On a machine with little free RAM the default parallelism can make `nvcc` run out of memory; set `CMAKE_BUILD_PARALLEL_LEVEL=4` (or pass `-j4`) and rerun, the build resumes.
+The CUDA kernels make the build slow: a cold release build took 9.0 minutes at `-j4` with FFmpeg already in vcpkg's cache (`v0.3.0`, Windows). On a machine with little free RAM the default parallelism can make `nvcc` run out of memory; set `CMAKE_BUILD_PARALLEL_LEVEL=4` (or pass `-j4`) and rerun, the build resumes.
 
 ## Models, formats and converting your own weights
 
