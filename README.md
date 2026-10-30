@@ -2,7 +2,7 @@
 
 Fast single-GPU inference of Qwen3.8-27B on the 22 GB modified GeForce RTX 2080 Ti (Turing, `sm_75`). It runs natively on Windows or on Linux/WSL2/Docker and serves OpenAI- and Anthropic-compatible HTTP APIs or a local CLI.
 
-This is my fork of [Neroued/ninfer](https://github.com/Neroued/ninfer) (see [NOTICE](NOTICE)), a from-scratch C++/CUDA inference engine, cut down to do one thing well: run Qwen3.8-27B (and the same-architecture Qwen3.6-27B) on a single RTX 2080 Ti 22 GB, natively on Windows or on Linux/WSL2/Docker. It handles text, image and video prompts with MTP speculative decoding (DFlash2 is supported but not yet run end to end), and includes the CLI, an OpenAI- and Anthropic-compatible server, `ninfer-perplexity` and `ninfer-logit-compare`. It no longer tracks upstream. [docs/turing-port.md](docs/turing-port.md) records the Turing work and how it was measured; `git checkout v0.1.0` gives the code from before the cut-down.
+It runs a 27B model with a 64k-token context on a single 22 GB 2080 Ti. On Windows, download the release zip, put the model next to it and run `.\serve.ps1`: no Linux, CUDA Toolkit or Visual Studio needed. You get an OpenAI- and Anthropic-compatible server (or a CLI) with image and video input, and MTP speculative decoding that reaches about 47 tok/s on code prompts (about 27 tok/s without it). See [Download a release](#download-a-release). Derived from [Neroued/ninfer](https://github.com/Neroued/ninfer) (see [NOTICE](NOTICE)).
 
 ## Download a release
 
