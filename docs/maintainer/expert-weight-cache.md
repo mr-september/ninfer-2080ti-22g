@@ -1,5 +1,7 @@
 # Expert 权重来源与 GPU 副本缓存
 
+状态：本仓库只构建 Turing 上的稠密 Qwen3.8-27B 产品；下文的 MoE 执行（35B-A3B、Qwen4Exp）没有 Turing kernel，无法在 2080 Ti 上运行。本文及其 bank、加载与缓存代码作为 Qwen4 系列的设计记录保留。
+
 本文约定已实现的 bank 视图、放置加载、GPU 副本容器与 MoE 计算交接。
 数学与量化布局由 [artifact 格式](artifact-container.md)和各 Op 合同拥有；
 执行与生命周期由 [Engine 架构](engine-architecture.md)拥有。

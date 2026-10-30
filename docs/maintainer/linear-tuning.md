@@ -191,11 +191,11 @@ not add an automatic second warm-cache pass.
 
 ## 7. Curated suites and extension
 
-`qwen3_6_27b` and `qwen3_6_35b_a3b` are explicit convenience suites. Their current geometry/role
+`qwen3_6_27b` is the explicit convenience suite. Its current geometry/role
 entries live in [linear_bench.cu](../../bench/ops/linear_bench.cu), and all use `A16Only`.
 `Continuous` samples T=`1,16,128,1024`; `VisionStep4` samples T=`4,128,1024`.
-The `all` suite unions identical `(qtype,policy,N,K,T)` points, retaining multiple role labels
-without repeating their timing. No-argument invocation prints usage instead of starting a suite.
+Identical `(qtype,policy,N,K,T)` points retain multiple role labels without repeating their
+timing. No-argument invocation prints usage instead of starting a suite.
 
 Points share one weight and maximum-T activation/output allocation per `(qtype,policy,N,K)` group.
 Suites use the exact-point execution path and do not reproduce production admission or dispatch.

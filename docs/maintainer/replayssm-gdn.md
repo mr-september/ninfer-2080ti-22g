@@ -1,5 +1,7 @@
 # ReplaySSM：GDN speculative state 的 raw-input replay
 
+状态：本仓库只编译 27B 的 48 value-head fold；文中的 35B-A3B（30 层、32 value head）与 Qwen4Exp 几何已无 kernel，其数据保留为设计记录。
+
 本文讨论 Gated DeltaNet（GDN）在短窗口 speculative decoding 中的 ReplaySSM：
 target verify 保留原有的逐 token recurrence，但不保存每个 verify position 的完整 recurrent
 state；它只记录驱动状态转移的 raw inputs。最终接受长度确定后，再从 committed checkpoint

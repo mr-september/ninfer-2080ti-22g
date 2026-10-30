@@ -54,6 +54,8 @@ runtime choices.
 
 ### Current official geometries
 
+Only the 27B column runs in this tree; the 35B-A3B Ops have no Turing kernels, and its column is kept as the architecture record for the Qwen4 series.
+
 These are useful workload points, rather than a second config registry:
 
 | Quantity | 27B Dense | 35B-A3B MoE |
