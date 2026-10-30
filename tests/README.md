@@ -97,7 +97,6 @@ injects event-record failures and checks graph consumption against independently
 CPU topology/task-pool tests link the C++ `ninfer_cpu` target and need no GPU:
 `ctest --test-dir build/dev -R '^ninfer_cpu_.*_test$' --output-on-failure`.
 GPU MoE is in `ninfer_moe_block_scaled_test`; `ninfer_moe_test` holds the expert-input usage contract. Shared fixtures and mathematical oracles are common.
-`ninfer_cpu_tensor_test` covers executor-based Tensor/arena computation;
 `ninfer_memory_test` covers portable CPU storage and views. Frontend and HTTP transport tests
 cover the task-pool consumers, including restricted media affinity and HTTP queue saturation.
 
@@ -441,8 +440,6 @@ Qwen4Exp loading/resources can be checked independently of the public Engine rou
 ```bash
 ./build/dev/tests/ninfer_qwen4_exp_loading_real_test out/qwen3_8_flash_next.ninfer --host-experts
 ./build/dev/tests/ninfer_qwen4_exp_loading_real_test out/qwen3_8_flash_next.ninfer --host-experts --materialize
-NINFER_QWEN4_EXP_TEST_ARTIFACT=out/qwen3_8_flash_next.ninfer \
-  ./build/dev/tests/ninfer_qwen4_exp_reclaim_real_test
 ```
 
 The first command plans component combinations, KV formats and concurrency without loading weight
@@ -452,8 +449,3 @@ about 64 GiB of available Host memory plus system headroom with `--host-experts`
 Text/Vision/MTP generation, eager or CUDA Graph decode, and text causal scoring use the public Engine,
 with current support described in the [execution reference](../docs/maintainer/qwen4_exp-execution.md)
 and commands in the [CLI guide](../docs/cli.md).
-
-The reclaim test loads Main experts on Host and MTP/fixed weights on Device, then constructs
-native checkpoint contents without generating text. It checks complete holder quotes, actual-page
-batch coverage, typed shortage clipping, stale holders/readers/residency, Main/MTP/State migrations,
-and quoted Host release against final store occupancy. It requires the same Host memory headroom.
