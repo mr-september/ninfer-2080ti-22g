@@ -331,11 +331,9 @@ prefix reuse, speculative execution, frontier bounds and Responses inheritance:
 python3 tools/smoke/serve_thinking_preservation.py \
   --server-bin build/dev/apps/ninfer-serve \
   --artifact out/qwen3_6_27b.ninfer --backend mtp
-
-python3 tools/smoke/serve_thinking_preservation.py \
-  --server-bin build/dev/apps/ninfer-serve \
-  --artifact out/qwen3_6_35b_a3b.ninfer --backend dflash
 ```
+
+`--backend dflash` targets the 35B-A3B artifact, which has no kernels in this tree.
 
 The shared messages are in
 [`fixtures/serve/qwen3_6_thinking_preservation.json`](fixtures/serve/qwen3_6_thinking_preservation.json).
@@ -393,9 +391,9 @@ Program storage and the production prefill route; select the draft component sto
 cmake --build build/dev -j --target ninfer_qwen3_5_dflash_prefill_real_test
 NINFER_TEST_ARTIFACT=out/qwen3_8_27b.ninfer \
   build/dev/tests/ninfer_qwen3_5_dflash_prefill_real_test dflash2
-NINFER_TEST_ARTIFACT=out/qwen3_6_35b_a3b.ninfer \
-  build/dev/tests/ninfer_qwen3_5_dflash_prefill_real_test dflash
 ```
+
+The `dflash` variant of this test needs the 35B-A3B artifact, which has no kernels in this tree.
 
 The Engine test requires a DFlash2 companion artifact and covers speculative transactions,
 page-boundary commit/continuation and retained/fresh prefix behavior. K>=7 exercises a stop inside

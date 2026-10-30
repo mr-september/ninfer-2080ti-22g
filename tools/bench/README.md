@@ -151,8 +151,8 @@ runner usage and output files.
 
 `run_serve_corpus.py` accepts explicit `--artifact LABEL=PATH` entries. Labels identify report groups;
 the selected artifact supplies the architecture, public name and weight bindings.
-Omitting `--mode` selects MTP0 and MTP3; repeat `--mode` to select a subset. Use `dflash7` for
-Qwen3.6-35B-A3B DFlash K=7 and `dflash2_7` for Qwen3.8-27B DFlash2 K=7, with companion weights
+Omitting `--mode` selects MTP0 and MTP3; repeat `--mode` to select a subset. `dflash7` selects
+Qwen3.6-35B-A3B DFlash K=7 (no kernels in this tree, so it cannot run here); use `dflash2_7` for Qwen3.8-27B DFlash2 K=7, with companion weights
 in the selected artifact. `--sampling greedy` selects exact argmax; the default is stochastic.
 Run commands with a selected Python 3.11 interpreter, as in the model-page reproduction entries.
 Both serving runners accept `--kv-dtype bf16|int8` (default: `int8`).

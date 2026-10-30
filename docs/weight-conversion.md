@@ -10,7 +10,7 @@ Run the commands below from the repository root.
 ## Upgrade an existing v2 artifact
 
 The offline upgrade tool supports the official Qwen3.6/3.8-27B groupwise-int artifacts,
-and Qwen3.6-35B-A3B groupwise-int. Update your checkout to the current `master` and
+and Qwen3.6-35B-A3B groupwise-int (the latter has no kernels in this tree). Update your checkout to the current `master` and
 [rebuild NInfer](../README.md#quick-start-from-source-windows), then run with Python 3.11:
 
 ```bash
@@ -54,7 +54,7 @@ The built-in recipes are ordinary Python functions in
 |---|---|---|
 | `qwen3_6_27b` | Q4/Q5 projections, Q6 vocabulary weights | None |
 | `qwen3_8_27b` | Q4/Q5 projections, Q8 vocabulary weights | None |
-| `qwen3_6_35b_a3b` | Q4 experts, Q5/Q6 expert down, Q8 shared/projection weights | None |
+| `qwen3_6_35b_a3b` | Q4 experts, Q5/Q6 expert down, Q8 shared/projection weights (no kernels in this tree) | None |
 
 These names select conversion choices. Runtime execution is selected from the architecture,
 configuration and actual bindings stored in the artifact. `--name` sets the public model name;

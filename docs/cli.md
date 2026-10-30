@@ -98,7 +98,7 @@ For example, this allows at most 512 model-origin thinking tokens while retainin
 GPU residency is frozen when the Engine starts:
 
 - `--spec none` omits MTP/DFlash/DFlash2 weights and state and the optimized proposal head (the executable default is `--spec mtp --draft-tokens 3`);
-- `--spec mtp`, `--spec dflash` (35B-A3B), and `--spec dflash2` (Qwen3.8-27B) load only the selected speculative backend;
+- `--spec mtp`, `--spec dflash` (35B-A3B, no kernels in this tree), and `--spec dflash2` (Qwen3.8-27B) load only the selected speculative backend;
 - a speculative backend with the full proposal head omits the optimized proposal head;
 - Vision is disabled by default, omitting its weights and Vision-specific unified-workspace extent;
 - `--vision` loads the weights, expands the one Program workspace for Vision encode/handoff, and enables image/video input.
@@ -160,9 +160,9 @@ See [`examples/cli/`](../examples/cli/) for committed text, image, video, mixed-
 
 ## Speculative decoding
 
-Speculative decoding defaults to MTP with three draft positions and, when the artifact carries one, the optimized proposal head; `--spec none` turns it off. MTP takes one to five draft positions; the alternatives are the
-35B-A3B DFlash or Qwen3.8-27B DFlash2 backend with one to fifteen. Both masked-draft backends
-may be combined with `--vision`.
+Speculative decoding defaults to MTP with three draft positions and, when the artifact carries one, the optimized proposal head; `--spec none` turns it off. MTP takes one to five draft positions; the alternative is the
+Qwen3.8-27B DFlash2 backend with one to fifteen, which may be combined with `--vision`. `--spec dflash` selects the
+35B-A3B drafter, whose Ops have no kernels in this tree, so it cannot run on a 2080 Ti.
 `--lm-head-draft` selects the optimized proposal head when the architecture and artifact provide it,
 and requires a selected backend.
 
@@ -170,7 +170,7 @@ Flash Next supports native MTP with the full head only; it does not support `--l
 DFlash or DFlash2.
 
 ```bash
-./build/release/apps/ninfer models/qwen3_6_35b_a3b.ninfer \
+./build/release/apps/ninfer models/qwen3_8_27b.ninfer \
   --prompt "Write a short explanation of speculative decoding." \
   --max-context 16384 \
   --max-new 512 \
@@ -178,18 +178,9 @@ DFlash or DFlash2.
   --lm-head-draft
 ```
 
-For DFlash:
+For Qwen3.8-27B artifacts containing the DFlash2 companion weights, select `--spec dflash2 --draft-tokens 7`, optionally with `--lm-head-draft` and `--vision`. DFlash2 accepts every draft count from 1 through 15; seven is the checkpoint recommendation. The `groupwise-int` artifact uses the same Engine route, including CUDA Graph, concurrent requests, sampling penalties, and prefix reuse. An artifact without the companion weights reports a missing DFlash2 component when selected. Vision, MTP and DFlash2 follow the same rule: their weights are required only when that component is enabled at startup.
 
-```bash
-./build/release/apps/ninfer models/qwen3_6_35b_a3b.ninfer \
-  --prompt "Write a short explanation of speculative decoding." \
-  --max-context 16384 --max-new 512 \
-  --spec dflash --draft-tokens 7 --lm-head-draft
-```
-
-For Qwen3.8-27B artifacts containing the DFlash2 companion weights, select `--spec dflash2 --draft-tokens 7`, optionally with `--lm-head-draft` and `--vision`. DFlash2 accepts every draft count from 1 through 15; seven is the checkpoint recommendation. The `groupwise-int` artifact uses the same Engine route, including CUDA Graph, concurrent requests, sampling penalties, and prefix reuse. An artifact without the companion weights reports a missing DFlash2 component when selected. Vision, MTP and DFlash follow the same rule: their weights are required only when that component is enabled at startup.
-
-Only one speculative backend can be enabled per Engine. The measured configurations in [Turing port](turing-port.md#current-performance) use MTP with three draft tokens and DFlash with seven draft tokens (block length eight), both with the optimized proposal head. DFlash accepts one to fifteen draft tokens; seven forms the measured block length eight, while fifteen uses the maximum supported block length sixteen.
+Only one speculative backend can be enabled per Engine. The measured configuration in [Turing port](turing-port.md#current-performance) uses MTP with three draft tokens and the optimized proposal head. DFlash2 draft count seven forms block length eight; fifteen uses the maximum supported block length sixteen.
 
 ## Common options
 

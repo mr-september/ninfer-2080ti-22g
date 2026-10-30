@@ -1051,6 +1051,8 @@ cmake --build build/dev --parallel --target ninfer_qwen3_5_mtp_round_bench
 
 ## 35B complete DFlash round benchmark
 
+The benchmark needs the 35B-A3B artifact and its Ops, which have no kernels in this tree, so it cannot run on a 2080 Ti; it is kept with the DFlash v1 code.
+
 `ninfer_qwen3_5_dflash_round_bench` drives the production Program through consecutive
 steady DFlash rounds. A measured round includes the previous confirmed feature-to-context append,
 the six-layer proposal, target verify/accept, and host publication. It reports GPU and wall latency,
