@@ -36,7 +36,7 @@ Read [Engine architecture](docs/maintainer/engine-architecture.md) before changi
 
 ## Local environment
 
-Windows 11, PowerShell, Visual Studio 2022 Build Tools, CUDA 12.9, vcpkg at `E:\vcpkg`. Build with `scripts\build.ps1` (release, `build\windows`) or `scripts\build.ps1 -Dev` (tests and benchmarks, `build\windows-dev`); set `VCPKG_ROOT=E:\vcpkg` and `CMAKE_BUILD_PARALLEL_LEVEL=4`, because nvcc runs out of memory at the default. Run tests with `PYTHONUTF8=1` and `ctest --test-dir build\windows-dev`. Python is `C:\Users\Larry\AppData\Local\Python\pythoncore-3.10-64\python.exe`.
+Windows 11, PowerShell, Visual Studio 2022 Build Tools, CUDA 12.9, vcpkg at `E:\vcpkg`. Build with `scripts\build.ps1` (release, `build\windows`) or `scripts\build.ps1 -Dev` (tests and benchmarks, `build\windows-dev`); set `VCPKG_ROOT=E:\vcpkg` and `CMAKE_BUILD_PARALLEL_LEVEL=4`, because nvcc runs out of memory at the default. Run tests with `PYTHONUTF8=1` and `ctest --test-dir build\windows-dev`. Python is `E:\ninfer\.venv\Scripts\python.exe`: uv-managed 3.14 with CUDA PyTorch from the cu126 wheel index, whose CUDA major version matches the 12.9 toolkit as PyTorch's JIT extension build requires; run tests that compile extensions from a VS developer shell. `build\windows-dev` caches it as `Python3_EXECUTABLE`; pass `-DPython3_EXECUTABLE=E:/ninfer/.venv/Scripts/python.exe` when reconfiguring.
 
 The usual local model is `E:/AI_Models/LLM/neroued/Qwen3.8-27B-NInfer/qwen3_8_27b.ninfer` (v3, `groupwise-int`). Select artifacts by explicit path, never glob order, modification time or "latest". The model needs about 18 GB of VRAM; check that the desktop holds under about 3 GB and never run two GPU jobs at once.
 

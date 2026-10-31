@@ -145,7 +145,7 @@ revision, hardware/toolchain, workload, sample count, and runtime settings. Link
 rather than repeating them; put exceptions and actual automatic KV capacities in the run record.
 Identify missing historical metadata without inferring values.
 
-Commands run from the repository root with a selected Python 3.11 interpreter. Use a fresh output
+Commands run from the repository root with a selected Python 3.14 interpreter. Use a fresh output
 directory for reruns; recorded report paths identify the measured evidence. Reproducing a workload
 on another build or artifact does not promise identical historical outputs or timings. Raw reports
 remain local under `profiles/bench/`; reuse existing JSON/CSV/Markdown summaries to verify values.

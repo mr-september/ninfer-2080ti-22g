@@ -60,7 +60,7 @@ worker startup/affinity facilities directly, without depending on the arithmetic
 Core's direct-file I/O uses liburing >= 2.5.
 Its registered files and buffers are caller-owned; the queue creates no CUDA resources or threads.
 
-CUDA 12.9 and Python 3.10 describe the maintained environment, not configuration version gates.
+CUDA 12.9 and Python 3.14 describe the maintained environment, not configuration version gates.
 FFmpeg is discovered without a version floor. The libcurl 7.85 minimum follows the use of
 `CURLOPT_PROTOCOLS_STR` and `CURLOPT_REDIR_PROTOCOLS_STR`. Actual API support is checked by compilation.
 

@@ -11,7 +11,7 @@ Run the commands below from the repository root.
 
 The offline upgrade tool supports the official Qwen3.6/3.8-27B groupwise-int artifacts,
 and Qwen3.6-35B-A3B groupwise-int (the latter has no kernels in this tree). Update your checkout to the current `master` and
-[rebuild NInfer](../README.md#quick-start-from-source-windows), then run with Python 3.11:
+[rebuild NInfer](../README.md#quick-start-from-source-windows), then run with Python 3.14:
 
 ```bash
 python3 tools/upgrade_ninfer_v2_to_v3.py \
@@ -26,7 +26,7 @@ downloaded files.
 
 ## Start with an official recipe
 
-Source-weight conversion requires a Python 3.11 environment with PyTorch and NumPy. It uses CUDA
+Source-weight conversion requires a Python 3.14 environment with PyTorch and NumPy. It uses CUDA
 by default; `--device cpu` selects CPU conversion. The input paths below are placeholders for your
 local checkpoint directories.
 

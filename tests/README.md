@@ -67,7 +67,7 @@ Numerical criteria and complete mathematical/state references stay with their se
 ## Build and run
 
 Select a Python environment with the dependencies for the tests first. The maintained environment
-uses Python 3.11; CMake finds Python 3 without restricting its minor version.
+uses Python 3.14; CMake finds Python 3 without restricting its minor version.
 `Python3_EXECUTABLE` selects the interpreter used by interop and frontend tests explicitly.
 
 ```bash
@@ -175,7 +175,7 @@ python3 -m pytest \
 ```
 
 The Python suites exercise conversion, encoded output and measurement tools without model inference.
-The maintained environment uses Python 3.11 with the dependencies for those suites. C++ binding and Engine tests
+The maintained environment uses Python 3.14 with the dependencies for those suites. C++ binding and Engine tests
 cover consumption of their resulting representation.
 
 The real loading test accepts an explicit artifact path and optional component selection:
