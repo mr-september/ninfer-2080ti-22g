@@ -1,0 +1,39 @@
+#pragma once
+#include "core/device_launch.h"
+#include "ops/common/device_limits.h"
+
+namespace ninfer::ops::detail::unified {
+template <int Bytes>
+__device__ __forceinline__ unsigned char* nvfp4_shared_storage() {
+    static_assert(Bytes > 0 && Bytes <= kMaxSharedBytesPerBlockSm8x);
+    if constexpr (Bytes > 48 * 1024) {
+        extern __shared__ __align__(16) unsigned char shared_dynamic[];
+        return shared_dynamic;
+    } else {
+        __shared__ __align__(16) unsigned char shared_static[Bytes];
+        return shared_static;
+    }
+}
+
+template <int Bytes, auto Kernel, bool Dynamic = false>
+int nvfp4_prepare_shared() {
+    static_assert(Bytes <= kMaxSharedBytesPerBlockSm8x);
+    if constexpr (Bytes > 48 * 1024) {
+        raise_dynamic_shared_memory(Kernel, Bytes);
+        return Bytes;
+    } else {
+        return Dynamic ? Bytes : 0;
+    }
+}
+
+template <class Schedule, class Epilogue>
+inline constexpr int nvfp4_mma_shared_bytes = [] {
+    constexpr int extra = [] {
+        if constexpr (requires { Epilogue::template kSharedBytes<Schedule>; })
+            return Epilogue::template kSharedBytes<Schedule>;
+        else
+            return 0;
+    }();
+    return Schedule::kSharedBytes > extra ? Schedule::kSharedBytes : extra;
+}();
+} // namespace ninfer::ops::detail::unified

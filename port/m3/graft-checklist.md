@@ -159,3 +159,82 @@ owns every shared name (the vendor header's stated rule, applied throughout):
   Tensor/DeviceContext **layout seam against port-compiled Ops** (checklist §4 risks 1-2) is live
   at that point, not before. ABI across the seam is name-compatible by construction (same class
   names) but layout-divergent (donor Tensor vs port MemorySpan Tensor).
+
+## 8. Graft link stage (2026-11-27, parent agent) — design + disabled-feature ledger
+
+Goal (Larry, 2026-11-27): no permanent glue — every grafted piece lands as first-class code; end
+state ~130+ decode t/s at donor-equivalent mixed quant + context (donor 85-100 with DSpark on the
+same card; acceptance/DSpark is the lever, launch-overhead work the multiplier, CUDA graphs the
+named escape hatch, m4/plan step 3).
+
+Method: `ninfer-inkling2-graft-probe` links the graft lib `/WHOLEARCHIVE` against
+`ninfer_engine` — the LNK list is the complete closure worklist. Resolutions, three kinds:
+1. REAL bridge (`graft/src/graft_bridge.cpp`): Tensor device-less ctor over the port ctor;
+   `ops::joins` over the port WeightView. The Tensor LAYOUT seam closed by making
+   `graft/include/core/tensor.h` mirror the port layout (Device member present) — destination owns
+   the name (§7 rule, applied to the highest-risk seam first).
+2. DONOR IMPLEMENTATIONS grafted under `graft/donor/` (compiled against the shim tree): core
+   arena/device/device_wait/growable_region/vmm + inkling2 kv_planes. gguf ops layer copied under
+   `graft/gguf/` as its own archive `ninfer_inkling2_ggml` (ggml-header isolation rule); the ggml
+   bridge kernels are the swap-in point for port-tuned projections on the road to 130+.
+3. DISABLED-FEATURE stubs (throw on touch; memory-plan queries return 0): ExpertDelivery,
+   ExpertParallelExchange, DividedHead, dspine::Runtime + ring_capacity, CpuExperts,
+   VisionTower::encode, Model::expert_range. These are port-mandate drops, not TODOs; promoting
+   one = delete stub + wire port path + registered battery with oracle stream.
+
+Promotion ledger: (none yet; DSpark/dspine promotion is the 130+ prerequisite and will land as
+donor dspine files + port ops wiring, not stubs.)
+
+Build contract learned (link-loop iterations, 2026-11-27) — the graft carries the DONOR'S BUILD
+RULES, not just its sources:
+- `NINFER_TIER_TURING` (+ `NINFER_CUDA_ARCHITECTURES="75"`) on both graft archives: ops/common/
+  device_tier.h dispatches on per-tier build defines set by CMake from the arch list; without them
+  the tier-dispatch lambdas in ggml_fattn.cu have no live branch (nvcc: "return value type does
+  not match").
+- ggml archive nvcc flags mirrored from donor sources.cmake: `--extended-lambda` (fattn-mma-f16
+  uses __device__-annotated lambdas) + `-Xcudafe=--diag_suppress=177`.
+- ggml include roots are `${NINFER_GGML_QUANTS_ROOT}/include` and `/src` (tree root is not the
+  include root); ops/common/*.{h,cuh} staged under `src/models/inkling2/common/` + mirrored at
+  `graft/include/ops/common/` for path-style includes.
+- pimpl cleanup: a stubbed class whose members hold unique_ptr<Impl> needs a complete Impl at the
+  throw-site — bridge defines `struct ExpertDelivery::Impl {}` (donor expert_delivery.cpp is not
+  in this link; no ODR clash). noexcept declarations (ExpertDelivery::memory, dspine tap_of/
+  device_bytes/image_bytes, CpuExperts::computes) must match in the stub; tap_of returns -1
+  ("drafter reads no layer") instead of throwing.
+- Launch layer split by ownership: port OWNS cuda_check (src/core/device.cu) — do NOT graft
+  donor device_launch.cpp (LNK2005 under whole-archive); raise_dynamic_shared_memory grafted in
+  graft_bridge.cpp; donor core/device_launch.h copied to graft/include/core (provides the
+  CUDA_CHECK macro + DeviceExecutionView sm70 needs).
+- QuantLayout collision round 2 (sm70 kernels): donor names BlockScaleK16M128x4/RowSplitPanel/
+  GgufBlocks/RowInterleaved ADDED to port src/core/weight.h on free numbers (2/7/5/8); donor's own
+  numbers 4/6 collide with port RowPagedG16_4K/BlockScaleM128K128 — graft code compares names only,
+  `.ninfer` ids unchanged. Weight gained donor weight_divisors/weight_divisor_rows/input_columns.
+- Include closure, not whack-a-mole: walk graft/{include,donor,sm70,gguf,src}, regex the quoted
+  includes, resolve against the target's include roots (graft/include, graft/gguf, src/,
+  include/, execution/vendor) — 232 includes, 0 missing is the compile-ready gate. Full donor
+  ops/common + ops/linear header subtrees are mirrored under graft/include/ops/ (headers only;
+  impls only via LNK demand — device_route.cpp + device_tier.cu already grafted into the lib).
+- Device-layer collision resolved by REMOVING graft donor/device.cu: the port engine owns the
+  device-layer objects (ninfer_core device.cu defines the same-mangled CudaCompletionEvent /
+  CudaEventTimer / DeviceContext ctors — 38x LNK2005). PROMOTION ITEM (pre-serve): unify donor
+  multi-rank DeviceContext into the port device layer so both headers stop defining one mangled
+  name two ways; until then graft TUs get DeviceContext only by reference/view.
+- Real impls now compiled from graft/donor/: cyclic_kv_cache.cpp, layout.cpp,
+  mapped_host_copy.cu, config.cpp, model.cpp (donor model layer 473 lines — moved out of
+  graft/include; its artifact/tokenizer closure is the next worklist if LNK grows).
+  Bridge-stubbed: rank_free_bytes/rank_copy_bandwidth (throw, single-rank), StageLink::~StageLink,
+  CpuExperts virtuals (supports=false, compute throws).
+- model.cpp EXCLUDED from the probe link (donor load layer: artifact binder/reader, qwen3_5
+  bindings/tokenizer, Residency — donor APIs absent in the graft tree; 45 compile errors, all in
+  that seam). PROMOTION (M4 step 2): adapt donor model.cpp to the port loader as first-class code,
+  or replace with a port Model-population path; until then Model::input throws (bridge stub).
+- ODR-class round (link 17-18): same-mangled-name/two-different-classes pairs found by whole-
+  archive link. Layout.cpp: donor & port LayoutBuilder verified CHARACTER-IDENTICAL → graft
+  donor/layout.cpp trimmed to the DeviceSpan surface only (bind(DeviceSpan), alloc_bytes,
+  scope→LayoutBuilder::Scope); ninfer_core owns the rest. DeviceBuffer/PinnedHostBuffer:
+  layouts DIFFER (port {data_,bytes_,device_} vs donor public {p,bytes}) → donor-shaped classes
+  moved to namespace ninfer::graft (graft/include/core/buffer.h), aliased back via `using` for
+  graft TUs; definitions wrapped in arena.cu. A TU seeing both headers now gets a compile-time
+  ambiguity — the rename is honest jank-removal, not a shim: the destination name stays the
+  port's. Same pattern to watch: DeviceContext pre-serve unification (above) is the remaining
+  known two-names-one-mangle pair.

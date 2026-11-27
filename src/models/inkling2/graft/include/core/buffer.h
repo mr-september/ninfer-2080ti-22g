@@ -1,12 +1,15 @@
 #pragma once
 
 // graft shim: one owning-buffer surface for grafted translation units. ninfer's DeviceBuffer
-// and PinnedHostBuffer (core/buffer.h in the destination tree) share these names with the
-// donor's, and the grafted code names the donor's: public p/bytes members on DeviceBuffer,
-// a bytes-only constructor, and HostMemoryRegistration. The port's accessor names are kept
-// as aliases so port headers read the same class. HostBuffer and CudaHostRegistration stay the
-// port's, as the destination tree's headers name them; their definitions are copied from the
-// port's core/buffer.h and must keep that layout.
+// and PinnedHostBuffer (core/buffer.h in the destination tree) are DIFFERENT classes from the
+// donor's (port: private data_/bytes_/device_ and a (Device,size) ctor; donor: public p/bytes,
+// bytes-only ctor) — same mangled names, incompatible layouts. Sharing one object file between
+// them corrupted silently, and 10x LNK2005 made it loud (link round 17). Resolution, per
+// "the destination owns the name": the donor-shaped classes live in ninfer::graft and are
+// aliased back into ninfer for grafted TUs only. A TU that includes BOTH headers gets an
+// ambiguity error — the guardrail is intentional: un-namespace one of them for real.
+// HostBuffer and CudaHostRegistration stay the port's, as the destination tree's headers name
+// them; their definitions are copied from the port's core/buffer.h and must keep that layout.
 
 #include "core/memory.h"
 
@@ -59,6 +62,9 @@ public:
 private:
     CudaHostView view_;
 };
+
+// --- Donor-shaped owning buffers: ninfer::graft, aliased back for grafted TUs (see top) ---------
+namespace graft {
 
 class DeviceBuffer {
 public:
@@ -122,5 +128,11 @@ public:
 private:
     void* data_ = nullptr;
 };
+
+} // namespace graft
+
+using graft::DeviceBuffer;
+using graft::PinnedHostBuffer;
+using graft::HostMemoryRegistration;
 
 } // namespace ninfer

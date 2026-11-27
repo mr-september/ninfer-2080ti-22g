@@ -55,10 +55,29 @@ enum class QType : std::uint16_t {
 enum class QuantLayout : std::uint16_t {
     RowSplit                   = 0,
     Contiguous                 = 1,
+    // Donor names carried in by the inkling2 graft (sm70/gguf code reads these tags; the numbers
+    // are in-process only — `.ninfer` layout ids keep the port values below). RowSplitPanel is
+    // RowSplit's bytes permuted into kRowSplitPanelRows-row panels; GgufBlocks is rows of whole
+    // ggml blocks as a GGUF stores them (the graft's gguf bridge tags its weights with this).
+    BlockScaleK16M128x4        = 2,
     RowScale                   = 3,
     RowPagedG16_4K             = 4,
+    GgufBlocks                 = 5,
     BlockScaleM128K128         = 6,
+    RowSplitPanel              = 7,
+    RowInterleaved             = 8,
 };
+
+// Rows per stored panel; kernels address panel and row-major forms with one shifted expression
+// (donor core/weight.h — the graft's sm70 views call this on w.layout).
+inline constexpr int kRowSplitPanelRows  = 4;
+inline constexpr int kRowSplitPanelShift = 2;
+static_assert((1 << kRowSplitPanelShift) == kRowSplitPanelRows,
+              "the panel row count is addressed by shifting, so it must be a power of two");
+
+[[nodiscard]] constexpr int row_split_panel_shift(QuantLayout layout) {
+    return layout == QuantLayout::RowSplitPanel ? kRowSplitPanelShift : 0;
+}
 
 struct Weight {
     Device device;
@@ -83,6 +102,14 @@ struct Weight {
     std::int64_t scale_nb[4]   = {0, 0, 0, 0};
     float weight_scale_divisor = 0.0F;
     float input_scale_divisor  = 0.0F;
+
+    // Donor fields (inkling2 graft): an NVFP4 plane assembled from several source matrices carries
+    // one divisor per source after the scales; the divisor of row r is element r /
+    // weight_divisor_rows (donor core/weight.h). input_columns is the INT32 [K] gather of a GGUF
+    // matrix whose stored columns permute the input's; null otherwise.
+    const void* weight_divisors      = nullptr;
+    std::int32_t weight_divisor_rows = 0;
+    const std::int32_t* input_columns = nullptr;
 };
 
 } // namespace ninfer
