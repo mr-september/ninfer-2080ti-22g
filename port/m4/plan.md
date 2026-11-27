@@ -33,3 +33,14 @@ Oracle (ninfer-all donor server, port 8191) is the correctness reference, not a 
   shape, not bandwidth-bound. Escape hatch as planned (step 2): graph path; plus the
   130+ target's Turing-specific work (port-tuned projection kernels replacing the
   ggml bridge on hot shapes). Profile in flight (nsys, 32 steps) to count launches.
+- **2026-11-27 nsys census (32+64 T=1 steps, whole-process totals).** 149,226
+  `cudaLaunchKernel` calls = **~1,550 launches/step (~32/visit)**. Host launch API time
+  alone ≈ 21 ms/step (avg 13.6 us/launch — WDDM submit cost), vs **~9 ms/step GPU kernel
+  busy**: the 44 ms step is launch-submission-bound, GPU is ~7 % busy. Kernel mix per
+  step: q4 gemv ×336 (6.6 us avg), bf16_rows_f32 ×631 (1.3 us — pure launch-cost
+  kernels), q5 ×168 (9.8 us), q8 attn/up ×126 (14.6 us), lm-head q6 0.82 ms/step.
+  `cudaMemcpyAsync` 2.5 ms/step (route-ids DtoH + token upload).
+  ⇒ **CUDA graphs is the gate lever** (planned escape hatch, step 2): removes ~35 ms of
+  the 44; ceiling after graphs ≈ GPU-busy 9 ms ≈ ~110 t/s. Reaching 130+ then needs the
+  kernel-efficiency pass (bf16_rows fan-in, q5/q8 SIMT → tuned sm_75 tiles), which also
+  covers the 130+ target's port-tuned-kernel mandate.
