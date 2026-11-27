@@ -19,7 +19,13 @@ __global__
 __launch_bounds__(Schedule::kThreads, Schedule::kMinBlocksPerSm) void q5_a16_direct_simt_kernel(
     const __nv_bfloat16* __restrict__ x, const std::uint8_t* __restrict__ codes,
     const std::uint8_t* __restrict__ high, const std::uint8_t* __restrict__ scales, Output output,
-    Epilogue epilogue, int rows, int k, int tokens, int padded_k, int token_begin) {
+    Epilogue epilogue, int rows, int k, int tokens, int padded_k, int token_begin,
+    const void* const* __restrict__ plane_slot) {
+    if (plane_slot != nullptr) {  // graph-mode expert dispatch: planes are device-side
+        codes  = static_cast<const std::uint8_t* __restrict__>(plane_slot[0]);
+        high   = static_cast<const std::uint8_t* __restrict__>(plane_slot[1]);
+        scales = static_cast<const std::uint8_t* __restrict__>(plane_slot[2]);
+    }
     constexpr int R  = Schedule::kBlockRows;
     constexpr int W  = Schedule::kWarpsPerRow;
     constexpr int T  = Schedule::kBlockTokens;

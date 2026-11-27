@@ -9,6 +9,7 @@
 
 #include "core/arena.h"
 #include "core/buffer.h"
+#include "core/decode_graph.h"
 #include "core/device.h"
 #include "core/tensor.h"
 #include "core/weight_view.h"
@@ -57,6 +58,15 @@ struct Mat {
         : w(ops::prepare_linear_weight(input)) {}
 };
 
+// The device-dispatch form of a prepared Mat: same policy and geometry; the weight planes are
+// fetched device-side from `slot` ([qdata, qhigh, scales]). The representative weight (any
+// expert of the same kind) supplies admission and validation data.
+[[nodiscard]] inline Mat with_slot(const Mat& m, const void* const* slot) {
+    Mat c = m;
+    c.w.weight.plane_slot = slot;
+    return c;
+}
+
 struct LPlan {
     bool full = false, loops = false;
     const float *input_norm = nullptr, *residual_query = nullptr, *loop_queries = nullptr,
@@ -71,6 +81,7 @@ struct LPlan {
     std::array<const float*, 3> ctrl_down{}, ctrl_gain{}, ctrl_forget{};  // [q|k|v]
     const float *ffn_down = nullptr, *ffn_gain = nullptr, *ffn_forget = nullptr;
     std::vector<Mat> expert_gate, expert_up, expert_down;
+    const void** expert_ptrs = nullptr;  // device table [expert][kind][plane] (route_ptrs)
     int query_rows = 0, tap_columns = 0;
 };
 
@@ -175,6 +186,15 @@ struct Executor::Impl {
     DeviceBuffer ctrl_state, ctrl_fg, ctrl_concat;
     DeviceBuffer gu_bf16, gu_f32, mid_bf16, down_bf16, down_f32;
     DeviceBuffer route_scratch;             // ids[i32 top_k] | weights[f32] | logits[f32 experts]
+    DeviceBuffer route_ptr_slot;            // [top_k][kind][plane] expert weight planes (device)
+
+    // CUDA-graph decode path (M4): capture one full 48-visit step, replay the rest. Routing is
+    // device-side (route_ptrs), so the step contains no host sync.
+    DecodeGraphDefinition graph_def;
+    DecodeGraphExecutable graph_exec;
+    bool graphs_enabled = false, graph_ready = false;
+    int  step_calls     = 0;
+    std::vector<DeviceBuffer> expert_ptr_tables;  // owned; LPlan::expert_ptrs are views into them
 
     bool inputs_ready = false;              // reference Session::inputs_ready
 
@@ -253,6 +273,7 @@ struct Executor::Impl {
         down_bf16  = DeviceBuffer(dev, std::size_t(top_k) * hidden * 2 + 256);
         down_f32   = DeviceBuffer(dev, std::size_t(top_k) * hidden * 4);
         route_scratch = DeviceBuffer(dev, (std::size_t(top_k) * 3 + experts) * 4 + 256);
+        route_ptr_slot = DeviceBuffer(dev, std::size_t(top_k) * 9 * 8);
         // Garbage in any buffer a kernel may read (partial fills, slot rings)
         // leaks nondeterministically into logits; zero the persistent scratch.
         for (DeviceBuffer* b : {&states, &messages, &raw_attn, &raw_ffn, &in_f32,
@@ -260,13 +281,18 @@ struct Executor::Impl {
                                 &logits_bf16, &qgr, &kv_rows, &taps_rows, &q_flat,
                                 &r_flat, &sinks, &attn_bf16, &ctrl_state, &ctrl_fg,
                                 &ctrl_concat, &gu_bf16, &gu_f32, &mid_bf16,
-                                &down_bf16, &down_f32, &route_scratch})
+                                &down_bf16, &down_f32, &route_scratch, &route_ptr_slot})
             cudaMemset(b->data(), 0, b->size());
 
         std::vector<std::int32_t> id(8);
         for (int i = 0; i < 8; ++i) { id[i] = i; }
         identity = DeviceBuffer(dev, id.size() * 4);
         cudaMemcpy(identity.data(), id.data(), id.size() * 4, cudaMemcpyHostToDevice);
+
+        graphs_enabled = std::getenv("INK2_NO_GRAPHS") == nullptr &&
+                         std::getenv("INK2_EXEC_DEBUG") == nullptr;
+        if (s != view.stream()) { graphs_enabled = false; }  // capture requires one stream
+        expert_ptr_tables.reserve(config.num_hidden_layers);
 
         build_plans();
         embed_table  = native_weight(find("text/token_embedding").view);
@@ -373,6 +399,22 @@ struct Executor::Impl {
                 p.expert_up[e]   = mat(base + "/up");
                 p.expert_down[e] = mat(base + "/down");
             }
+            // Device pointer table [expert][kind][plane] for graph-mode routing (route_ptrs).
+            const std::size_t ptrs = std::size_t(config.moe.num_experts) * 9;
+            std::vector<const void*> tab(ptrs);
+            for (std::uint32_t e = 0; e < config.moe.num_experts; ++e) {
+                const Mat* m[3] = { &p.expert_gate[e], &p.expert_up[e], &p.expert_down[e] };
+                for (int kind = 0; kind < 3; ++kind) {
+                    const Weight& w = m[kind]->w.weight;
+                    tab[std::size_t(e) * 9 + std::size_t(kind) * 3 + 0] = w.qdata;
+                    tab[std::size_t(e) * 9 + std::size_t(kind) * 3 + 1] = w.qhigh;
+                    tab[std::size_t(e) * 9 + std::size_t(kind) * 3 + 2] = w.scales;
+                }
+            }
+            expert_ptr_tables.push_back(DeviceBuffer(dev, ptrs * sizeof(void*)));
+            cudaMemcpy(expert_ptr_tables.back().data(), tab.data(), ptrs * sizeof(void*),
+                       cudaMemcpyHostToDevice);
+            p.expert_ptrs = static_cast<const void**>(expert_ptr_tables.back().data());
 
             // The artifact ships residual_query pre-tiled to [3][hidden] for full
             // layers with three DISTINCT rows (measured 2026-11-25, weight/000170);
@@ -728,31 +770,29 @@ void Executor::Impl::visit(Session& session, std::size_t v, const kern::Rows& ro
         rt.logits = rl; rt.ids = rid; rt.weights = rw; rt.pair_scale = ps;
         kern::route(rt, stream);
     }
-    std::int32_t host_ids[8];
-    // stream_ is cudaStreamNonBlocking: a NULL-stream memcpy has NO ordering with it.
-    cudaMemcpyAsync(host_ids, rid, top_k * 4, cudaMemcpyDeviceToHost, stream);
-    cudaStreamSynchronize(stream);
+    // Routing stays device-side (graph mode): expert weight planes are fetched through the
+    // per-visit pointer slots. No DtoH, no stream sync inside the step.
+    void** pslot = static_cast<void**>(route_ptr_slot.data());
+    kern::route_ptrs(rid, static_cast<const void* const*>(p.expert_ptrs), pslot, top_k, stream);
     {
         const Tensor xin = vbf16(ffn_bf16.data(), {hidden, 1});
         float* gu = static_cast<float*>(gu_f32.data());
         for (int t = 0; t < top_k; ++t) {
-            const int e = host_ids[t];
             Tensor yg = arena.alloc(DType::BF16, {width, 1});
-            linear(p.expert_gate[e], xin, yg, arena);
+            linear(with_slot(p.expert_gate[0], pslot + std::size_t(t) * 9), xin, yg, arena);
             row_to_f32(yg.data, width, gu + std::size_t(t) * 2 * width, 2 * width);
             Tensor yu = arena.alloc(DType::BF16, {width, 1});
-            linear(p.expert_up[e], xin, yu, arena);
+            linear(with_slot(p.expert_up[0], pslot + std::size_t(t) * 9 + 3), xin, yu, arena);
             row_to_f32(yu.data, width, gu + std::size_t(t) * 2 * width + width, 2 * width);
         }
         kern::situ_rows(gu, 2 * width, top_k, width, ps, config.moe.situ_beta,
                         config.moe.situ_linear_beta,
                         static_cast<__nv_bfloat16*>(mid_bf16.data()), stream);
         for (int t = 0; t < top_k; ++t) {
-            const int e = host_ids[t];
             const Tensor xm = vbf16(static_cast<__nv_bfloat16*>(mid_bf16.data()) +
                                     std::size_t(t) * width, {width, 1});
             Tensor yd = arena.alloc(DType::BF16, {hidden, 1});
-            linear(p.expert_down[e], xm, yd, arena);
+            linear(with_slot(p.expert_down[0], pslot + std::size_t(t) * 9 + 6), xm, yd, arena);
             row_to_f32(yd.data, hidden,
                        static_cast<float*>(down_f32.data()) + std::size_t(t) * hidden, hidden);
         }
@@ -815,6 +855,17 @@ void Executor::decode_step(Session& session, std::uint32_t token, std::int64_t p
     cudaMemcpyAsync(im.stage.data(), &tok32, 4, cudaMemcpyHostToDevice, im.stream);
     cudaMemcpyAsync(static_cast<char*>(im.stage.data()) + 4, &pos32, 4,
                     cudaMemcpyHostToDevice, im.stream);
+
+    // Token and position landed in the fixed stage buffer; the step reads them device-side, so
+    // one captured graph serves every step (values are never baked into kernel arguments).
+    ++im.step_calls;
+    if (im.graph_ready) {
+        im.graph_exec.launch(im.stream);
+        session.advance(1);
+        return;
+    }
+
+    auto body = [&] {
     const Tensor ids = Tensor(im.stage.data(), im.dev, DType::I32, {1});
     Tensor emb = im.arena.alloc(DType::BF16, {im.hidden, 1});  // ops::embedding wants [d,T]
     ops::embedding(ids, im.embed_table, emb, im.view);
@@ -857,6 +908,25 @@ void Executor::decode_step(Session& session, std::uint32_t token, std::int64_t p
                            static_cast<__nv_bfloat16*>(im.logits_bf16.data()), im.vocab,
                            im.softcap, im.stream);
     }
+    };
+
+    // Capture on the second call (the first warms allocator, routes, and scratch); capture does
+    // not execute, so this step still runs through body() directly.
+    if (im.graphs_enabled && im.step_calls == 2) {
+        {
+            DecodeGraphCapture capture(im.stream);
+            body();
+            im.graph_def = capture.finish();
+        }
+        im.graph_exec.instantiate(im.graph_def);
+        im.graph_ready = true;
+        // Capture only records; the replay executes this step, so body() must not run again
+        // (a second pass would re-consume the per-step residual state pool).
+        im.graph_exec.launch(im.stream);
+        session.advance(1);
+        return;
+    }
+    body();
     session.advance(1);
 }
 

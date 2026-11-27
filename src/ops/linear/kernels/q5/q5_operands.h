@@ -19,6 +19,7 @@ struct Q5LinearOperands {
     std::int32_t k;
     std::int32_t tokens;
     std::int32_t padded_k;
+    const void* const* plane_slot = nullptr;
 };
 
 inline Q5LinearOperands q5_linear_operands(const Tensor& x, const Weight& weight) {
@@ -29,7 +30,8 @@ inline Q5LinearOperands q5_linear_operands(const Tensor& x, const Weight& weight
             weight.n,
             weight.k,
             x.ne[1],
-            weight.padded_shape[1]};
+            weight.padded_shape[1],
+            weight.plane_slot};
 }
 
 // Private template domain. Public shape admission remains in q5_dispatch.

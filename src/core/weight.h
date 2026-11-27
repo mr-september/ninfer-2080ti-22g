@@ -110,6 +110,13 @@ struct Weight {
     const void* weight_divisors      = nullptr;
     std::int32_t weight_divisor_rows = 0;
     const std::int32_t* input_columns = nullptr;
+
+    // Device-side plane indirection for graph-captured expert dispatch (inkling2 MoE). When set,
+    // it points to a device slot {qdata, qhigh, scales}: kernels admitted with a slot fetch the
+    // live planes from it, so one captured launch serves every expert. The host pointers above
+    // must remain the representative weight's (admission and validation read them); kernels must
+    // not dereference them when the slot is set.
+    const void* const* plane_slot = nullptr;
 };
 
 } // namespace ninfer

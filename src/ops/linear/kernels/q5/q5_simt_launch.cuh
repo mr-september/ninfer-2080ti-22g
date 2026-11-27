@@ -86,12 +86,14 @@ void launch_q5_a16_direct_simt(const Q5LinearOperands& operands, Output output, 
                         q5_a16_direct_simt_kernel<Schedule, FullK, FullTokens, Output, Epilogue,
                                                   TriggerPdl, JoinPdl>,
                         x, operands.codes, operands.high, operands.scales, output, epilogue,
-                        operands.rows, operands.k, count, operands.padded_k, offset));
+                        operands.rows, operands.k, count, operands.padded_k, offset,
+                        operands.plane_slot));
                 } else {
                     q5_a16_direct_simt_kernel<Schedule, FullK, FullTokens, Output, Epilogue,
                                               TriggerPdl, JoinPdl><<<grid, block, 0, stream>>>(
                         x, operands.codes, operands.high, operands.scales, output, epilogue,
-                        operands.rows, operands.k, count, operands.padded_k, offset);
+                        operands.rows, operands.k, count, operands.padded_k, offset,
+                        operands.plane_slot);
                     CUDA_CHECK(cudaGetLastError());
                 }
             };

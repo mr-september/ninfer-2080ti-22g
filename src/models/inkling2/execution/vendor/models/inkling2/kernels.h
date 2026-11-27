@@ -28,6 +28,14 @@
 
 namespace ninfer::models::inkling2::kernels {
 
+// Graph-mode expert dispatch: for the top_k routed ids, copy each expert's three weight-plane
+// pointers (qdata, qhigh, scales) per kind (gate, up, down) from the layer's device table
+// [expert][kind][plane] into the step's device slots [slot][kind][plane]. The expert projection
+// kernels fetch their planes from the slots (Weight::plane_slot), so routing never crosses to the
+// host and the decode step stays CUDA-graph capturable.
+void route_ptrs(const std::int32_t* ids, const void* const* table, void** slots, int top_k,
+                cudaStream_t stream);
+
 // Rows in the GGUF vector kernels' q8_1 activation form (ggml_bridge.h's vector activation):
 // int8 values [T][k] and (d, sum) half2 pairs [T][k / 32].
 struct Q8Rows {

@@ -29,12 +29,12 @@ void launch_q4_a16_gemv(const Q4LinearOperands& operands, Output output, Epilogu
             {grid, block, shared_bytes, stream},
             q4_a16_gemv_kernel<Schedule, Output, Epilogue, TriggerPdl, JoinPdl>, operands.x,
             operands.codes, operands.scales, output, epilogue, operands.rows, operands.k,
-            operands.padded_k));
+            operands.padded_k, operands.plane_slot));
     } else {
         q4_a16_gemv_kernel<Schedule, Output, Epilogue, TriggerPdl, JoinPdl>
             <<<grid, block, shared_bytes, stream>>>(operands.x, operands.codes, operands.scales,
                                                     output, epilogue, operands.rows, operands.k,
-                                                    operands.padded_k);
+                                                    operands.padded_k, operands.plane_slot);
         CUDA_CHECK(cudaGetLastError());
     }
 }

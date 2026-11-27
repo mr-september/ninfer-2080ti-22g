@@ -2376,4 +2376,21 @@ void add_fixed(unsigned long long* sums, const void* products, const std::int32_
     check_launch("add_fixed");
 }
 
+// ---- graph-mode expert dispatch ---------------------------------------------------------------
+
+__global__ void route_ptrs_kernel(const std::int32_t* __restrict__ ids,
+                                  const void* const* __restrict__ table, void** __restrict__ slots,
+                                  int total, int per_expert) {
+    const int i = static_cast<int>(threadIdx.x);
+    if (i < total) {
+        const std::int32_t e = ids[i / per_expert];
+        slots[i] = const_cast<void*>(table[static_cast<std::size_t>(e) * per_expert + (i % per_expert)]);
+    }
+}
+
+void route_ptrs(const std::int32_t* ids, const void* const* table, void** slots, int top_k,
+                cudaStream_t stream) {
+    route_ptrs_kernel<<<1, 96, 0, stream>>>(ids, table, slots, top_k * 9, 9);
+}
+
 } // namespace ninfer::models::inkling2::kernels

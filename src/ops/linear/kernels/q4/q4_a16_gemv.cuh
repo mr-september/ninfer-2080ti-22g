@@ -298,8 +298,12 @@ template <class Schedule, class Output, class Epilogue, bool TriggerPdl = false,
 __global__ __launch_bounds__(Schedule::kThreads, Schedule::kMinBlocksPerSm) void q4_a16_gemv_kernel(
     const __nv_bfloat16* __restrict__ x, const std::uint8_t* __restrict__ codes,
     const std::uint8_t* __restrict__ scales, Output output, Epilogue epilogue, std::int32_t rows,
-    std::int32_t k, std::int32_t padded_k) {
+    std::int32_t k, std::int32_t padded_k, const void* const* __restrict__ plane_slot) {
     // clang-format on
+    if (plane_slot != nullptr) {  // graph-mode expert dispatch: planes are device-side
+        codes  = static_cast<const std::uint8_t* __restrict__>(plane_slot[0]);
+        scales = static_cast<const std::uint8_t* __restrict__>(plane_slot[2]);
+    }
     constexpr int kBlockRows   = Schedule::kBlockRows;
     constexpr int kWarpsPerRow = Schedule::kWarpsPerRow;
 
