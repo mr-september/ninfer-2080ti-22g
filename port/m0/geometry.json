@@ -1,0 +1,979 @@
+{
+  "source": "E:/AI_Models/LLM/nokeepai/Inkling-2-Mini-Unbound-v2-Q4_K_M.gguf",
+  "file_bytes": 17782517280,
+  "gguf_version": 3,
+  "metadata": {
+    "GGUF.version": 3,
+    "GGUF.tensor_count": 704,
+    "GGUF.kv_count": 63,
+    "general.architecture": "inkling2_loop",
+    "general.type": "model",
+    "general.sampling.top_k": 50,
+    "general.sampling.top_p": 1.0,
+    "general.sampling.min_p": 0.0,
+    "general.sampling.temp": 1.0,
+    "general.name": "Inkling-2-Mini-Unbound-v2",
+    "general.basename": "Inkling-2-Mini",
+    "general.size_label": "128x1.8B",
+    "inkling2_loop.block_count": 24,
+    "inkling2_loop.context_length": 1048576,
+    "inkling2_loop.embedding_length": 2304,
+    "inkling2_loop.feed_forward_length": 1152,
+    "inkling2_loop.attention.head_count": {
+      "type": "array",
+      "len": 24,
+      "head": [
+        24,
+        24,
+        24,
+        24,
+        24
+      ],
+      "tail": [
+        24,
+        24,
+        24
+      ]
+    },
+    "inkling2_loop.attention.head_count_kv": {
+      "type": "array",
+      "len": 24,
+      "head": [
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "tail": [
+        8,
+        8,
+        8
+      ]
+    },
+    "inkling2_loop.attention.layer_norm_rms_epsilon": 9.999999974752427e-07,
+    "inkling2_loop.expert_count": 128,
+    "inkling2_loop.expert_used_count": 8,
+    "inkling2_loop.attention.key_length": 128,
+    "inkling2_loop.attention.value_length": 128,
+    "inkling2_loop.vocab_size": 201024,
+    "inkling2_loop.vocab_size_unpadded": 200058,
+    "inkling2_loop.expert_feed_forward_length": 1152,
+    "inkling2_loop.attention.key_length_swa": 128,
+    "inkling2_loop.attention.value_length_swa": 128,
+    "inkling2_loop.rope.dimension_count": 0,
+    "inkling2_loop.attention.sliding_window": 1024,
+    "inkling2_loop.attention.sliding_window_pattern": {
+      "type": "array",
+      "len": 24,
+      "head": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "tail": [
+        true,
+        true,
+        false
+      ]
+    },
+    "inkling2_loop.shortconv.l_cache": 4,
+    "inkling2_loop.expert_weights_scale": 8.0,
+    "inkling2_loop.activation.situ_beta": 4.0,
+    "inkling2_loop.activation.situ_linear_beta": 25.0,
+    "inkling2_loop.attn_res.block_size": 6,
+    "inkling2_loop.final_logit_softcapping": 30.0,
+    "inkling2_loop.attention.relative_length": 16,
+    "inkling2_loop.attention.relative_extent": 1024,
+    "inkling2_loop.attention.qk_clip": 22.627416610717773,
+    "inkling2_loop.attention.relative_clip": 8.0,
+    "inkling2_loop.attention.log_scale_floor": 8192,
+    "inkling2_loop.attention.log_scale_alpha": 0.10000000149011612,
+    "inkling2_loop.loop.start": 6,
+    "inkling2_loop.loop.end": 18,
+    "inkling2_loop.loop.count": 3,
+    "inkling2_loop.loop.gate_rank": 64,
+    "inkling2_loop.loop.varying": false,
+    "tokenizer.ggml.model": "gpt2",
+    "tokenizer.ggml.pre": "inkling2",
+    "tokenizer.ggml.tokens": {
+      "type": "array",
+      "len": 200058,
+      "head": [
+        "!",
+        "\"",
+        "#",
+        "$",
+        "%"
+      ],
+      "tail": [
+        "<|unused_200055|>",
+        "<|unused_200056|>",
+        "<|content_invoke_tool_text|>"
+      ]
+    },
+    "tokenizer.ggml.token_type": {
+      "type": "array",
+      "len": 200058,
+      "head": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "tail": [
+        3,
+        3,
+        3
+      ]
+    },
+    "tokenizer.ggml.merges": {
+      "type": "array",
+      "len": 424413,
+      "head": [
+        "i n",
+        "e r",
+        "t h",
+        "a n",
+        "o n"
+      ],
+      "tail": [
+        "\u0120S CHO",
+        "\u0120SC HO",
+        "\u0120SCH O"
+      ]
+    },
+    "tokenizer.ggml.eos_token_id": 200006,
+    "tokenizer.ggml.padding_token_id": 199999,
+    "tokenizer.ggml.eot_token_id": 200006,
+    "tokenizer.ggml.add_bos_token": false,
+    "tokenizer.ggml.add_eos_token": false,
+    "tokenizer.chat_template": {
+      "type": "string",
+      "len": 6868,
+      "head": "{%- set effort_map = {\"none\": 0.0, \"minimal\": 0.1, \"low\": 0.2, \"medium\": 0.7, \"high\": 0.9, \"xhigh\": 0.99, \"max\": 0.99} -%}\n{%- set role_token = {\"user\": \"<|message_user|>\", \"assistant\": \"<|message_model|>\", \"system\": \"<|message_system|>\", \"tool\": \"<|message_tool|>\"} -%}\n\n{%- macro emit_thinking_effo"
+    },
+    "tokenizer.ggml.clean_spaces": false,
+    "general.quantization_version": 2,
+    "general.file_type": 15,
+    "quantize.imatrix.file": "imatrix.gguf",
+    "quantize.imatrix.dataset": "inkling2-loop-calibration-v6.txt",
+    "quantize.imatrix.entries_count": 392,
+    "quantize.imatrix.chunks_count": 1770
+  },
+  "tensor_inventory": [
+    {
+      "pattern": "blk.N.attn_gate.weight",
+      "dtype": "8",
+      "shape": [
+        2304,
+        3072
+      ],
+      "count": 24,
+      "elements": 169869312,
+      "n_bytes": 180486144,
+      "example": "blk.0.attn_gate.weight"
+    },
+    {
+      "pattern": "blk.N.attn_k.weight",
+      "dtype": "8",
+      "shape": [
+        2304,
+        1024
+      ],
+      "count": 24,
+      "elements": 56623104,
+      "n_bytes": 60162048,
+      "example": "blk.0.attn_k.weight"
+    },
+    {
+      "pattern": "blk.N.attn_k_conv.weight",
+      "dtype": "0",
+      "shape": [
+        4,
+        1024
+      ],
+      "count": 24,
+      "elements": 98304,
+      "n_bytes": 393216,
+      "example": "blk.0.attn_k_conv.weight"
+    },
+    {
+      "pattern": "blk.N.attn_k_conv_proj.weight",
+      "dtype": "8",
+      "shape": [
+        2304,
+        32
+      ],
+      "count": 4,
+      "elements": 294912,
+      "n_bytes": 313344,
+      "example": "blk.5.attn_k_conv_proj.weight"
+    },
+    {
+      "pattern": "blk.N.attn_k_inp_norm.weight",
+      "dtype": "0",
+      "shape": [
+        2304
+      ],
+      "count": 4,
+      "elements": 9216,
+      "n_bytes": 36864,
+      "example": "blk.5.attn_k_inp_norm.weight"
+    },
+    {
+      "pattern": "blk.N.attn_norm.weight",
+      "dtype": "0",
+      "shape": [
+        2304
+      ],
+      "count": 20,
+      "elements": 46080,
+      "n_bytes": 184320,
+      "example": "blk.0.attn_norm.weight"
+    },
+    {
+      "pattern": "blk.N.attn_output.weight",
+      "dtype": "8",
+      "shape": [
+        3072,
+        2304
+      ],
+      "count": 24,
+      "elements": 169869312,
+      "n_bytes": 180486144,
+      "example": "blk.0.attn_output.weight"
+    },
+    {
+      "pattern": "blk.N.attn_post_conv.weight",
+      "dtype": "0",
+      "shape": [
+        4,
+        2304
+      ],
+      "count": 24,
+      "elements": 221184,
+      "n_bytes": 884736,
+      "example": "blk.0.attn_post_conv.weight"
+    },
+    {
+      "pattern": "blk.N.attn_q.weight",
+      "dtype": "8",
+      "shape": [
+        2304,
+        3072
+      ],
+      "count": 24,
+      "elements": 169869312,
+      "n_bytes": 180486144,
+      "example": "blk.0.attn_q.weight"
+    },
+    {
+      "pattern": "blk.N.attn_q_clip.weight",
+      "dtype": "0",
+      "shape": [
+        128,
+        24
+      ],
+      "count": 24,
+      "elements": 73728,
+      "n_bytes": 294912,
+      "example": "blk.0.attn_q_clip.weight"
+    },
+    {
+      "pattern": "blk.N.attn_q_inp_norm.weight",
+      "dtype": "0",
+      "shape": [
+        2304
+      ],
+      "count": 4,
+      "elements": 9216,
+      "n_bytes": 36864,
+      "example": "blk.5.attn_q_inp_norm.weight"
+    },
+    {
+      "pattern": "blk.N.attn_rel.weight",
+      "dtype": "12",
+      "shape": [
+        2304,
+        384
+      ],
+      "count": 24,
+      "elements": 21233664,
+      "n_bytes": 11943936,
+      "example": "blk.0.attn_rel.weight"
+    },
+    {
+      "pattern": "blk.N.attn_rel_bias.weight",
+      "dtype": "0",
+      "shape": [
+        16,
+        1024
+      ],
+      "count": 24,
+      "elements": 393216,
+      "n_bytes": 1572864,
+      "example": "blk.0.attn_rel_bias.weight"
+    },
+    {
+      "pattern": "blk.N.attn_rel_clip.weight",
+      "dtype": "0",
+      "shape": [
+        16,
+        24
+      ],
+      "count": 24,
+      "elements": 9216,
+      "n_bytes": 36864,
+      "example": "blk.0.attn_rel_clip.weight"
+    },
+    {
+      "pattern": "blk.N.attn_res_query.weight",
+      "dtype": "0",
+      "shape": [
+        2304
+      ],
+      "count": 19,
+      "elements": 43776,
+      "n_bytes": 175104,
+      "example": "blk.1.attn_res_query.weight"
+    },
+    {
+      "pattern": "blk.N.attn_res_query.weight",
+      "dtype": "0",
+      "shape": [
+        2304,
+        3
+      ],
+      "count": 4,
+      "elements": 27648,
+      "n_bytes": 110592,
+      "example": "blk.5.attn_res_query.weight"
+    },
+    {
+      "pattern": "blk.N.attn_sink_proj.weight",
+      "dtype": "12",
+      "shape": [
+        2304,
+        24
+      ],
+      "count": 24,
+      "elements": 1327104,
+      "n_bytes": 746496,
+      "example": "blk.0.attn_sink_proj.weight"
+    },
+    {
+      "pattern": "blk.N.attn_v.weight",
+      "dtype": "8",
+      "shape": [
+        2304,
+        1024
+      ],
+      "count": 24,
+      "elements": 56623104,
+      "n_bytes": 60162048,
+      "example": "blk.0.attn_v.weight"
+    },
+    {
+      "pattern": "blk.N.attn_v_conv.weight",
+      "dtype": "0",
+      "shape": [
+        4,
+        1024
+      ],
+      "count": 24,
+      "elements": 98304,
+      "n_bytes": 393216,
+      "example": "blk.0.attn_v_conv.weight"
+    },
+    {
+      "pattern": "blk.N.attn_v_conv_proj.weight",
+      "dtype": "8",
+      "shape": [
+        2304,
+        32
+      ],
+      "count": 4,
+      "elements": 294912,
+      "n_bytes": 313344,
+      "example": "blk.5.attn_v_conv_proj.weight"
+    },
+    {
+      "pattern": "blk.N.attn_v_inp_norm.weight",
+      "dtype": "0",
+      "shape": [
+        2304
+      ],
+      "count": 4,
+      "elements": 9216,
+      "n_bytes": 36864,
+      "example": "blk.5.attn_v_inp_norm.weight"
+    },
+    {
+      "pattern": "blk.N.exp_probs_b.bias",
+      "dtype": "0",
+      "shape": [
+        128
+      ],
+      "count": 24,
+      "elements": 3072,
+      "n_bytes": 12288,
+      "example": "blk.0.exp_probs_b.bias"
+    },
+    {
+      "pattern": "blk.N.ffn_down_exps.weight",
+      "dtype": "6",
+      "shape": [
+        1152,
+        2304,
+        128
+      ],
+      "count": 12,
+      "elements": 4076863488,
+      "n_bytes": 2802843648,
+      "example": "blk.6.ffn_down_exps.weight"
+    },
+    {
+      "pattern": "blk.N.ffn_down_exps.weight",
+      "dtype": "8",
+      "shape": [
+        1152,
+        2304,
+        128
+      ],
+      "count": 12,
+      "elements": 4076863488,
+      "n_bytes": 4331667456,
+      "example": "blk.0.ffn_down_exps.weight"
+    },
+    {
+      "pattern": "blk.N.ffn_gate_inp.weight",
+      "dtype": "0",
+      "shape": [
+        2304,
+        128
+      ],
+      "count": 24,
+      "elements": 7077888,
+      "n_bytes": 28311552,
+      "example": "blk.0.ffn_gate_inp.weight"
+    },
+    {
+      "pattern": "blk.N.ffn_gate_up_exps.weight",
+      "dtype": "12",
+      "shape": [
+        2304,
+        2304,
+        128
+      ],
+      "count": 24,
+      "elements": 16307453952,
+      "n_bytes": 9172942848,
+      "example": "blk.0.ffn_gate_up_exps.weight"
+    },
+    {
+      "pattern": "blk.N.ffn_norm.weight",
+      "dtype": "0",
+      "shape": [
+        2304
+      ],
+      "count": 24,
+      "elements": 55296,
+      "n_bytes": 221184,
+      "example": "blk.0.ffn_norm.weight"
+    },
+    {
+      "pattern": "blk.N.ffn_post_conv.weight",
+      "dtype": "0",
+      "shape": [
+        4,
+        2304
+      ],
+      "count": 24,
+      "elements": 221184,
+      "n_bytes": 884736,
+      "example": "blk.0.ffn_post_conv.weight"
+    },
+    {
+      "pattern": "blk.N.ffn_res_query.weight",
+      "dtype": "0",
+      "shape": [
+        2304
+      ],
+      "count": 24,
+      "elements": 55296,
+      "n_bytes": 221184,
+      "example": "blk.0.ffn_res_query.weight"
+    },
+    {
+      "pattern": "blk.N.loop_ffn_ctrl_down.weight",
+      "dtype": "0",
+      "shape": [
+        4608,
+        64
+      ],
+      "count": 12,
+      "elements": 3538944,
+      "n_bytes": 14155776,
+      "example": "blk.6.loop_ffn_ctrl_down.weight"
+    },
+    {
+      "pattern": "blk.N.loop_ffn_ctrl_forget.weight",
+      "dtype": "0",
+      "shape": [
+        64,
+        2304
+      ],
+      "count": 12,
+      "elements": 1769472,
+      "n_bytes": 7077888,
+      "example": "blk.6.loop_ffn_ctrl_forget.weight"
+    },
+    {
+      "pattern": "blk.N.loop_ffn_ctrl_gain.weight",
+      "dtype": "0",
+      "shape": [
+        64,
+        2304
+      ],
+      "count": 12,
+      "elements": 1769472,
+      "n_bytes": 7077888,
+      "example": "blk.6.loop_ffn_ctrl_gain.weight"
+    },
+    {
+      "pattern": "blk.N.loop_k_ctrl_down.weight",
+      "dtype": "0",
+      "shape": [
+        4608,
+        64
+      ],
+      "count": 12,
+      "elements": 3538944,
+      "n_bytes": 14155776,
+      "example": "blk.6.loop_k_ctrl_down.weight"
+    },
+    {
+      "pattern": "blk.N.loop_k_ctrl_forget.weight",
+      "dtype": "0",
+      "shape": [
+        64,
+        2304
+      ],
+      "count": 12,
+      "elements": 1769472,
+      "n_bytes": 7077888,
+      "example": "blk.6.loop_k_ctrl_forget.weight"
+    },
+    {
+      "pattern": "blk.N.loop_k_ctrl_gain.weight",
+      "dtype": "0",
+      "shape": [
+        64,
+        2304
+      ],
+      "count": 12,
+      "elements": 1769472,
+      "n_bytes": 7077888,
+      "example": "blk.6.loop_k_ctrl_gain.weight"
+    },
+    {
+      "pattern": "blk.N.loop_msg_query.weight",
+      "dtype": "0",
+      "shape": [
+        2304,
+        4
+      ],
+      "count": 12,
+      "elements": 110592,
+      "n_bytes": 442368,
+      "example": "blk.6.loop_msg_query.weight"
+    },
+    {
+      "pattern": "blk.N.loop_q_ctrl_down.weight",
+      "dtype": "0",
+      "shape": [
+        4608,
+        64
+      ],
+      "count": 12,
+      "elements": 3538944,
+      "n_bytes": 14155776,
+      "example": "blk.6.loop_q_ctrl_down.weight"
+    },
+    {
+      "pattern": "blk.N.loop_q_ctrl_forget.weight",
+      "dtype": "0",
+      "shape": [
+        64,
+        2304
+      ],
+      "count": 12,
+      "elements": 1769472,
+      "n_bytes": 7077888,
+      "example": "blk.6.loop_q_ctrl_forget.weight"
+    },
+    {
+      "pattern": "blk.N.loop_q_ctrl_gain.weight",
+      "dtype": "0",
+      "shape": [
+        64,
+        2304
+      ],
+      "count": 12,
+      "elements": 1769472,
+      "n_bytes": 7077888,
+      "example": "blk.6.loop_q_ctrl_gain.weight"
+    },
+    {
+      "pattern": "blk.N.loop_v_ctrl_down.weight",
+      "dtype": "0",
+      "shape": [
+        4608,
+        64
+      ],
+      "count": 12,
+      "elements": 3538944,
+      "n_bytes": 14155776,
+      "example": "blk.6.loop_v_ctrl_down.weight"
+    },
+    {
+      "pattern": "blk.N.loop_v_ctrl_forget.weight",
+      "dtype": "0",
+      "shape": [
+        64,
+        2304
+      ],
+      "count": 12,
+      "elements": 1769472,
+      "n_bytes": 7077888,
+      "example": "blk.6.loop_v_ctrl_forget.weight"
+    },
+    {
+      "pattern": "blk.N.loop_v_ctrl_gain.weight",
+      "dtype": "0",
+      "shape": [
+        64,
+        2304
+      ],
+      "count": 12,
+      "elements": 1769472,
+      "n_bytes": 7077888,
+      "example": "blk.6.loop_v_ctrl_gain.weight"
+    },
+    {
+      "pattern": "output.weight",
+      "dtype": "14",
+      "shape": [
+        2304,
+        201024
+      ],
+      "count": 1,
+      "elements": 463159296,
+      "n_bytes": 379935360,
+      "example": "output.weight"
+    },
+    {
+      "pattern": "output_norm.weight",
+      "dtype": "0",
+      "shape": [
+        2304
+      ],
+      "count": 1,
+      "elements": 2304,
+      "n_bytes": 9216,
+      "example": "output_norm.weight"
+    },
+    {
+      "pattern": "output_res_query.weight",
+      "dtype": "0",
+      "shape": [
+        2304
+      ],
+      "count": 1,
+      "elements": 2304,
+      "n_bytes": 9216,
+      "example": "output_res_query.weight"
+    },
+    {
+      "pattern": "token_embd.weight",
+      "dtype": "12",
+      "shape": [
+        2304,
+        201024
+      ],
+      "count": 1,
+      "elements": 463159296,
+      "n_bytes": 260527104,
+      "example": "token_embd.weight"
+    },
+    {
+      "pattern": "token_embd_norm.weight",
+      "dtype": "0",
+      "shape": [
+        2304
+      ],
+      "count": 1,
+      "elements": 2304,
+      "n_bytes": 9216,
+      "example": "token_embd_norm.weight"
+    }
+  ],
+  "weight_groups": [
+    {
+      "group": "expert_moe",
+      "tensors": 48,
+      "elements": 24461180928,
+      "n_bytes": 16307453952,
+      "dtypes": [
+        "12",
+        "6",
+        "8"
+      ],
+      "patterns": [
+        "blk.N.ffn_down_exps.weight",
+        "blk.N.ffn_gate_up_exps.weight"
+      ]
+    },
+    {
+      "group": "attention_matrices",
+      "tensors": 120,
+      "elements": 622854144,
+      "n_bytes": 661782528,
+      "dtypes": [
+        "8"
+      ],
+      "patterns": [
+        "blk.N.attn_gate.weight",
+        "blk.N.attn_k.weight",
+        "blk.N.attn_output.weight",
+        "blk.N.attn_q.weight",
+        "blk.N.attn_v.weight"
+      ]
+    },
+    {
+      "group": "lm_head",
+      "tensors": 1,
+      "elements": 463159296,
+      "n_bytes": 379935360,
+      "dtypes": [
+        "14"
+      ],
+      "patterns": [
+        "output.weight"
+      ]
+    },
+    {
+      "group": "embedding",
+      "tensors": 1,
+      "elements": 463159296,
+      "n_bytes": 260527104,
+      "dtypes": [
+        "12"
+      ],
+      "patterns": [
+        "token_embd.weight"
+      ]
+    },
+    {
+      "group": "loop_controller",
+      "tensors": 156,
+      "elements": 28422144,
+      "n_bytes": 113688576,
+      "dtypes": [
+        "0"
+      ],
+      "patterns": [
+        "blk.N.loop_ffn_ctrl_down.weight",
+        "blk.N.loop_ffn_ctrl_forget.weight",
+        "blk.N.loop_ffn_ctrl_gain.weight",
+        "blk.N.loop_k_ctrl_down.weight",
+        "blk.N.loop_k_ctrl_forget.weight",
+        "blk.N.loop_k_ctrl_gain.weight",
+        "blk.N.loop_msg_query.weight",
+        "blk.N.loop_q_ctrl_down.weight",
+        "blk.N.loop_q_ctrl_forget.weight",
+        "blk.N.loop_q_ctrl_gain.weight",
+        "blk.N.loop_v_ctrl_down.weight",
+        "blk.N.loop_v_ctrl_forget.weight",
+        "blk.N.loop_v_ctrl_gain.weight"
+      ]
+    },
+    {
+      "group": "ffn_gate_inp",
+      "tensors": 24,
+      "elements": 7077888,
+      "n_bytes": 28311552,
+      "dtypes": [
+        "0"
+      ],
+      "patterns": [
+        "blk.N.ffn_gate_inp.weight"
+      ]
+    },
+    {
+      "group": "attn_rel",
+      "tensors": 72,
+      "elements": 21636096,
+      "n_bytes": 13553664,
+      "dtypes": [
+        "0",
+        "12"
+      ],
+      "patterns": [
+        "blk.N.attn_rel.weight",
+        "blk.N.attn_rel_bias.weight",
+        "blk.N.attn_rel_clip.weight"
+      ]
+    },
+    {
+      "group": "conv_weights",
+      "tensors": 104,
+      "elements": 1228800,
+      "n_bytes": 3182592,
+      "dtypes": [
+        "0",
+        "8"
+      ],
+      "patterns": [
+        "blk.N.attn_k_conv.weight",
+        "blk.N.attn_k_conv_proj.weight",
+        "blk.N.attn_post_conv.weight",
+        "blk.N.attn_v_conv.weight",
+        "blk.N.attn_v_conv_proj.weight",
+        "blk.N.ffn_post_conv.weight"
+      ]
+    },
+    {
+      "group": "attn_sink",
+      "tensors": 24,
+      "elements": 1327104,
+      "n_bytes": 746496,
+      "dtypes": [
+        "12"
+      ],
+      "patterns": [
+        "blk.N.attn_sink_proj.weight"
+      ]
+    },
+    {
+      "group": "attn_q_clip",
+      "tensors": 24,
+      "elements": 73728,
+      "n_bytes": 294912,
+      "dtypes": [
+        "0"
+      ],
+      "patterns": [
+        "blk.N.attn_q_clip.weight"
+      ]
+    },
+    {
+      "group": "attn_res_query",
+      "tensors": 23,
+      "elements": 71424,
+      "n_bytes": 285696,
+      "dtypes": [
+        "0"
+      ],
+      "patterns": [
+        "blk.N.attn_res_query.weight"
+      ]
+    },
+    {
+      "group": "ffn_norm",
+      "tensors": 24,
+      "elements": 55296,
+      "n_bytes": 221184,
+      "dtypes": [
+        "0"
+      ],
+      "patterns": [
+        "blk.N.ffn_norm.weight"
+      ]
+    },
+    {
+      "group": "ffn_res_query",
+      "tensors": 24,
+      "elements": 55296,
+      "n_bytes": 221184,
+      "dtypes": [
+        "0"
+      ],
+      "patterns": [
+        "blk.N.ffn_res_query.weight"
+      ]
+    },
+    {
+      "group": "attn_norm",
+      "tensors": 20,
+      "elements": 46080,
+      "n_bytes": 184320,
+      "dtypes": [
+        "0"
+      ],
+      "patterns": [
+        "blk.N.attn_norm.weight"
+      ]
+    },
+    {
+      "group": "attn_inp_norm",
+      "tensors": 12,
+      "elements": 27648,
+      "n_bytes": 110592,
+      "dtypes": [
+        "0"
+      ],
+      "patterns": [
+        "blk.N.attn_k_inp_norm.weight",
+        "blk.N.attn_q_inp_norm.weight",
+        "blk.N.attn_v_inp_norm.weight"
+      ]
+    },
+    {
+      "group": "output_aux",
+      "tensors": 2,
+      "elements": 4608,
+      "n_bytes": 18432,
+      "dtypes": [
+        "0"
+      ],
+      "patterns": [
+        "output_norm.weight",
+        "output_res_query.weight"
+      ]
+    },
+    {
+      "group": "exp_probs_bias",
+      "tensors": 24,
+      "elements": 3072,
+      "n_bytes": 12288,
+      "dtypes": [
+        "0"
+      ],
+      "patterns": [
+        "blk.N.exp_probs_b.bias"
+      ]
+    },
+    {
+      "group": "norm_vectors",
+      "tensors": 1,
+      "elements": 2304,
+      "n_bytes": 9216,
+      "dtypes": [
+        "0"
+      ],
+      "patterns": [
+        "token_embd_norm.weight"
+      ]
+    }
+  ],
+  "totals": {
+    "tensor_count": 704,
+    "total_elements": 26070385152,
+    "total_n_bytes": 17770539648
+  }
+}

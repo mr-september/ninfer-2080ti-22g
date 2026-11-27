@@ -15,6 +15,7 @@ constexpr std::array kShapes{
     ShapeEntry{7168, 5120, select_q5_n7168_k5120},   ShapeEntry{5120, 6144, select_q5_n5120_k6144},
     ShapeEntry{5120, 17408, select_q5_n5120_k17408}, ShapeEntry{1152, 1152, select_q5_n1152_k1152},
     ShapeEntry{1152, 4304, select_q5_n1152_k4304},
+    ShapeEntry{2304, 1152, select_q5_n2304_k1152},
 };
 } // namespace
 

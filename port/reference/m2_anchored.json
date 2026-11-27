@@ -1,0 +1,20 @@
+[
+ {
+  "id": "factual-1",
+  "match": 0,
+  "of": 32,
+  "first_miss": 0
+ },
+ {
+  "id": "factual-2",
+  "match": 0,
+  "of": 32,
+  "first_miss": 0
+ },
+ {
+  "id": "factual-3",
+  "match": 1,
+  "of": 32,
+  "first_miss": 1
+ }
+]

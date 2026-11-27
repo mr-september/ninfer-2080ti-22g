@@ -26,6 +26,9 @@ Architecture resolve_architecture(std::string_view architecture, std::string_vie
     if (architecture == "Qwen3_5MoeForCausalLM" && model_type == "qwen3_5_moe_text") {
         return Architecture::Qwen3_5Moe;
     }
+    if (architecture == "Inkling2LoopForCausalLM" && model_type == "inkling2_loop_text") {
+        return Architecture::Inkling2;
+    }
     throw std::invalid_argument("unsupported architecture/config pair " +
                                 std::string(architecture) + "/" + std::string(model_type));
 }
@@ -38,6 +41,8 @@ std::string_view architecture_name(Architecture architecture) noexcept {
         return "Qwen3_5ForCausalLM";
     case Architecture::Qwen3_5Moe:
         return "Qwen3_5MoeForCausalLM";
+    case Architecture::Inkling2:
+        return "Inkling2LoopForCausalLM";
     }
     return {};
 }

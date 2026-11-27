@@ -21,14 +21,40 @@ namespace ninfer::ops {
 enum class LinearPolicy : std::uint8_t {
     A16Only, ///< Admit only A16 compute profiles.
     AllowA8, ///< Admit either A16 or A8 compute profiles.
+    AllowA4, ///< Admit A16, A8 or A4 compute profiles.
+    /// Admit either A16 or integer-A8 compute profiles. Distinct from AllowA8, which selects the
+    /// FP8 activation path against FP8 weights; this one quantises activations to s8 with one
+    /// scale per weight group and feeds groupwise-int weights to the integer tensor cores. Held
+    /// to the same A8 activation allowance.
+    AllowA8Int,
+    /// AllowA8Int plus the integer small-T route for the 27B gate_up at decode and verify widths
+    /// (ops/linear/q4/q4_small_t_mma_i8.cuh). Separate because that route is a quality trade the
+    /// prefill one is not asked to carry: it applies s8 activation quantisation to every decode
+    /// step rather than to full prefill tiles only, so it is opt-in per engine.
+    AllowA8IntDecode,
+    /// AllowA8Int plus the cuBLAS prefill route at wide token counts: the weight is materialised as
+    /// int8 with one scale per row and the GEMM handed to cuBLAS, which runs it about twice as fast
+    /// as this fork's own integer mainloop can. It is a further quality trade -- per-row weight
+    /// scales and per-token activation scales, where the integer route carries per-group ones -- so
+    /// it is opt-in per engine, and it falls back to AllowA8Int below the width where it pays.
+    AllowPrefillCublas,
+    /// AllowA8Int's counterpart for block-scaled NVFP4 weights: the stored E2M1 codes widen
+    /// losslessly to s8 and feed the integer tensor cores with s8-quantised activations, one FP32
+    /// scale per (token, 32 columns) and the per-16 E4M3 weight scales rescaling in FP32. It is the
+    /// same A8-activation quality trade the Q4/Q5 integer routes carry, opt-in per engine with
+    /// --nvfp4-w4a8-int.
+    AllowNvfp4Int8,
 };
 
 [[nodiscard]] constexpr bool valid_linear_policy(LinearPolicy policy) noexcept {
-    return policy == LinearPolicy::A16Only || policy == LinearPolicy::AllowA8;
+    return policy == LinearPolicy::A16Only || policy == LinearPolicy::AllowA8 ||
+           policy == LinearPolicy::AllowA4 || policy == LinearPolicy::AllowA8Int ||
+           policy == LinearPolicy::AllowA8IntDecode || policy == LinearPolicy::AllowPrefillCublas ||
+           policy == LinearPolicy::AllowNvfp4Int8;
 }
 
 [[nodiscard]] constexpr bool allows_a8(LinearPolicy policy) noexcept {
-    return policy == LinearPolicy::AllowA8;
+    return policy == LinearPolicy::AllowA8 || policy == LinearPolicy::AllowA4;
 }
 
 /**

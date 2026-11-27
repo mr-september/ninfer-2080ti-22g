@@ -9,6 +9,7 @@ namespace ninfer::ops::detail::q5_instances {
 
 using GemvR16W1G16S2XK5120 = Q5A16GemvSchedule<16, 1, 16, 2, Cache::ca, 1, true, 5120>;
 using DirectR1T1W4K5120    = Q5A16DirectSimtSchedule<1, 1, 4, 4, 10, 5120, true>;
+using DirectR1T1W4K1152    = Q5A16DirectSimtSchedule<1, 1, 4, 4, 10, 1152, true>;
 using DirectR1T2W4K5120    = Q5A16DirectSimtSchedule<1, 2, 4, 4, 10, 5120, true>;
 using DirectR1T3W4K5120    = Q5A16DirectSimtSchedule<1, 3, 4, 4, 10, 5120, true>;
 

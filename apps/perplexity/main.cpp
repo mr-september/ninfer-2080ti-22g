@@ -16,6 +16,9 @@
 #include <chrono>
 #include <cctype>
 #include <cstdint>
+#ifdef NINFER_KV_EMULATION
+#include <cstdlib>
+#endif
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -289,6 +292,17 @@ int run(const Options& options, const std::shared_ptr<spdlog::logger>& logger,
                 throw std::runtime_error("scoring returned an invalid target count for " +
                                          stream.source.id);
             }
+#ifdef NINFER_KV_EMULATION // EXPERIMENT ONLY (.agent-tmp/kv-ngram-eval): per-token logprob dump
+            if (const char* dump = std::getenv("NINFER_PPL_TOKEN_DUMP"); dump != nullptr && *dump) {
+                std::ofstream token_dump(std::filesystem::path(dump) /
+                                             (stream.source.id + "_w" +
+                                              std::to_string(window_index) + ".f32"),
+                                         std::ios::binary);
+                token_dump.write(reinterpret_cast<const char*>(logprobs.data()),
+                                 static_cast<std::streamsize>(logprobs.size() * sizeof(float)));
+                if (!token_dump) { throw std::runtime_error("token dump write failed"); }
+            }
+#endif
             ScoreAggregate window_score;
             window_score.add(logprobs);
             stream_score.add(window_score);

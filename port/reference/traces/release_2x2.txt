@@ -1,0 +1,5 @@
+=== RELEASE on gguf_blocks (original weights)
+<|message_model|><|content_thinking|>The user asks a factual
+RUN1_EXIT=0
+=== RELEASE on requant v3
+RUN2_EXIT=1

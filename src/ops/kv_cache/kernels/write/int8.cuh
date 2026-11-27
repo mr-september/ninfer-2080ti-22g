@@ -6,6 +6,7 @@
 #include "ops/common/quant/integer.cuh"
 #include "ops/kv_cache/kernels/layout.cuh"
 #include "ops/kv_cache/kernels/hadamard.cuh"
+#include "ops/kv_cache/kernels/write/emulation.cuh"
 
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
@@ -79,6 +80,26 @@ __launch_bounds__(256) __global__
             scale_k[scale_off] = k_quant.scale;
             scale_v[scale_off] = v_quant.scale;
         }
+#if defined(NINFER_KV_EMULATION) && NINFER_KV_EMULATION > 0
+        {
+            const auto ve                  = emulation::int4_value_group(v0, v1);
+            cache_v[code_base + lane]      = ve.c0;
+            cache_v[code_base + lane + 32] = ve.c1;
+            __half ks                      = k_quant.scale;
+            if constexpr (emulation::kMode == 2) {
+                const auto ke                  = emulation::lloyd4_key_group(k0, k1);
+                cache_k[code_base + lane]      = ke.c0;
+                cache_k[code_base + lane + 32] = ke.c1;
+                ks                             = ke.scale;
+            }
+            if (lane == 0) {
+                const std::int64_t so =
+                    Int8G64Layout<Geometry::KVHeads>::scale_offset(page, kv_head, group, page_off);
+                scale_k[so] = ks;
+                scale_v[so] = ve.scale;
+            }
+        }
+#endif
     }
 }
 

@@ -2,6 +2,7 @@
 #include "ops/common/quant/integer.cuh"
 #include "ops/kv_cache/kernels/hadamard.cuh"
 #include "ops/kv_cache/kernels/layout.cuh"
+#include "ops/kv_cache/kernels/write/emulation.cuh"
 #include "ops/softmax_attention/kernels/causal/tile_io.cuh"
 #include "ops/softmax_attention/kernels/causal/operands.h"
 #include "ops/softmax_attention/kernels/causal/int8/schedule.cuh"
@@ -204,6 +205,27 @@ __launch_bounds__(Schedule::kThreads, Schedule::kMinBlocks) __global__
                 cache_k_scale[so] = k_quant.scale;
                 cache_v_scale[so] = v_quant.scale;
             }
+#if defined(NINFER_KV_EMULATION) && NINFER_KV_EMULATION > 0
+            {
+                using L       = kv::Int8G64Layout<Geometry::KVHeads>;
+                const auto ve = kv::emulation::int4_value_group(vv0, vv1);
+                cache_v_i8[L::code_offset(physical_page, kv_head, d0, page_offset)] = ve.c0;
+                cache_v_i8[L::code_offset(physical_page, kv_head, d1, page_offset)] = ve.c1;
+                __half ks = k_quant.scale;
+                if constexpr (kv::emulation::kMode == 2) {
+                    const auto ke = kv::emulation::lloyd4_key_group(kv0, kv1);
+                    cache_k_i8[L::code_offset(physical_page, kv_head, d0, page_offset)] = ke.c0;
+                    cache_k_i8[L::code_offset(physical_page, kv_head, d1, page_offset)] = ke.c1;
+                    ks = ke.scale;
+                }
+                if (lane == 0) {
+                    const std::int64_t so =
+                        L::scale_offset(physical_page, kv_head, grp, page_offset);
+                    cache_k_scale[so] = ks;
+                    cache_v_scale[so] = ve.scale;
+                }
+            }
+#endif
         }
         __syncthreads();
     }

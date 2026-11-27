@@ -35,6 +35,19 @@ enum class KvCacheStorage : std::uint8_t {
     BFloat16,
     Int8Group64,
     Fp8E4M3Row256,
+    // The donor's KV storages, grafted for the Inkling-2 donor tree (whose vendored kernels
+    // name them VendoredKvCacheStorage, an alias of this enum). The first three keep their
+    // numbering; the rest follow the vendor header's order. None is reachable from this
+    // port's --kv-dtype parsing yet.
+    RotatedInt8KeyInt4ValueGroup64,   // rk8v4: rotated int8 keys, packed int4 G32 values
+    Nvfp4Group16,                     // NVFP4 e2m1 both planes, group-16 scale
+    Fp8KeyNvfp4Value,                 // K8V4: FP8 E4M3 keys, NVFP4 values
+    RotatedLloyd4KeyInt4Value,        // rk4v4: rotated Lloyd-Max 4-bit keys, int4 values
+    RotatedInt4KeyInt4ValueE8,        // rk4v4-e8: keys snapped to the E8 lattice
+    RotatedE8RootKeyInt4Value,        // rk2v4-e8: keys as nearest E8 roots
+    Bf16Packed,                       // bf16p: BF16 packed losslessly to 384 bytes per row
+    Float16,                          // native binary16 K/V
+    Mxfp8,                            // E4M3 over one UE8M0 scale per 32 dims (Inkling 2 default)
 };
 
 enum class EnginePurpose : std::uint8_t {
@@ -79,6 +92,8 @@ enum class SpeculativeBackend : std::uint8_t {
     Mtp,
     DFlash,
     DFlash2,
+    DSpark, // the release's DSpark drafter (DeepSeek-V4.1, Inkling 2)
+    DSpine, // a standalone DSpine drafter artifact (SpeculativeOptions::draft_model)
 };
 
 struct SpeculativeOptions {

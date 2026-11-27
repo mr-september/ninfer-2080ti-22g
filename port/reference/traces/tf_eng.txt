@@ -1,0 +1,9 @@
+[probe] device
+[probe] reader
+[probe] binder/bind
+[probe] materialize
+[probe] executor
+loaded 9872 weights; 6 prompt tokens
+[probe] prefill
+151107 18.8750
+[probe] done

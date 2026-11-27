@@ -15,9 +15,41 @@ enum class QType : std::uint16_t {
     BF16                         = 4,
     FP32                         = 5,
     INT32                        = 6,
+    NVFP4                        = 7,
     FP8_E4M3FN_ROW_BF16          = 8,
     NF4_G16_E4M3FN               = 9,
     FP8_E4M3FN_BLOCK128X128_BF16 = 10,
+
+    // The donor formats grafted for the Inkling-2 donor tree (graft/include/core/qtype.h
+    // forwards here). The donor numbers T2 and the ggml block types 9-33; this port owns 9
+    // and 10, so the donor-only formats are appended past them. Nothing stores these numbers
+    // on disk: the port's binder names formats from artifact metadata, and this port binds
+    // no ggml blocks.
+    T2_G128_FP16 = 34,
+    GGUF_Q8_0    = 35,
+    GGUF_Q2_K    = 36,
+    GGUF_Q3_K    = 37,
+    GGUF_Q4_K    = 38,
+    GGUF_Q5_K    = 39,
+    GGUF_Q6_K    = 40,
+    GGUF_IQ2_XXS = 41,
+    GGUF_IQ2_XS  = 42,
+    GGUF_IQ2_S   = 43,
+    GGUF_IQ3_XXS = 44,
+    GGUF_IQ3_S   = 45,
+    GGUF_IQ1_S   = 46,
+    GGUF_IQ1_M   = 47,
+    GGUF_IQ4_NL  = 48,
+    GGUF_IQ4_XS  = 49,
+    GGUF_Q4_0    = 50,
+    GGUF_Q5_0    = 51,
+    GGUF_Q2_0    = 52,
+    Q2_G64_FP16  = 53,
+    FP8_E4M3FN_ROW_FP16 = 54,
+    GGUF_MXFP4   = 55,
+    FP16         = 56,
+    UINT16       = 57,
+    GGUF_NVFP4   = 58,
 };
 
 enum class QuantLayout : std::uint16_t {

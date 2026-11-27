@@ -13,9 +13,11 @@ from collections.abc import Mapping
 from .official_recipes import RECIPES
 from .pipeline import convert
 from .proposal import DEFAULT_RANKING, add_official_proposal
+from .inkling2 import build_model as build_inkling2
 from .qwen3_5 import build_model as build_qwen3_5
 from .qwen4_exp import build_model as build_qwen4_exp
 from .recipe import Recipe
+from .sources.gguf import GGUFSource
 from .sources.safetensors import SafetensorsSource
 
 
@@ -139,6 +141,11 @@ def main(argv=None):
     parser.add_argument("--proposal-rows", type=int, default=131072)
     parser.add_argument("--ranking", type=Path, default=DEFAULT_RANKING)
     parser.add_argument("--name", help="public instance name saved in metadata")
+    parser.add_argument(
+        "--resources",
+        type=Path,
+        help="frontend resource directory (required when --model is a .gguf file)",
+    )
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--rows-per-chunk", type=int, default=512)
@@ -152,31 +159,50 @@ def main(argv=None):
         raise ValueError("select the base source with --model")
     overrides = _pairs(args.resource, "resource")
     with ExitStack() as stack:
-        base = stack.enter_context(SafetensorsSource(args.model))
-        sources = SourceInputs(base, paths, stack)
-        companions = {
-            key: sources[key] for key in ("dflash", "dflash2") if key in components
-        }
-        architectures = base.config.get("architectures", [])
-        qwen4_exp = architectures in (
-            ["Qwen4ExpForConditionalGeneration"],
-            ["Qwen4ExpForCausalLM"],
-        )
-        if qwen4_exp and args.proposal:
-            raise ValueError("Qwen4Exp does not have an indexed proposal head")
-        build_model = build_qwen4_exp if qwen4_exp else build_qwen3_5
-        model = build_model(
-            base,
-            components=components,
-            companions=companions,
-            resource_overrides=overrides,
-        )
-        recipe = Recipe(model)
-        _function(args.recipe)(model, recipe, sources)
-        if args.proposal:
-            add_official_proposal(recipe, ranking=args.ranking, rows=args.proposal_rows)
-        if args.override:
-            _function(args.override)(model, recipe, sources)
+        if args.model.suffix == ".gguf":
+            if args.resources is None:
+                raise ValueError("a .gguf model requires --resources")
+            if args.proposal:
+                raise ValueError("the GGUF path has no indexed proposal head")
+            base = stack.enter_context(GGUFSource(args.model))
+            model = build_inkling2(
+                base, resource_dir=args.resources, resource_overrides=overrides
+            )
+            sources = {}
+            recipe = Recipe(model)
+            _function(args.recipe)(model, recipe, sources)
+            if args.override:
+                _function(args.override)(model, recipe, sources)
+            base_provenance = {"base": {"path": str(args.model)}}
+        else:
+            base = stack.enter_context(SafetensorsSource(args.model))
+            sources = SourceInputs(base, paths, stack)
+            companions = {
+                key: sources[key] for key in ("dflash", "dflash2") if key in components
+            }
+            architectures = base.config.get("architectures", [])
+            qwen4_exp = architectures in (
+                ["Qwen4ExpForConditionalGeneration"],
+                ["Qwen4ExpForCausalLM"],
+            )
+            if qwen4_exp and args.proposal:
+                raise ValueError("Qwen4Exp does not have an indexed proposal head")
+            build_model = build_qwen4_exp if qwen4_exp else build_qwen3_5
+            model = build_model(
+                base,
+                components=components,
+                companions=companions,
+                resource_overrides=overrides,
+            )
+            recipe = Recipe(model)
+            _function(args.recipe)(model, recipe, sources)
+            if args.proposal:
+                add_official_proposal(
+                    recipe, ranking=args.ranking, rows=args.proposal_rows
+                )
+            if args.override:
+                _function(args.override)(model, recipe, sources)
+            base_provenance = sources.provenance()
 
         def progress(index, total, job):
             label = job.parameters[0]
@@ -190,7 +216,7 @@ def main(argv=None):
         provenance = {
             "converter": "ninfer-v3",
             "recipe": args.recipe,
-            "sources": sources.provenance(),
+            "sources": base_provenance,
         }
         if args.override:
             provenance["override"] = args.override

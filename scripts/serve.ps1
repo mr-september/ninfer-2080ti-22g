@@ -25,5 +25,7 @@ if (-not $Model) {
 if (-not (Test-Path $Model)) { Fail "model not found: $Model" }
 
 Write-Host "Serving at http://127.0.0.1:$Port/v1  (Ctrl+C to stop)"
+# Compute-card pin: PCI 07:00.0 drives the displays; model work runs on 04:00.0 (bus-ID form is enumeration-independent).
+$env:CUDA_VISIBLE_DEVICES = '0000:04:00.0'
 & $exe $Model --port $Port @ServerArgs
 exit $LASTEXITCODE

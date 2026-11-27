@@ -23,6 +23,11 @@ ninfer_windows_utf8(ninfer)
 ninfer_windows_utf8(ninfer-serve)
 ninfer_windows_utf8(ninfer-perplexity)
 
+add_executable(ninfer-inkling2-probe logit_compare/inkling2_probe.cpp)
+ninfer_internal_includes(ninfer-inkling2-probe)
+target_link_libraries(ninfer-inkling2-probe PRIVATE ninfer_engine ninfer_product_logging ninfer::json CUDA::cudart)
+ninfer_windows_utf8(ninfer-inkling2-probe)
+
 add_executable(ninfer-logit-compare logit_compare/main.cpp)
 ninfer_internal_includes(ninfer-logit-compare)
 target_link_libraries(ninfer-logit-compare PRIVATE

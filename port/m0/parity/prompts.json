@@ -1,0 +1,22 @@
+[
+  {"id": "factual-1", "category": "factual", "prompt": "The capital of Australia is"},
+  {"id": "factual-2", "category": "factual", "prompt": "The chemical symbol for gold is"},
+  {"id": "factual-3", "category": "factual", "prompt": "The speed of light in vacuum is approximately"},
+  {"id": "code-1", "category": "code", "prompt": "Write a Python function that returns the nth Fibonacci number:"},
+  {"id": "code-2", "category": "code", "prompt": "Explain what this code does:\nfor i in range(10): print(i*i)"},
+  {"id": "code-3", "category": "code", "prompt": "Write a SQL query to select all rows from a table named users where age > 18:"},
+  {"id": "math-1", "category": "math", "prompt": "If x + 3 = 7, then x equals"},
+  {"id": "math-2", "category": "math", "prompt": "What is the derivative of x^2 * sin(x)?"},
+  {"id": "math-3", "category": "math", "prompt": "Compute 17 * 23:"},
+  {"id": "instr-1", "category": "instruction-following", "prompt": "List three colors. Answer with only the colors, comma separated."},
+  {"id": "instr-2", "category": "instruction-following", "prompt": "Repeat the following sentence exactly: 'The quick brown fox jumps over the lazy dog.'"},
+  {"id": "instr-3", "category": "instruction-following", "prompt": "Translate 'good morning' to French. Reply with only the translation."},
+  {"id": "instr-4", "category": "instruction-following", "prompt": "Count the number of letters in the word 'parity'. Reply with only the number."},
+  {"id": "multilingual-1", "category": "multilingual", "prompt": "Translate 'Where is the train station?' into German. Reply with only the translation."},
+  {"id": "factual-4", "category": "factual", "prompt": "The year World War II ended is"},
+  {"id": "code-4", "category": "code", "prompt": "Write a bash one-liner that lists all .txt files in the current directory:"},
+  {"id": "math-4", "category": "math", "prompt": "What is 12 choose 3?"},
+  {"id": "instr-5", "category": "instruction-following", "prompt": "Name a prime number greater than 50. Reply with only the number."},
+  {"id": "factual-5", "category": "factual", "prompt": "The largest planet in our solar system is"},
+  {"id": "multilingual-2", "category": "multilingual", "prompt": "Translate 'I would like a coffee' into Spanish. Reply with only the translation."}
+]

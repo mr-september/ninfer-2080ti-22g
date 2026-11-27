@@ -256,9 +256,51 @@ def qwen3_8_flash_next(model, recipe, sources):
     )
 
 
+def inkling_2_mini(model, recipe, sources):
+    """Inkling-2-Mini Unbound GGUF → repo groupwise destination (roadmap v2, decided).
+
+    Every projection is requantized at convert time from decoded source values
+    (this repo executes no GGUF block format); FP32 vectors, conv taps, norms,
+    routers, and loop controllers stay FP and are not assigned here. Expert source
+    dtypes vary (gate_up Q4_K; down Q8_0 or Q5_0) — the destination tier is fixed
+    by the roadmap regardless of source tier.
+    """
+    if model.config.get("model_type") != "inkling2_loop_text":
+        raise ValueError("inkling_2_mini requires inkling2_loop_text mathematics")
+    recipe.provenance.update(
+        mapping="inkling2_loop_v1",
+        destination="requantized_from_decoded_gguf_values",
+        gate_up_rows="gate_then_up_per_expert",
+    )
+    # ops::embedding supports dense BF16 / Q6_G64_FP16 / Q8_G32_FP16 only; Q4 is
+    # not a gather-able table qtype, so the table ships Q8 (as in qwen3_6_35b_a3b).
+    _assign(recipe, "text/token_embedding", Q8)
+    _assign(recipe, "text/output_head", Q6)
+    for name, parameter in model.parameters.items():
+        if not parameter.projection or parameter.direct_format != "bf16":
+            continue
+        if "/moe/experts/" in name:
+            _assign(recipe, name, Q4 if name.endswith(("/gate", "/up")) else Q5)
+        elif name.startswith("text/layers/") and "/attention/" in name:
+            role = name.split("/attention/", 1)[1]
+            if role in (
+                "query",
+                "key",
+                "value",
+                "gate",
+                "output",
+                "relative_projection",
+                "sink_projection",
+                "key_convolution_projection",
+                "value_convolution_projection",
+            ):
+                _assign(recipe, name, Q8)
+
+
 RECIPES = {
     "qwen3_6_27b": qwen3_6_27b,
     "qwen3_8_27b": qwen3_8_27b,
     "qwen3_6_35b_a3b": qwen3_6_35b_a3b,
     "qwen3_8_flash_next": qwen3_8_flash_next,
+    "inkling_2_mini": inkling_2_mini,
 }

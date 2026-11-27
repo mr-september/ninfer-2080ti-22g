@@ -1,0 +1,16 @@
+#include "ops/linear/projection/q8/shapes.h"
+
+#include <stdexcept>
+
+namespace ninfer::ops::detail {
+
+Q8Launch select_q8_n384_k2304(std::int32_t tokens) {
+    // inkling2 route: correctness-first buckets from shape-generic launchers (M3);
+    // per-shape route tuning is deferred to the M4 autotuner pass.
+    if (tokens > 32768) throw std::invalid_argument("q8 linear: column extent exceeds 32768");
+    if (tokens <= 4) return launch_q8_a16_simt_r8_t4;
+    if (tokens <= 5) return launch_q8_a16_simt_r8_t8;
+    return launch_q8_a16_mma_r64_t128;
+}
+
+} // namespace ninfer::ops::detail
