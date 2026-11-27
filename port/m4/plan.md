@@ -22,3 +22,14 @@ Oracle (ninfer-all donor server, port 8191) is the correctness reference, not a 
 - 22 GB card vs 15.6 GiB weights + 2.66 GiB KV @80K + arena/activations: tight; Startup plan decides ctx size for the benchmark, report actual usable ctx separately from llama.cpp's 22-GB packing.
 - bf16-rounded projection rows (engine `ops::linear`) vs donor FP32 rows: parity-tolerance question resolved empirically at step 1.
 - CUDA graphs: decode step is ~600 kernels/visit × 48 visits — kernel-launch overhead may dominate; graph capture is the M4 escape hatch if under target.
+
+## Measurements
+- **2026-11-27 speed gate, step 3 run early (lean probe, direct launch).** artifact
+  `inkling_2_mini_v3.ninfer`, prompt code-1, 64-token greedy, warm, compute card
+  (04:00.0), two independent processes: **22.33 / 23.34 t/s** (median over 61 steps,
+  first 2 steps excluded; probe now prints `[decode-timing]`). FAIL vs gate ~39.
+  Roofline: ~1.87 GB/token active bytes -> ~320 t/s at 600 GB/s; measured 44 ms/token
+  = ~42 GB/s effective = ~7 % of bandwidth. Verdict: launch/overhead-bound at this
+  shape, not bandwidth-bound. Escape hatch as planned (step 2): graph path; plus the
+  130+ target's Turing-specific work (port-tuned projection kernels replacing the
+  ggml bridge on hot shapes). Profile in flight (nsys, 32 steps) to count launches.

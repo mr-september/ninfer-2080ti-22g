@@ -18,6 +18,8 @@
 #include <cuda_bf16.h>
 
 #include <cstdio>
+#include <algorithm>
+#include <chrono>
 #include <cstdlib>
 #include <exception>
 #include <stdexcept>
@@ -171,9 +173,17 @@ int main(int argc, char** argv) {
         std::printf("%u %.4f\n", next, bestv);
         out.push_back(next);
     }
+    // Decode timing (M4 speed gate, port/m4/plan.md step 3): steady-clock around
+    // decode_step + stream sync only; the logits copy + argmax below is harness work
+    // and stays outside the measurement. Warmup: the first two steps (cold caches,
+    // first-touch of late-allocated workspace) are excluded from the median.
+    std::vector<double> step_ms;
     for (int s = 1; s < steps; ++s) {
+        const auto t0 = std::chrono::steady_clock::now();
         executor.decode_step(*session, next, std::int64_t(prompt.size() + s - 1));
         cudaStreamSynchronize(device.stream());
+        step_ms.push_back(std::chrono::duration<double, std::milli>(
+                              std::chrono::steady_clock::now() - t0).count());
         std::vector<__nv_bfloat16> logits(std::size_t(config.vocab_size));
         cudaMemcpy(logits.data(), executor.logits(), logits.size() * 2, cudaMemcpyDeviceToHost);
         int best = 0;
@@ -184,6 +194,17 @@ int main(int argc, char** argv) {
         }
         next = std::uint32_t(best);
         std::printf("%u %.4f\n", next, bestv);
+    }
+    if (step_ms.size() > 4) {
+        std::vector<double> warm(step_ms.begin() + 2, step_ms.end());
+        std::sort(warm.begin(), warm.end());
+        const double median = warm[warm.size() / 2];
+        double mean = 0.0;
+        for (const double v : warm) { mean += v; }
+        mean /= double(warm.size());
+        std::printf("[decode-timing] steps=%zu median_ms=%.3f mean_ms=%.3f -> %.2f t/s "
+                    "(warmup: first 2 steps excluded)\n",
+                    warm.size(), median, mean, 1000.0 / median);
     }
     stage("done");
     return 0;
