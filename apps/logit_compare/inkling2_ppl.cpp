@@ -47,6 +47,7 @@ int main(int argc, char** argv) {
     const std::filesystem::path artifact = argv[1];
     std::uint32_t context                = 4096;
     std::uint32_t stride                 = 2048;
+    std::uint32_t unpadded_override      = 0;
     std::uint64_t cap_targets            = 0;  // 0 = no cap (all windows)
     std::uint64_t trace_targets          = 0;  // print per-target nll for the first N
     std::string output;
@@ -58,6 +59,7 @@ int main(int argc, char** argv) {
         };
         if (option == "--context") { context = std::stoul(value()); }
         else if (option == "--stride") { stride = std::stoul(value()); }
+        else if (option == "--unpadded-vocab") { unpadded_override = std::stoul(value()); }
         else if (option == "--cap-targets") { cap_targets = std::stoull(value()); }
         else if (option == "--trace") { trace_targets = std::stoull(value()); }
         else if (option == "--output") { output = value(); }
@@ -78,7 +80,10 @@ int main(int argc, char** argv) {
     device.bind_to_current_thread();
     stage("reader");
     artifact::Reader reader(artifact);
-    const models::inkling2::Config config = models::inkling2::config_from_directory(reader.directory());
+    // Transient shim: the v3 artifacts predate the converter's unpadded_vocab_size member, so
+    // the PPL gate may supply the cut until the artifact is re-converted.
+    models::inkling2::Config config = models::inkling2::config_from_directory(reader.directory());
+    if (unpadded_override != 0) { config.unpadded_vocab_size = unpadded_override; }
     stage("binder/bind");
     artifact::Binder binder(reader);
     models::Bindings bindings(binder);
@@ -99,7 +104,8 @@ int main(int argc, char** argv) {
     stage("executor");
     models::inkling2::execution::Executor executor(config, bound, device, device.stream(), context);
 
-    std::vector<__nv_bfloat16> logits(std::size_t(config.vocab_size));
+    // The donor head is cut to the unpadded vocabulary; executor.logits() honors that cut.
+    std::vector<__nv_bfloat16> logits(std::size_t(config.unpadded_vocab_size));
     std::vector<float> scores;
     perplexity::ScoreAggregate aggregate;
     const auto started = std::chrono::steady_clock::now();
@@ -127,7 +133,8 @@ int main(int argc, char** argv) {
             if (aggregate.scored_tokens + scores.size() < trace_targets) {
                 std::fprintf(stderr, "[trace] target %zu nll %.4f\n", next, nll);
             }
-            scores.push_back(float(nll));
+            // ScoreAggregate consumes logprobs (evaluation.h contract): push -nll.
+            scores.push_back(float(-nll));
             if (cap_targets != 0 && aggregate.scored_tokens + scores.size() >= cap_targets) { break; }
         }
         aggregate.add(scores);

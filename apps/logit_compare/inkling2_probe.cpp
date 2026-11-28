@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
         stage("executor");
         models::inkling2::execution::Executor executor(config, bound, device, device.stream(), 4096);
 
-        std::vector<__nv_bfloat16> logits(std::size_t(config.vocab_size));
+        std::vector<__nv_bfloat16> logits(std::size_t(config.unpadded_vocab_size));
         for (const auto& job : jobs) {
             auto session = executor.make_session();   // fresh state per prompt
             for (std::size_t i = 0; i < job.toks.size(); ++i) {
@@ -161,7 +161,7 @@ int main(int argc, char** argv) {
     std::vector<std::uint32_t> out;
     std::uint32_t next = 0;
     {
-        std::vector<__nv_bfloat16> logits(std::size_t(config.vocab_size));
+        std::vector<__nv_bfloat16> logits(std::size_t(config.unpadded_vocab_size));
         cudaMemcpy(logits.data(), executor.logits(), logits.size() * 2, cudaMemcpyDeviceToHost);
         int best = 0;
         float bestv = -1e30f;
@@ -184,7 +184,7 @@ int main(int argc, char** argv) {
         cudaStreamSynchronize(device.stream());
         step_ms.push_back(std::chrono::duration<double, std::milli>(
                               std::chrono::steady_clock::now() - t0).count());
-        std::vector<__nv_bfloat16> logits(std::size_t(config.vocab_size));
+        std::vector<__nv_bfloat16> logits(std::size_t(config.unpadded_vocab_size));
         cudaMemcpy(logits.data(), executor.logits(), logits.size() * 2, cudaMemcpyDeviceToHost);
         int best = 0;
         float bestv = -1e30f;

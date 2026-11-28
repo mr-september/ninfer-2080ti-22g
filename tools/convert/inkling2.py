@@ -86,6 +86,9 @@ def text_config(metadata: dict) -> dict:
         "model_type": "inkling2_loop_text",
         "hidden_size": _positive(metadata, "embedding_length"),
         "vocab_size": _positive(metadata, "vocab_size"),
+        # The head is scored up to this row only (donor "cut to the unpadded vocabulary");
+        # rows [unpadded, vocab) are padding and must never enter the softmax.
+        "unpadded_vocab_size": _positive(metadata, "vocab_size_unpadded"),
         "num_hidden_layers": layers,
         "max_position_embeddings": _positive(metadata, "context_length"),
         "num_attention_heads": heads[0],

@@ -122,6 +122,14 @@ Config config_from_directory(const artifact::Directory& directory) {
     out.architecture            = Architecture::Inkling2;
     out.hidden_size             = dimension(config, "hidden_size");
     out.vocab_size              = dimension(config, "vocab_size");
+    // Artifacts converted before the head-cut fix carry no unpadded member: fall back to the
+    // padded vocab (uncut head — the historical behavior), never to zero.
+    out.unpadded_vocab_size     = config.contains("unpadded_vocab_size")
+                                      ? dimension(config, "unpadded_vocab_size")
+                                      : out.vocab_size;
+    if (out.unpadded_vocab_size == 0 || out.unpadded_vocab_size > out.vocab_size) {
+        throw ArtifactError("text config: unpadded_vocab_size must be in [1, vocab_size]");
+    }
     out.num_hidden_layers       = dimension(config, "num_hidden_layers");
     out.max_position_embeddings = dimension(config, "max_position_embeddings");
     out.num_attention_heads     = dimension(config, "num_attention_heads");

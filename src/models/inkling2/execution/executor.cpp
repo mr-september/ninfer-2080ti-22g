@@ -160,7 +160,7 @@ struct Executor::Impl {
     cudaStream_t                 stream;
     Device                       dev;
     CudaExecutionView            view;
-    int hidden, q_heads, head_dim, kv_heads, kvd, rel, window, vocab, experts, top_k, width;
+    int hidden, q_heads, head_dim, kv_heads, kvd, rel, window, vocab, unpadded, experts, top_k, width;
     float eps, softcap, scale;
     std::uint32_t max_ctx;
     std::vector<LPlan> layers;
@@ -221,7 +221,7 @@ struct Executor::Impl {
           hidden(int(cfg.hidden_size)), q_heads(int(cfg.num_attention_heads)),
           head_dim(int(cfg.head_dim)), kv_heads(int(cfg.num_key_value_heads)),
           rel(int(cfg.attention.relative_taps)), window(int(cfg.sliding_window)),
-          vocab(int(cfg.vocab_size)), experts(int(cfg.moe.num_experts)),
+          vocab(int(cfg.vocab_size)), unpadded(int(cfg.unpadded_vocab_size)), experts(int(cfg.moe.num_experts)),
           top_k(int(cfg.moe.num_experts_per_tok)), width(int(cfg.moe.intermediate_size)),
           eps(cfg.rms_norm_eps), softcap(cfg.final_logit_softcapping),
           scale(1.0f / std::sqrt(float(cfg.head_dim))), max_ctx(max_context),
@@ -903,9 +903,12 @@ void Executor::decode_step(Session& session, std::uint32_t token, std::int64_t p
         const Tensor x = im.vbf16(im.ffn_bf16.data(), {im.hidden, 1});
         Tensor y = im.arena.alloc(DType::BF16, {im.vocab, 1});
         im.linear(im.head_mat, x, y, im.arena);
-        im.row_to_f32(y.data, im.vocab, static_cast<float*>(im.logits_f32.data()), im.vocab);
+        // Donor semantics: the head is cut to the unpadded vocabulary — padded rows are never
+        // scored, so they cannot enter the softmax denominator or win an argmax (graft does the
+        // same by setting vocab = config.unpadded_vocab_size before projection).
+        im.row_to_f32(y.data, im.unpadded, static_cast<float*>(im.logits_f32.data()), im.vocab);
         kern::softcap_bf16(static_cast<const float*>(im.logits_f32.data()),
-                           static_cast<__nv_bfloat16*>(im.logits_bf16.data()), im.vocab,
+                           static_cast<__nv_bfloat16*>(im.logits_bf16.data()), im.unpadded,
                            im.softcap, im.stream);
     }
     };

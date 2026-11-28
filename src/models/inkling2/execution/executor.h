@@ -43,7 +43,8 @@ public:
     // One decode step for a single sequence: 48 visits, then the fused output mix + head.
     void decode_step(Session&, std::uint32_t token, std::int64_t position);
 
-    // The last decode step's logits (bf16 [vocab], device-resident).
+    // The last decode step's logits (bf16; the first unpadded_vocab_size rows are the scored
+    // vocabulary — the donor head is cut there, padded rows are stale bytes).
     [[nodiscard]] const void* logits() const noexcept;
 
 private:

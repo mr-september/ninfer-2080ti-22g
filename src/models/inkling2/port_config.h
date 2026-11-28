@@ -60,6 +60,7 @@ struct Config {
     Architecture architecture = Architecture::Inkling2;
     std::uint32_t hidden_size             = 0;
     std::uint32_t vocab_size              = 0;
+    std::uint32_t unpadded_vocab_size     = 0;   // the rows the head scores; default = vocab_size
     std::uint32_t num_hidden_layers       = 0;
     std::uint32_t max_position_embeddings = 0;
     std::uint32_t num_attention_heads     = 0;
