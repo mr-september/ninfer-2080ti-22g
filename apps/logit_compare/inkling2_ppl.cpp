@@ -108,6 +108,11 @@ int main(int argc, char** argv) {
     std::vector<__nv_bfloat16> logits(std::size_t(config.unpadded_vocab_size));
     std::vector<float> scores;
     perplexity::ScoreAggregate aggregate;
+    struct WindowRow {
+        std::size_t index; std::uint32_t first_target; std::size_t input_begin, input_end;
+        double mean_nll, ppl; std::uint64_t scored;
+    };
+    std::vector<WindowRow> windows_out;
     const auto started = std::chrono::steady_clock::now();
 
     for (std::size_t w = 0; w < windows.size(); ++w) {
@@ -157,6 +162,13 @@ int main(int argc, char** argv) {
             if (cap_targets != 0 && aggregate.scored_tokens + scores.size() >= cap_targets) { break; }
         }
         aggregate.add(scores);
+        {
+            perplexity::ScoreAggregate per_window;
+            per_window.add(scores);
+            windows_out.push_back({w, window.first_target, window.input_begin, window.input_end,
+                                   per_window.mean_nll(), per_window.ppl(),
+                                   per_window.scored_tokens});
+        }
         const double done_seconds =
             std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
         std::fprintf(stderr,
@@ -175,7 +187,15 @@ int main(int argc, char** argv) {
         std::ofstream out(output, std::ios::trunc);
         out << "{\n  \"ppl\": " << ppl << ",\n  \"mean_nll\": " << mean_nll
             << ",\n  \"scored_tokens\": " << aggregate.scored_tokens << ",\n  \"context\": " << context
-            << ",\n  \"stride\": " << stride << "\n}\n";
+            << ",\n  \"stride\": " << stride << ",\n  \"windows\": [";
+        for (std::size_t i = 0; i < windows_out.size(); ++i) {
+            const auto& r = windows_out[i];
+            out << (i ? ", " : "\n    ") << "{\"index\": " << r.index
+                << ", \"first_target\": " << r.first_target << ", \"input_begin\": " << r.input_begin
+                << ", \"input_end\": " << r.input_end << ", \"mean_nll\": " << r.mean_nll
+                << ", \"perplexity\": " << r.ppl << ", \"scored_tokens\": " << r.scored << "}";
+        }
+        out << (windows_out.empty() ? "" : "\n  ") << "]\n}\n";
     }
     return 0;
     } catch (const std::exception& e) {

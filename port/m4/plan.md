@@ -29,6 +29,35 @@ individually considered and justifiable, with the overall table coherent. Total 
 ±1 GB around ~15 GB; that variance is uninteresting. No overly-fine-tuned benchmark sweeps to
 justify components; the PPL/behavior gates already in this plan are the qualification.
 
+### Artifact pass (after the engine line is clean/integrated) — two options
+
+Soft size basis: the Q4_K_M artifact we work against (GGUF 16.56 GiB / ninfer artifact 17.27 GiB);
+~15 GB with no extra degradation is a commendable outcome. No vendor supplies NVFP4/MXFP8 for the
+Unbound lineage (it is community-abliterated) and sm_75 has no FP4/FP8 tensor cores — the earlier
+"vendor NVFP4" suggestion was wrong and is withdrawn.
+
+1. **Training-free mixed quant ladder**: source = the FULL bf16 Unbound checkpoint (not the GGUF),
+   so the Q4_K_M ceiling does not apply — training-free calibrated methods (GPTQ/AWQ/imatrix-style:
+   calibration corpus only, no post-training) are on the table and can in principle BEAT the
+   community Q4_K_M at equal size. Best-known methods for the best
+   quality ladder; formats with direct sm_75 hardware support first (int8/int4 weight-only, fp16;
+   W8A16/W4A16 dequant-then-fp16-GEMM styles where sensible — Turing INT8 tensor cores). Reserved
+   knob from the GGUF path (down-proj → gate_up tier, ≈ −2.5 GiB) is subsumed by this: from bf16 we
+   choose every component's tier fresh under the Memory policy.
+2. **Strata-style runtime uncensor** — mechanism ESTABLISHED 2026-11-28 (`strata-lut-research.md`,
+   primary sources read): not a weight-delta LUT. The uncensor edit is rank-1 along one refusal
+   direction — for Flash-Next, Strata applies `h = h − (h·r)r` at runtime from a 480 KB control
+   vector (weights byte-unchanged); for Inkling-2-Mini, SC117 bakes the same class of edit
+   (`late_24_47_orth, k=1`, s_nonloop 4.0 / s_loop 2.5) into only 20/1,244 tensors
+   (`layers.4..23.attn.wo_ud`) on TOP of the official Strata packs (NVFP4/MXFP8 experts preserved;
+   ΔPPL +0.70 %, refusal 98→9/100, SQ-15 = 13.36 GiB). Reframes the vendor point: no vendor ships
+   Unbound in native formats (still true), but official-quantized + rank-1 uncensor = uncensored
+   from best-quantized weights. Build-time (our ladder from official bf16 + direction applied
+   pre-quant) or runtime (port implements the projection; loop-aware per-visit semantics are the
+   porting risk). Discriminator before choosing: diff Unbound v2 vs official bf16 — if Unbound is
+   itself rank-1-on-wo_ud, the two routes converge. Lineage caveat: SC117 direction derived from
+   the official base, not Unbound; equivalence UNMEASURED.
+
 ## Risks
 - 22 GB card vs 14.65 GiB weights (= 15.74 GB decimal; the "15.6 GiB" here was a units slip) + 2.66 GiB KV @80K + arena/activations: fits with headroom per the Memory policy; Startup plan decides ctx size for the benchmark, report actual usable ctx separately from llama.cpp's 22-GB packing.
 - bf16-rounded projection rows (engine `ops::linear`) vs donor FP32 rows: parity-tolerance question resolved empirically at step 1.
