@@ -120,6 +120,10 @@ int main(int argc, char** argv) {
             executor.decode_step(*session, tokens[i], std::int64_t(i - window.input_begin));
             const std::size_t next = i + 1;
             if (next < window.target_begin || next >= window.target_end) { continue; }
+            // Order with the non-blocking compute stream before the host copy (the default
+            // stream does NOT synchronize with cudaStreamNonBlocking streams — without this,
+            // the copy races the head kernel and reads the PREVIOUS step's logits).
+            cudaStreamSynchronize(device.stream());
             cudaMemcpy(logits.data(), executor.logits(), logits.size() * sizeof(__nv_bfloat16),
                        cudaMemcpyDeviceToHost);
             float max_logit = -1e30f;
@@ -131,7 +135,22 @@ int main(int argc, char** argv) {
             const double target = double(__bfloat162float(logits[tokens[next]]));
             const double nll    = -(target - double(max_logit) - std::log(sum_exp));
             if (aggregate.scored_tokens + scores.size() < trace_targets) {
-                std::fprintf(stderr, "[trace] target %zu nll %.4f\n", next, nll);
+                std::fprintf(stderr, "[trace] target %zu nll %.4f", next, nll);
+                // Top-5 (id:logit) so the trace can be compared against the donor distribution.
+                std::uint32_t top_id[5] = {0, 0, 0, 0, 0};
+                float top_v[5] = {-1e30f, -1e30f, -1e30f, -1e30f, -1e30f};
+                for (std::size_t i = 0; i < logits.size(); ++i) {
+                    const float v = __bfloat162float(logits[i]);
+                    for (int s = 0; s < 5; ++s) {
+                        if (v > top_v[s]) {
+                            for (int r = 4; r > s; --r) { top_v[r] = top_v[r - 1]; top_id[r] = top_id[r - 1]; }
+                            top_v[s] = v; top_id[s] = static_cast<std::uint32_t>(i);
+                            break;
+                        }
+                    }
+                }
+                for (int s = 0; s < 5; ++s) { std::fprintf(stderr, " | %u:%.2f", top_id[s], top_v[s]); }
+                std::fprintf(stderr, "\n");
             }
             // ScoreAggregate consumes logprobs (evaluation.h contract): push -nll.
             scores.push_back(float(-nll));
