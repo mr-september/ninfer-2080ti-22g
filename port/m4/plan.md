@@ -55,7 +55,10 @@ Unbound lineage (it is community-abliterated) and sm_75 has no FP4/FP8 tensor co
    from best-quantized weights. Build-time (our ladder from official bf16 + direction applied
    pre-quant) or runtime (port implements the projection; loop-aware per-visit semantics are the
    porting risk). Discriminator before choosing: diff Unbound v2 vs official bf16 — if Unbound is
-   itself rank-1-on-wo_ud, the two routes converge. Lineage caveat: SC117 direction derived from
+   itself rank-1-on-wo_ud, the two routes share one uncensor direction — but they remain DIFFERENT
+   artifact pipelines: (1) downloads bf16 and requantizes; (2) consumes an already-quantized
+   checkpoint + applies the rank-1 edit (no requantization of experts).
+   Lineage caveat: SC117 direction derived from
    the official base, not Unbound; equivalence UNMEASURED.
 
 ## Risks
