@@ -1,0 +1,7 @@
+{
+  "ppl": 1.36698e+08,
+  "mean_nll": 18.7333,
+  "scored_tokens": 59988,
+  "context": 4096,
+  "stride": 2048
+}

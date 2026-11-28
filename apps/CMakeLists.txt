@@ -28,6 +28,15 @@ ninfer_internal_includes(ninfer-inkling2-probe)
 target_link_libraries(ninfer-inkling2-probe PRIVATE ninfer_engine ninfer_product_logging ninfer::json CUDA::cudart)
 ninfer_windows_utf8(ninfer-inkling2-probe)
 
+# Direct executor perplexity (M4 numerical qualification): shares evaluation.cpp with
+# ninfer-perplexity so windowing/scoring semantics cannot drift from the donor run.
+add_executable(ninfer-inkling2-ppl
+  logit_compare/inkling2_ppl.cpp
+  perplexity/evaluation.cpp)
+ninfer_internal_includes(ninfer-inkling2-ppl)
+target_link_libraries(ninfer-inkling2-ppl PRIVATE ninfer_engine ninfer_product_logging ninfer::json CUDA::cudart)
+ninfer_windows_utf8(ninfer-inkling2-ppl)
+
 add_executable(ninfer-logit-compare logit_compare/main.cpp)
 ninfer_internal_includes(ninfer-logit-compare)
 target_link_libraries(ninfer-logit-compare PRIVATE
