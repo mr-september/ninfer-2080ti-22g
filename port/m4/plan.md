@@ -7,7 +7,7 @@ Goal: the ported engine must (a) match the oracle greedy tokens (M3 gate carried
 |---|---|---|
 | llama.cpp IQ4_NL | 38.7 | ~22 GB |
 | Strata (fp16 KV) | — | quality gates 92.35/96.68/100% same-word; KL 0.072/0.011/0.000 |
-| Target | ≥ ~39 | ≤ 14.4 GB |
+| Target | ≥ ~39 | see Memory policy below |
 
 Oracle (ninfer-all donor server, port 8191) is the correctness reference, not a speed reference (it carries DSpark + full quantized-KV machinery this lean port defers).
 
@@ -15,11 +15,22 @@ Oracle (ninfer-all donor server, port 8191) is the correctness reference, not a 
 1. **Token parity** (carries M3 closure): probe greedy ids == `port/m0/parity/reference_baseline.json` continuation ids on the 20-prompt set; bit-instability rule from M2 applies (differences only where the reference baseline itself is tie-fragile).
 2. **Serve integration**: engine-level load.cpp (Reader→Binder→materialize→resolve_weights, mirroring qwen3_5/load.cpp), registry entry, Startup memory plan, Program/graph path if the direct-launch decode misses the gate.
 3. **Speed gate**: 64-token greedy decode, warm, on the compute card (CUDA_VISIBLE_DEVICES=00000000:04:00.0). Measure t/s and nvidia-smi peak. Compare vs 38.7 / target ~39.
-4. **int8-KV decision**: measure FP16-KV fit at the 80K ctx budget first. If weights+KV+arena ≤ 14.4 GB with FP16, int8-KV stays deferred (lean mandate); if not, implement via the vendored KvPlaneView quantized codings (already in kernels).
+4. **int8-KV decision**: measure FP16-KV fit at the 80K ctx budget first. If the model fits the 22 GB card with headroom under the Memory policy, int8-KV stays deferred (lean mandate); if not, implement via the vendored KvPlaneView quantized codings (already in kernels).
 5. **Quality spot-check** (only if int8-KV lands): same-word + KL on the Strata corpus (sha256 9ff6aa…82c57) vs FP16-KV serve, same harness as M1.
 
+## Memory policy (revised 2026-11-28 — supersedes the "≤ 14.4 GB" gate)
+
+The 14.4 GB absolute was arbitrary and is RETIRED (violated the quantitative-gate rule: no basis,
+invented into the roadmap). The actual criterion: each component's quantization (per-tile expert
+tiers, attention q8-class, embeddings/head, conv/norm fp32 keeps, KV dtype) is chosen by known
+rules of thumb plus first-principles reasoning — smallest size with minimal behavior
+degradation/divergence for that component's sensitivity class — and each choice must be
+individually considered and justifiable, with the overall table coherent. Total footprint may land
+±1 GB around ~15 GB; that variance is uninteresting. No overly-fine-tuned benchmark sweeps to
+justify components; the PPL/behavior gates already in this plan are the qualification.
+
 ## Risks
-- 22 GB card vs 15.6 GiB weights + 2.66 GiB KV @80K + arena/activations: tight; Startup plan decides ctx size for the benchmark, report actual usable ctx separately from llama.cpp's 22-GB packing.
+- 22 GB card vs 14.65 GiB weights (= 15.74 GB decimal; the "15.6 GiB" here was a units slip) + 2.66 GiB KV @80K + arena/activations: fits with headroom per the Memory policy; Startup plan decides ctx size for the benchmark, report actual usable ctx separately from llama.cpp's 22-GB packing.
 - bf16-rounded projection rows (engine `ops::linear`) vs donor FP32 rows: parity-tolerance question resolved empirically at step 1.
 - CUDA graphs: decode step is ~600 kernels/visit × 48 visits — kernel-launch overhead may dominate; graph capture is the M4 escape hatch if under target.
 

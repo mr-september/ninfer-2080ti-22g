@@ -51,9 +51,9 @@ engine sequence ids → executor sessions 1:1, capacity = `options.max_context �
   (24 ms each → 4096-token prompt ≈ 98 s). Functionally sufficient for the VRAM/int8-KV
   decision and serve smoke; the kernel-efficiency pass (matrix prefill + decode kernels toward
   the ~110 t/s graph ceiling) replaces it later.
-- VRAM budget arithmetic (gate ≤ 14.4 GB): v3 weights are 15,736,138,240 B = 14.65 GiB = 15.74 GB
-  decimal. The gate's unit decides pass/fail **before any KV is allocated** — settle GB-vs-GiB
-  from `port/m4/plan.md` at the int8-KV decision; int8 KV only reduces the KV side.
+- Memory: no absolute footprint gate (the "≤14.4 GB" was arbitrary, retired 2026-11-28 — see the
+  Memory policy in `port/m4/plan.md`). v3 weights are 14.65 GiB / 15.74 GB; per-component
+  quantization choices must each be justified by rules of thumb + first principles.
 - Donor reference for semantics when the program does prefill properly later:
   donor `executor.cpp` vector path (t≤8) vs matrix path, `quantize_vector_activation` +
   fixed-point `moe_weighted_rows` (still unported; §46 — status UNSETTLED until the post-sync
