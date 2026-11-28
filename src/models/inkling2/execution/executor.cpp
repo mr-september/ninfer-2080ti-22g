@@ -104,11 +104,22 @@ struct Session::Storage {
 };
 
 std::vector<std::uint32_t> visit_layers(const Config& cfg) {
+    // Donor flow (validated by the qualified reference, which reproduces the
+    // engine's anchor tokens): the looped region [loop.start, loop.end) fires
+    // `loop.count` times IN PLACE when the stream reaches it; the tail layers
+    // after loop.end run once, after the last pass.  A pass-first schedule
+    // (all layers, then the region again) runs the tail mid-stream and takes
+    // logits at the wrong place — the M4 PPL defect's structural component.
     std::vector<std::uint32_t> out;
-    for (std::uint32_t pass = 0; pass < cfg.loop.count; ++pass) {
-        for (std::uint32_t l = 0; l < cfg.num_hidden_layers; ++l) {
-            if (pass > 0 && !cfg.loop.loops(l)) { continue; }
+    for (std::uint32_t l = 0; l < cfg.num_hidden_layers; ++l) {
+        if (!cfg.loop.loops(l)) {
             out.push_back(l);
+        } else if (l == cfg.loop.start) {
+            for (std::uint32_t pass = 0; pass < cfg.loop.count; ++pass) {
+                for (std::uint32_t k = cfg.loop.start; k < cfg.loop.end; ++k) {
+                    out.push_back(k);
+                }
+            }
         }
     }
     return out;
@@ -230,12 +241,13 @@ struct Executor::Impl {
         kvd = kv_heads * head_dim;
 
         const auto vlayers = visit_layers(cfg);
-        const std::size_t n0 = cfg.num_hidden_layers, nc = cfg.loop.end - cfg.loop.start;
         visits.resize(vlayers.size());
         for (std::size_t v = 0; v < vlayers.size(); ++v) {
             VPlan& vp = visits[v];
             vp.layer  = vlayers[v];
-            vp.pass   = v < n0 ? 0 : (v - n0 < nc ? 1 : 2);
+            // Instance index in the in-place loop schedule (0 for tail layers).
+            vp.pass = static_cast<std::uint32_t>(
+                std::count(vlayers.begin(), vlayers.begin() + v, vlayers[v]));
             const bool looped = cfg.loop.loops(vp.layer);
             vp.save_prelude = looped && vp.layer == cfg.loop.start && vp.pass == 0;
             vp.restart      = looped && vp.layer == cfg.loop.start && vp.pass > 0;
@@ -716,6 +728,34 @@ void Executor::Impl::visit(Session& session, std::size_t v, const kern::Rows& ro
 
     // 9. Output projection; the residual update with the fused FFN mix.
     {
+        static const bool stage_attn = std::getenv("INK2_STAGE_DEBUG") != nullptr;
+        if (stage_attn && vp.layer < 4) {
+            std::vector<float> qh(q_heads * head_dim), sh(q_heads), gh(q_heads * head_dim),
+                ah(q_heads * head_dim);
+            cudaMemcpy(qh.data(), q_flat.data(), qh.size() * sizeof(float),
+                       cudaMemcpyDeviceToHost);
+            cudaMemcpy(sh.data(), sinks.data(), sh.size() * sizeof(float),
+                       cudaMemcpyDeviceToHost);
+            cudaMemcpy(gh.data(), qgr + q_heads * head_dim, gh.size() * sizeof(float),
+                       cudaMemcpyDeviceToHost);
+            std::vector<__nv_bfloat16> bh(ah.size());
+            cudaMemcpy(bh.data(), attn_bf16.data(), bh.size() * sizeof(__nv_bfloat16),
+                       cudaMemcpyDeviceToHost);
+            for (std::size_t i = 0; i < ah.size(); ++i) ah[i] = __bfloat162float(bh[i]);
+            auto rms_v = [](const auto& v) {
+                double s = 0.0;
+                for (auto f : v) s += double(f) * double(f);
+                return std::sqrt(s / double(v.size()));
+            };
+            printf("[stage] L%02d q=%.4f sinks=%.4f gate=%.4f attn_gated=%.4f", vp.layer,
+                   rms_v(qh), rms_v(sh), rms_v(gh), rms_v(ah));
+            for (int hd = 0; hd < q_heads; hd += 8) {
+                printf(" h%d=%.4f", hd, rms_v(std::vector<float>(
+                    ah.begin() + hd * head_dim, ah.begin() + (hd + 1) * head_dim)));
+            }
+            printf("\n");
+            fflush(stdout);
+        }
         const Tensor xa = vbf16(attn_bf16.data(), {q_heads * head_dim, 1});
         Tensor y = arena.alloc(DType::BF16, {hidden, 1});
         linear(p.output, xa, y, arena);
@@ -735,12 +775,30 @@ void Executor::Impl::visit(Session& session, std::size_t v, const kern::Rows& ro
         ra.start   = vp.start;  // a block start: cur takes y as a fresh row, not an addend
         ra.cur     = S + std::size_t(st.cur) * hidden;
         ra.hidden  = hidden;
-        ra.mix     = ffn_mix(p, ctl);
+        ra.mix = ffn_mix(p, ctl);
         if (!ctl) {
             ra.mix.out = static_cast<__nv_bfloat16*>(ffn_bf16.data());
             ra.mix.f32 = static_cast<float*>(ffn_f32.data());
         }
         kern::residual(ra, stream);
+        static const bool stage_on = std::getenv("INK2_STAGE_DEBUG") != nullptr;
+        if (stage_on) {
+            // Mirror of reference probe seams (conv rows/out + cur) for L00 bisection.
+            auto rms_host = [&](const float* p_, std::size_t n) {
+                double s = 0.0;
+                for (std::size_t i = 0; i < n; ++i) s += double(p_[i]) * double(p_[i]);
+                return std::sqrt(s / double(n));
+            };
+            std::vector<float> h(hidden), yh(hidden), mix_h(hidden);
+            cudaMemcpy(yh.data(), yf, hidden * sizeof(float), cudaMemcpyDeviceToHost);
+            cudaMemcpy(mix_h.data(), ffn_f32.data(), hidden * sizeof(float),
+                       cudaMemcpyDeviceToHost);
+            cudaMemcpy(h.data(), ra.cur, hidden * sizeof(float), cudaMemcpyDeviceToHost);
+            printf("[stage] L%02d post-attn pre_conv=%.4f cur=%.4f ffn_mix_raw=%.4f\n",
+                   vp.layer, rms_host(yh.data(), hidden), rms_host(h.data(), hidden),
+                   rms_host(mix_h.data(), hidden));
+            fflush(stdout);
+        }
     }
 
     // 10. FFN-side controller (loop layers), overwriting the FFN planes.
@@ -824,6 +882,27 @@ void Executor::Impl::visit(Session& session, std::size_t v, const kern::Rows& ro
             inputs_ready = true;
         }
         kern::residual(ra, stream);
+        static const bool stage_on = std::getenv("INK2_STAGE_DEBUG") != nullptr;
+        if (stage_on) {
+            // MoE weighted sum pre-conv (reference conv#rows seam) + updated cur.
+            std::vector<float> rwv(top_k), rows_h(std::size_t(top_k) * hidden), moe(hidden, 0.f),
+                h(hidden);
+            cudaMemcpy(rwv.data(), ra.moe_weights, std::size_t(top_k) * sizeof(float),
+                       cudaMemcpyDeviceToHost);
+            cudaMemcpy(rows_h.data(), ra.moe_rows, rows_h.size() * sizeof(float),
+                       cudaMemcpyDeviceToHost);
+            auto rms_of = [](const float* p_, std::size_t n) {
+                double s = 0.0;
+                for (std::size_t i = 0; i < n; ++i) s += double(p_[i]) * double(p_[i]);
+                return std::sqrt(s / double(n));
+            };
+            for (int t = 0; t < top_k; ++t)
+                for (std::size_t i = 0; i < hidden; ++i)
+                    moe[i] += rwv[t] * rows_h[std::size_t(t) * hidden + i];
+            cudaMemcpy(h.data(), ra.cur, hidden * sizeof(float), cudaMemcpyDeviceToHost);
+            printf("[stage] L%02d moe_sum_pre_conv=%.4f cur=%.4f\n", vp.layer,
+                   rms_of(moe.data(), hidden), rms_of(h.data(), hidden));
+        }
     }
 }
 
