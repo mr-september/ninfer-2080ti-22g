@@ -420,9 +420,30 @@ class Inkling2Reference:
                     sink = sinks[i, h]
                     top = torch.clamp_min(m, sink)
                     den = e.sum() * torch.exp(m - top) + torch.exp(sink - top)
-                    attn[i, h * D:(h + 1) * D] = (e @ V[:, kh]) * (1.0 / den)
+                    if os.environ.get("INK2_STAGE") and vp["layer"] < 4 \
+                            and i == 0 and h in (0, 8, 16):
+                        print(f"[refw] L{vp['layer']:02d} h{h}: s_tot={float(s.mean()):.3f} "
+                              f"sink={float(sink):.3f} "
+                              f"w={float(torch.exp(m - top) / den):.4f}", flush=True)
+                    attn[i, h * D:(h + 1) * D] = (e @ V[:, kh]) * (
+                        torch.exp(m - top) / den)
             attn = attn.reshape(t, Q_HEADS, D) * torch.sigmoid(gate.reshape(t, Q_HEADS, D))
             y = act_plane(bf16(attn.reshape(t, Q)), t) @ lp["out"].t()       # [T,H] fp32
+            if os.environ.get("INK2_STAGE"):
+                def _r(x):
+                    return float(x.detach().float().pow(2).mean().sqrt())
+                print(f"[refstage] v{v:02d} L{vp['layer']:02d} "
+                      f"q={_r(qs):.4f} sinks={_r(sinks):.4f} gate={_r(gate):.4f} "
+                      f"attn_gated={_r(attn):.4f} y_pre_conv={_r(y):.4f}", flush=True)
+                if vp["layer"] < 4:
+                    kbias = (lp["distances"][dists[:1]] @ rs[0].t())[0]  # [Q]
+                    hh = (0, 8, 16)
+                    print("[refstage] L%02d k=%.4f v=%.4f attnh=%s " % (
+                        vp["layer"], _r(K[0]), _r(V[0]),
+                        " ".join(f"h{h}:{_r(attn[0, h]):.4f}" for h in hh)) + " " +
+                        " ".join(
+                        f"h{h}:s={float(((K[:, h // GROUP] @ qs[0, h]) * (1.0 / math.sqrt(D))).mean()):.3f},b={float(kbias[h]):.3f},sink={float(sinks[0, h]):.3f}"
+                        for h in hh), flush=True)
 
             # --- attention residual (start pushes block) + ffn input
             if vp["start"]:
